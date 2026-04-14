@@ -108,7 +108,6 @@ Nos comprometemos a cumplir con este acuerdo, revisarlo al inicio de cada sprint
 | N° | Apellidos y Nombres | Firma | Fecha |
 |:---|:---|:---|:---|
 | 1 | Tapia De La Cruz Jhann Pier | _________________ | 24/03/2026 |
-| 2 | Alberto Rolibert Patiño Reynoso | _________________ | 24/03/2026 |
-| 3 | Mendez Roca Kevin | _________________ | 24/03/2026 |
-| 4 | Condor Aliaga Brayan Pedro | _________________ | 24/03/2026 |
-| 5 | Taquiri Rojas Phol Edwin | _________________ | 24/03/2026 |
+| 2 | Mendez Roca Kevin | _________________ | 24/03/2026 |
+| 3 | Condor Aliaga Brayan Pedro | _________________ | 24/03/2026 |
+| 4 | Taquiri Rojas Phol Edwin | _________________ | 24/03/2026 |
