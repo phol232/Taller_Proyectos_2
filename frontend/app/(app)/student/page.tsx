@@ -1,9 +1,9 @@
 "use client";
 
 import { useAuthStore } from "@/store/auth.store";
+import { useTranslation } from "@/lib/i18n";
 import PageShell from "@/components/layout/PageShell";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -14,80 +14,39 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-interface QuickAction {
-  title:       string;
-  description: string;
-  href:        string;
-  icon:        React.ReactNode;
-  iconBg:      string;
-}
-
-const QUICK_ACTIONS: QuickAction[] = [
-  {
-    title:       "Mi Horario",
-    description: "Consulta tu horario asignado para el ciclo actual.",
-    href:        "/student/my-schedule",
-    icon:        <CalendarDays className="h-5 w-5 text-blue-600" />,
-    iconBg:      "bg-blue-50",
-  },
-  {
-    title:       "Ver Horarios",
-    description: "Explora los horarios disponibles de todas las secciones.",
-    href:        "/student/schedule/generate",
-    icon:        <BookOpen className="h-5 w-5 text-purple-600" />,
-    iconBg:      "bg-purple-50",
-  },
-  {
-    title:       "Armar Horario",
-    description: "Crea tu combinación ideal de cursos sin conflictos.",
-    href:        "/student/schedule/builder",
-    icon:        <Sparkles className="h-5 w-5 text-amber-600" />,
-    iconBg:      "bg-amber-50",
-  },
-];
-
-const INFO_CARDS = [
-  {
-    label: "Ciclo actual",
-    value: "2025-I",
-    sub:   "Semestre en curso",
-    icon:  <Clock className="h-4 w-4 text-gray-400" />,
-  },
-  {
-    label: "Cursos matriculados",
-    value: "—",
-    sub:   "Disponible en Fase 3",
-    icon:  <CheckCircle2 className="h-4 w-4 text-gray-400" />,
-  },
-  {
-    label: "Créditos",
-    value: "—",
-    sub:   "Disponible en Fase 3",
-    icon:  <BookOpen className="h-4 w-4 text-gray-400" />,
-  },
-];
-
 export default function StudentHomePage() {
   const { user } = useAuthStore();
+  const { t } = useTranslation();
+  const firstName = user?.name?.split(" ")[0] ?? t.student.fallbackName;
 
-  const firstName = user?.name?.split(" ")[0] ?? "Estudiante";
+  const QUICK_ACTIONS = [
+    { title: t.student.actions.myScheduleTitle,    description: t.student.actions.myScheduleDesc,    href: "/student/my-schedule",          icon: <CalendarDays className="h-5 w-5" /> },
+    { title: t.student.actions.viewSchedulesTitle, description: t.student.actions.viewSchedulesDesc, href: "/student/schedule/generate",    icon: <BookOpen className="h-5 w-5" /> },
+    { title: t.student.actions.buildScheduleTitle, description: t.student.actions.buildScheduleDesc, href: "/student/schedule/builder",     icon: <Sparkles className="h-5 w-5" /> },
+  ];
+
+  const INFO_CARDS = [
+    { label: t.student.info.activeCycle,      value: t.student.info.activeCycleValue,  sub: t.student.info.activeCycleDesc,      icon: <Clock className="h-4 w-4" /> },
+    { label: t.student.info.enrolledCourses,  value: "—",                               sub: t.student.info.enrolledCoursesDesc,  icon: <CheckCircle2 className="h-4 w-4" /> },
+    { label: t.student.info.credits,          value: "—",                               sub: t.student.info.creditsDesc,          icon: <BookOpen className="h-4 w-4" /> },
+  ];
 
   return (
     <PageShell
-      title={`Hola, ${firstName} 👋`}
-      description="Bienvenido a tu panel de horarios. Aquí puedes gestionar y consultar tu agenda académica."
+      title={t.student.title.replace("{name}", firstName)}
+      description={t.student.description}
     >
       {/* Tarjetas de resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {INFO_CARDS.map((card) => (
-          <Card key={card.label} className="p-4 bg-white border border-gray-100 shadow-none rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+          <Card key={card.label} className="p-5 bg-white dark:bg-[#1a1a1a] border border-gray-100 dark:border-white/8 shadow-none rounded-xl">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-gray-400 font-semibold uppercase tracking-widest">
                 {card.label}
               </span>
-              {card.icon}
+              <span style={{ color: "#6B21A8" }}>{card.icon}</span>
             </div>
-            <p className="text-2xl font-semibold text-vercel-black tracking-tight">
+            <p className="text-2xl font-semibold text-[#171717] dark:text-white tracking-tight">
               {card.value}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">{card.sub}</p>
@@ -96,35 +55,40 @@ export default function StudentHomePage() {
       </div>
 
       {/* Acciones rápidas */}
-      <h2 className="text-sm font-medium text-gray-500 uppercase tracking-widest mb-3">
-        Acciones rápidas
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+        {t.student.quickActions}
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {QUICK_ACTIONS.map((action) => (
-          <Card
-            key={action.href}
-            className="group p-5 bg-white border border-gray-100 shadow-none rounded-xl hover:border-gray-300 hover:shadow-sm transition-all cursor-pointer"
-          >
-            <Link href={action.href} className="flex flex-col gap-3 h-full">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${action.iconBg}`}>
-                {action.icon}
-              </div>
+          <Link key={action.href} href={action.href} className="group block">
+            <Card className="p-5 bg-white dark:bg-[#1a1a1a] border border-gray-100 dark:border-white/8 shadow-none rounded-xl hover:border-gray-200 dark:hover:border-white/15 hover:shadow-sm transition-all h-full">
+              <div className="flex flex-col gap-3 h-full">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: "rgba(107,33,168,0.07)", color: "#6B21A8" }}
+                >
+                  {action.icon}
+                </div>
 
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-vercel-black mb-0.5">
-                  {action.title}
-                </h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  {action.description}
-                </p>
-              </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-[#171717] dark:text-white mb-1 group-hover:text-[#6B21A8] transition-colors">
+                    {action.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {action.description}
+                  </p>
+                </div>
 
-              <div className="flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-vercel-black transition-colors mt-1">
-                Ir ahora
-                <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                <div
+                  className="flex items-center gap-1 text-xs font-medium transition-colors mt-1"
+                  style={{ color: "rgba(107,33,168,0.5)" }}
+                >
+                  {t.common.goNow}
+                  <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                </div>
               </div>
-            </Link>
-          </Card>
+            </Card>
+          </Link>
         ))}
       </div>
     </PageShell>

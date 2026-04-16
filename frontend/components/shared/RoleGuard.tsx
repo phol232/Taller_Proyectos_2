@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthStore } from "@/store/auth.store";
+import { useTranslation } from "@/lib/i18n";
 import type { Role } from "@/types/entities";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -18,6 +19,7 @@ interface RoleGuardProps {
  */
 export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const { isAuthenticated, role } = useAuthStore();
+  const { t } = useTranslation();
   const router = useRouter();
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
           Acceso denegado
         </p>
         <p className="text-sm text-gray-500">
-          Tu rol no tiene permiso para acceder a esta sección.
+          {t.common.accessDeniedDesc}
         </p>
       </div>
     );

@@ -21,6 +21,16 @@ Object.defineProperty(window, "location", {
 // Importar el módulo DESPUÉS del mock de sonner
 import api from "@/lib/api";
 
+// Tipo para acceder a los handlers internos del interceptor de Axios
+type InterceptorManager = {
+  handlers: Array<{ rejected: (error: unknown) => Promise<never> }>;
+};
+
+// Helper para invocar el interceptor de error registrado
+function callRejected(error: unknown) {
+  return (api.interceptors.response as unknown as InterceptorManager).handlers[0].rejected(error);
+}
+
 // Helpers para simular el error de Axios como lo hace el interceptor
 function makeAxiosError(
   status: number,
@@ -55,7 +65,7 @@ describe("api.ts — interceptor de respuesta", () => {
     // Simular rechazo con el error desde un endpoint auth
     const error = makeAxiosError(401, "/api/auth/login");
     try {
-      await (api.interceptors.response as never).handlers[0].rejected(error);
+      await callRejected(error);
     } catch {
       // Se espera rechazo
     }
@@ -65,7 +75,7 @@ describe("api.ts — interceptor de respuesta", () => {
   it("401 desde /api/auth/password-reset/verify → NO redirige", async () => {
     const error = makeAxiosError(401, "/api/auth/password-reset/verify");
     try {
-      await (api.interceptors.response as never).handlers[0].rejected(error);
+      await callRejected(error);
     } catch {
       // Se espera rechazo
     }
@@ -77,7 +87,7 @@ describe("api.ts — interceptor de respuesta", () => {
   it("401 desde /api/schedules → redirige a /login", async () => {
     const error = makeAxiosError(401, "/api/schedules");
     try {
-      await (api.interceptors.response as never).handlers[0].rejected(error);
+      await callRejected(error);
     } catch {
       // Se espera rechazo
     }
@@ -89,7 +99,7 @@ describe("api.ts — interceptor de respuesta", () => {
   it("403 → muestra toast 'Sin permisos'", async () => {
     const error = makeAxiosError(403, "/api/some-protected-endpoint");
     try {
-      await (api.interceptors.response as never).handlers[0].rejected(error);
+      await callRejected(error);
     } catch {
       // Se espera rechazo
     }
@@ -101,7 +111,7 @@ describe("api.ts — interceptor de respuesta", () => {
   it("409 → muestra toast 'Conflicto de recurso'", async () => {
     const error = makeAxiosError(409, "/api/schedules", { message: "Ya asignado" });
     try {
-      await (api.interceptors.response as never).handlers[0].rejected(error);
+      await callRejected(error);
     } catch {
       // Se espera rechazo
     }
@@ -113,7 +123,7 @@ describe("api.ts — interceptor de respuesta", () => {
   it("500 → muestra toast 'Error del servidor'", async () => {
     const error = makeAxiosError(500, "/api/schedules");
     try {
-      await (api.interceptors.response as never).handlers[0].rejected(error);
+      await callRejected(error);
     } catch {
       // Se espera rechazo
     }
@@ -126,7 +136,7 @@ describe("api.ts — interceptor de respuesta", () => {
     const networkError = new axios.AxiosError("Network Error");
     // Sin networkError.response → simula fallo de red
     try {
-      await (api.interceptors.response as never).handlers[0].rejected(networkError);
+      await callRejected(networkError);
     } catch {
       // Se espera rechazo
     }
@@ -138,7 +148,7 @@ describe("api.ts — interceptor de respuesta", () => {
   it("siempre rechaza con el error original", async () => {
     const error = makeAxiosError(500, "/api/test");
     await expect(
-      (api.interceptors.response as never).handlers[0].rejected(error)
+      callRejected(error)
     ).rejects.toThrow();
   });
 });

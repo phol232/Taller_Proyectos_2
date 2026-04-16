@@ -2,6 +2,7 @@
 
 // TODO Fase 1: Implementar tabla reutilizable con ordenamiento, búsqueda y paginación
 // Basada en Table de shadcn/ui
+import { useTranslation } from "@/lib/i18n";
 
 export interface Column<T> {
   key: keyof T;
@@ -21,6 +22,7 @@ export default function DataTable<T extends { id: string }>({
   data,
   isLoading = false,
 }: DataTableProps<T>) {
+  const { t } = useTranslation();
   if (isLoading) {
     return <div className="animate-pulse h-40 rounded-lg bg-gray-50 card-border" />;
   }
@@ -54,7 +56,7 @@ export default function DataTable<T extends { id: string }>({
       </table>
       {data.length === 0 && (
         <div className="flex items-center justify-center py-16 text-gray-400 text-sm">
-          Sin registros
+          {t.common.noRecords}
         </div>
       )}
     </div>
