@@ -1,0 +1,42 @@
+services:
+
+  # ── Base de datos PostgreSQL ────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: planner-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: horarios_db
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d horarios_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend Spring Boot ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend/horarios_api
+      dockerfile: Dockerfile
+    container_name: planner-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/horarios_api/.env
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/horarios_db
+      TZ: America/Lima
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
