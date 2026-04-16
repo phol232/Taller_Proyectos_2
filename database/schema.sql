@@ -281,17 +281,3 @@ CREATE TRIGGER trg_users_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION fn_set_updated_at();
 
--- ============================================================
---  DATOS INICIALES (ajustar antes de producción)
--- ============================================================
-
--- Insertar usuario administrador inicial.
--- Cambiar la contraseña (BCrypt de 'ChangeMe123!') antes de usar en producción.
--- INSERT INTO users (email, password_hash, full_name, role, email_verified)
--- VALUES (
---     'admin@universidad.cl',
---     '$2a$12$K8PqxwNQm1wMvJzc0OuPCOqfO3UQzO5fLn3X9TqZE4qMZxGnf7gRm',
---     'Administrador del Sistema',
---     'ADMIN',
---     TRUE
--- );
