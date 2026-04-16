@@ -25,10 +25,9 @@ Desarrollar y entregar el Producto Mínimo Viable (PMV) del sistema Planner UC d
 | N° | Apellidos y Nombres | Rol | Responsabilidades Clave |
 |:---|:---|:---|:---|
 | 1 | Tapia De La Cruz Jhann Pier | Gerente de Proyecto | Planificación del proyecto, coordinación del equipo, gestión del cronograma, seguimiento de avances y toma de decisiones generales. |
-| 2 | Alberto Rolibert Patiño Reynoso | Desarrollador Backend | Desarrollo de la API REST, implementación de la lógica de negocio, integración con la base de datos y soporte al algoritmo de generación de horarios. |
+| 2 | Taquiri Rojas Phol Edwin | Desarrollador Backend | Desarrollo de la API REST, implementación de la lógica de negocio, integración con la base de datos y soporte al algoritmo de generación de horarios. |
 | 3 | Mendez Roca Kevin | Tester (QA) | Diseño y ejecución de pruebas unitarias e integración, validación del sistema, identificación de defectos y aseguramiento de calidad. Responsable de alcanzar cobertura ≥ 70% en módulos críticos. |
 | 4 | Condor Aliaga Brayan Pedro | Desarrollador Frontend | Desarrollo de la interfaz SPA, implementación de vistas, integración con la API REST y mejora de experiencia de usuario. |
-| 5 | Taquiri Rojas Phol Edwin | Líder de Desarrollo | Supervisión técnica del proyecto, definición de arquitectura, apoyo en backend/frontend y validación de decisiones técnicas. |
 
 ---
 
@@ -109,7 +108,6 @@ Nos comprometemos a cumplir con este acuerdo, revisarlo al inicio de cada sprint
 | N° | Apellidos y Nombres | Firma | Fecha |
 |:---|:---|:---|:---|
 | 1 | Tapia De La Cruz Jhann Pier | _________________ | 24/03/2026 |
-| 2 | Alberto Rolibert Patiño Reynoso | _________________ | 24/03/2026 |
-| 3 | Mendez Roca Kevin | _________________ | 24/03/2026 |
-| 4 | Condor Aliaga Brayan Pedro | _________________ | 24/03/2026 |
-| 5 | Taquiri Rojas Phol Edwin | _________________ | 24/03/2026 |
+| 2 | Mendez Roca Kevin | _________________ | 24/03/2026 |
+| 3 | Condor Aliaga Brayan Pedro | _________________ | 24/03/2026 |
+| 4 | Taquiri Rojas Phol Edwin | _________________ | 24/03/2026 |
