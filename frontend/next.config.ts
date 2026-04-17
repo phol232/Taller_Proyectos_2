@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Genera un servidor Node.js standalone, requerido por el Dockerfile de producción
-  output: "standalone",
+  // "standalone" solo para Docker; Vercel gestiona su propio build
+  ...(process.env.VERCEL ? {} : { output: "standalone" }),
   async headers() {
     return [
       {
