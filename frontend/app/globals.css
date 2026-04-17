@@ -15,6 +15,13 @@
   --color-pure-white:   #ffffff;
   --color-true-black:   #000000;
 
+  /* UC Purple — color de acento institucional */
+  --color-uc-purple:       #6B21A8;
+  --color-uc-purple-dark:  #4C1278;
+  --color-uc-purple-mid:   #7C3AED;
+  --color-uc-purple-light: #F3E8FF;
+  --color-uc-purple-bg:    rgba(107, 33, 168, 0.06);
+
   /* Acentos de flujo de trabajo */
   --color-develop-blue:  #0a72ef;
   --color-preview-pink:  #de1d8d;
@@ -83,18 +90,19 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /* UC Purple como color primario */
+  --primary: oklch(0.38 0.18 295);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent: oklch(0.96 0.04 295);
+  --accent-foreground: oklch(0.38 0.18 295);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.55 0.18 295);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

@@ -28,11 +28,20 @@ export function useExport() {
   const exportToExcel = useCallback(async (data: Record<string, unknown>[], sheetName = "Horario") => {
     setIsExporting(true);
     try {
-      const XLSX = await import("xlsx");
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      XLSX.writeFile(wb, "horario-planner-uc.xlsx");
+      const ExcelJS = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      const ws = workbook.addWorksheet(sheetName);
+      const keys = Object.keys(data[0] ?? {});
+      ws.addRow(keys);
+      data.forEach((row) => ws.addRow(keys.map((k) => row[k])));
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "horario-planner-uc.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
     } finally {
       setIsExporting(false);
     }

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { FormField } from "@/components/shared/FormField";
 import api from "@/lib/api";
 import { toastError, toastSuccess } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
 const UC = {
   purple:      "#6B21A8",
@@ -21,6 +22,7 @@ type Step = "email" | "code" | "password" | "success";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [step, setStep]             = useState<Step>("email");
   const [email, setEmail]           = useState("");
@@ -41,11 +43,11 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed) {
-      setEmailError("El correo es obligatorio.");
+      setEmailError(t.forgotPassword.emailRequired);
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setEmailError("Ingresa un correo institucional válido.");
+      setEmailError(t.forgotPassword.emailInvalid);
       return;
     }
     setLoading(true);
@@ -53,11 +55,11 @@ export default function ForgotPasswordPage() {
       await api.post("/api/auth/password-reset/request", { email });
       setStep("code");
       setTimeout(() => codeRefs.current[0]?.focus(), 80);
-      toastSuccess("Código enviado", "Revisa tu bandeja de entrada (y la carpeta de spam).");
+      toastSuccess(t.forgotPassword.codeSent, t.forgotPassword.codeSentDesc);
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } })?.response?.status;
       if (status === 429) {
-        toastError("Demasiadas solicitudes", "Espera unos minutos antes de solicitar otro código.");
+        toastError(t.forgotPassword.tooManyRequests, t.forgotPassword.tooManyRequestsDesc);
       }
       // Para cualquier otro error, mostramos mensaje genérico
       // (el backend tampoco revela si el correo existe)
@@ -94,11 +96,11 @@ export default function ForgotPasswordPage() {
       const status = (err as { response?: { status: number } })?.response?.status;
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       if (status === 429) {
-        toastError("Demasiados intentos", "Solicita un nuevo código de verificación.");
+        toastError(t.forgotPassword.tooManyAttempts, t.forgotPassword.tooManyAttemptsDesc);
         setCode(["", "", "", "", "", ""]);
         setStep("email");
       } else {
-        toastError("Código incorrecto", message ?? "El código es inválido o ya expiró.");
+        toastError(t.forgotPassword.invalidCode, message ?? t.forgotPassword.invalidCodeDesc);
         setCode(["", "", "", "", "", ""]);
         setTimeout(() => codeRefs.current[0]?.focus(), 80);
       }
@@ -111,9 +113,9 @@ export default function ForgotPasswordPage() {
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     const newErrors = { newPass: "", confirm: "" };
-    if (newPass.length < 8) newErrors.newPass = "Mínimo 8 caracteres.";
-    if (!confirm) newErrors.confirm = "Repite la nueva contraseña.";
-    else if (newPass !== confirm) newErrors.confirm = "Las contraseñas no coinciden.";
+    if (newPass.length < 8) newErrors.newPass = t.forgotPassword.minChars;
+    if (!confirm) newErrors.confirm = t.forgotPassword.repeatPassword;
+    else if (newPass !== confirm) newErrors.confirm = t.forgotPassword.passwordsMismatch;
     if (newErrors.newPass || newErrors.confirm) {
       setNewPassError(newErrors.newPass);
       setConfirmError(newErrors.confirm);
@@ -129,12 +131,12 @@ export default function ForgotPasswordPage() {
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } })?.response?.status;
       if (status === 400) {
-        toastError("Enlace expirado", "El tiempo de recuperación expiró. Inicia el proceso nuevamente.");
+        toastError(t.forgotPassword.linkExpired, t.forgotPassword.linkExpiredDesc);
         setStep("email");
         setCode(["", "", "", "", "", ""]);
         setResetToken("");
       } else {
-        toastError("Error al actualizar", "No se pudo cambiar la contraseña. Inténtalo de nuevo.");
+        toastError(t.forgotPassword.updateError, t.forgotPassword.updateErrorDesc);
       }
     } finally {
       setLoading(false);
@@ -146,12 +148,12 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     try {
       await api.post("/api/auth/password-reset/request", { email });
-      toastSuccess("Nuevo código enviado", "Revisa tu bandeja de entrada.");
+      toastSuccess(t.forgotPassword.newCodeSent, t.forgotPassword.newCodeSentDesc);
       setTimeout(() => codeRefs.current[0]?.focus(), 80);
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } })?.response?.status;
       if (status === 429) {
-        toastError("Demasiadas solicitudes", "Espera unos minutos antes de solicitar otro código.");
+        toastError(t.forgotPassword.tooManyRequests, t.forgotPassword.tooManyRequestsDesc);
       }
     } finally {
       setLoading(false);
@@ -176,7 +178,7 @@ export default function ForgotPasswordPage() {
           </div>
           <div>
             <span className="text-lg font-semibold text-white tracking-tight">Planner UC</span>
-            <p className="text-[10px] text-white/50 leading-none">Sistema de Gestión Académica</p>
+            <p className="text-[10px] text-white/50 leading-none">{t.login.academicSystem}</p>
           </div>
         </div>
 
@@ -185,21 +187,20 @@ export default function ForgotPasswordPage() {
             Universidad Continental
           </p>
           <h2 className="text-3xl font-bold text-white leading-snug">
-            Recupera el acceso
+            {t.forgotPassword.title}
             <br />
-            <span className="text-pink-200">a tu cuenta.</span>
+            <span className="text-pink-200">{t.forgotPassword.titleHighlight}</span>
           </h2>
           <p className="text-sm text-white/60 leading-relaxed">
-            Sigue los pasos para verificar tu identidad y establecer una
-            nueva contraseña segura para tu cuenta institucional.
+            {t.forgotPassword.subtitle}
           </p>
 
           {/* Pasos visuales */}
           <div className="space-y-3 pt-2">
             {[
-              { icon: Mail,         label: "Ingresa tu correo institucional" },
-              { icon: KeyRound,     label: "Verifica el código enviado" },
-              { icon: Lock,         label: "Establece una nueva contraseña" },
+              { icon: Mail,         label: t.forgotPassword.step1 },
+              { icon: KeyRound,     label: t.forgotPassword.step2 },
+              { icon: Lock,         label: t.forgotPassword.step3 },
             ].map(({ icon: Icon, label }, i) => (
               <div key={label} className="flex items-center gap-3">
                 <div
@@ -223,7 +224,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         <p className="text-xs text-white/25">
-          © {new Date().getFullYear()} Planner UC — Universidad Continental
+          © {new Date().getFullYear()} {t.forgotPassword.copyright}
         </p>
       </div>
 
@@ -239,7 +240,7 @@ export default function ForgotPasswordPage() {
             disabled={step === "success"}
           >
             <ArrowLeft className="h-4 w-4" />
-            {step === "email" ? "Volver al inicio de sesión" : "Paso anterior"}
+            {step === "email" ? t.forgotPassword.backToLogin : t.forgotPassword.previousStep}
           </button>
 
           {/* Indicador de pasos */}
@@ -270,9 +271,9 @@ export default function ForgotPasswordPage() {
                 >
                   <Mail className="h-6 w-6" style={{ color: UC.purple }} />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">¿Olvidaste tu contraseña?</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t.forgotPassword.forgotPasswordTitle}</h1>
                 <p className="text-sm text-gray-500">
-                  Ingresa tu correo institucional. Te enviaremos un código de verificación de 6 dígitos.
+                  {t.forgotPassword.forgotPasswordDesc}
                 </p>
               </div>
 
@@ -285,7 +286,7 @@ export default function ForgotPasswordPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="usuario@continental.edu.pe"
+                    placeholder={t.forgotPassword.emailPlaceholder}
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); emailError && setEmailError(""); }}
                     aria-invalid={!!emailError}
@@ -297,7 +298,7 @@ export default function ForgotPasswordPage() {
                   disabled={loading}
                   style={{ backgroundColor: UC.purple }}
                 >
-                  {loading ? "Enviando código…" : "Enviar código de verificación"}
+                  {loading ? t.forgotPassword.sendingCode : t.forgotPassword.sendCode}
                 </Button>
               </form>
             </div>
@@ -313,17 +314,16 @@ export default function ForgotPasswordPage() {
                 >
                   <KeyRound className="h-6 w-6" style={{ color: UC.purple }} />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">Código de verificación</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t.forgotPassword.verificationCode}</h1>
                 <p className="text-sm text-gray-500">
-                  Ingresa el código de 6 dígitos que enviamos a{" "}
+                  {t.forgotPassword.verificationCodeDesc.replace("{email}", "")}
                   <span className="font-semibold text-gray-700">{email}</span>.
-                  Válido por 10 minutos.
                 </p>
               </div>
 
               <form onSubmit={handleVerifyCode} className="space-y-6">
                 <div className="space-y-3">
-                  <Label>Código de 6 dígitos</Label>
+                  <Label>{t.forgotPassword.codeLabel}</Label>
                   <div className="flex gap-3">
                     {code.map((digit, i) => (
                       <input
@@ -335,7 +335,7 @@ export default function ForgotPasswordPage() {
                         value={digit}
                         onChange={(e) => handleDigitChange(i, e.target.value)}
                         onKeyDown={(e) => handleDigitKeyDown(i, e)}
-                        aria-label={`Dígito ${i + 1}`}
+                        aria-label={t.forgotPassword.digitLabel.replace("{n}", String(i + 1))}
                         className="h-14 w-full rounded-lg border border-input bg-background text-center text-xl font-bold shadow-sm outline-none transition focus:border-transparent focus:ring-2"
                         style={{ "--tw-ring-color": UC.purple } as React.CSSProperties}
                       />
@@ -349,11 +349,11 @@ export default function ForgotPasswordPage() {
                   disabled={loading || code.join("").length < 6}
                   style={{ backgroundColor: UC.purple }}
                 >
-                  {loading ? "Verificando…" : "Verificar código"}
+                  {loading ? t.forgotPassword.verifying : t.forgotPassword.verifyCode}
                 </Button>
 
                 <p className="text-center text-sm text-gray-500">
-                  ¿No recibiste el código?{" "}
+                  {t.forgotPassword.noCode}{" "}
                   <button
                     type="button"
                     className="font-medium hover:underline"
@@ -361,7 +361,7 @@ export default function ForgotPasswordPage() {
                     onClick={handleResendCode}
                     disabled={loading}
                   >
-                    Reenviar
+                    {t.forgotPassword.resend}
                   </button>
                 </p>
               </form>
@@ -378,15 +378,15 @@ export default function ForgotPasswordPage() {
                 >
                   <Lock className="h-6 w-6" style={{ color: UC.purple }} />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">Nueva contraseña</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t.forgotPassword.newPassword}</h1>
                 <p className="text-sm text-gray-500">
-                  Elige una contraseña segura de al menos 8 caracteres.
+                  {t.forgotPassword.newPasswordDesc}
                 </p>
               </div>
 
               <form onSubmit={handleChangePassword} noValidate className="space-y-5">
                 <FormField
-                  label="Nueva contraseña"
+                  label={t.forgotPassword.newPasswordLabel}
                   htmlFor="new-pass"
                   error={newPassError}
                 >
@@ -394,7 +394,7 @@ export default function ForgotPasswordPage() {
                     <Input
                       id="new-pass"
                       type={showNew ? "text" : "password"}
-                      placeholder="Mínimo 8 caracteres"
+                      placeholder={t.forgotPassword.newPasswordPlaceholder}
                       value={newPass}
                       onChange={(e) => { setNewPass(e.target.value); newPassError && setNewPassError(""); }}
                       aria-invalid={!!newPassError}
@@ -412,7 +412,7 @@ export default function ForgotPasswordPage() {
                 </FormField>
 
                 <FormField
-                  label="Confirmar contraseña"
+                  label={t.forgotPassword.confirmPasswordLabel}
                   htmlFor="confirm-pass"
                   error={confirmError}
                 >
@@ -420,7 +420,7 @@ export default function ForgotPasswordPage() {
                     <Input
                       id="confirm-pass"
                       type={showConfirm ? "text" : "password"}
-                      placeholder="Repite la nueva contraseña"
+                      placeholder={t.forgotPassword.confirmPasswordPlaceholder}
                       value={confirm}
                       onChange={(e) => { setConfirm(e.target.value); confirmError && setConfirmError(""); }}
                       aria-invalid={!!confirmError}
@@ -443,7 +443,7 @@ export default function ForgotPasswordPage() {
                   disabled={loading || newPass !== confirm || newPass.length < 8}
                   style={{ backgroundColor: UC.purple }}
                 >
-                  {loading ? "Guardando…" : "Establecer nueva contraseña"}
+                  {loading ? t.forgotPassword.saving : t.forgotPassword.setNewPassword}
                 </Button>
               </form>
             </div>
@@ -459,10 +459,9 @@ export default function ForgotPasswordPage() {
                 <CheckCircle2 className="h-10 w-10" style={{ color: UC.purple }} />
               </div>
               <div className="space-y-2">
-                <h1 className="text-2xl font-bold text-gray-900">¡Contraseña actualizada!</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t.forgotPassword.passwordUpdated}</h1>
                 <p className="text-sm text-gray-500 max-w-sm">
-                  Tu contraseña fue cambiada correctamente. Ya puedes iniciar sesión
-                  con tus nuevas credenciales.
+                  {t.forgotPassword.passwordUpdatedDesc}
                 </p>
               </div>
               <Button
@@ -470,7 +469,7 @@ export default function ForgotPasswordPage() {
                 style={{ backgroundColor: UC.purple }}
                 onClick={() => router.push("/login")}
               >
-                Ir al inicio de sesión
+                {t.forgotPassword.goToLogin}
               </Button>
             </div>
           )}
@@ -478,7 +477,7 @@ export default function ForgotPasswordPage() {
 
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
-          <span>¿Problemas para recuperar tu cuenta?</span>
+          <span>{t.forgotPassword.recoveryProblems}</span>
           <a
             href="mailto:soporte@continental.edu.pe"
             className="font-medium hover:underline"

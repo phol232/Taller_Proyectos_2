@@ -3,6 +3,7 @@ package online.horarios_api.auth.service;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.horarios_api.auth.dto.AuthResponse;
 import online.horarios_api.auth.dto.LoginRequest;
 import online.horarios_api.auth.dto.UserInfoResponse;
@@ -21,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -45,6 +47,9 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
+        log.info("Login email/password exitoso: userId={} email={} role={}",
+                user.getId(), user.getEmail(), user.getRole());
+
         return issueTokensAndSetCookies(user, httpRequest, httpResponse);
     }
 
@@ -67,6 +72,8 @@ public class AuthService {
 
         User user = refreshTokenService.validateAndRotate(rawRefreshToken);
 
+        log.info("Refresh token rotado: userId={} email={}", user.getId(), user.getEmail());
+
         return issueTokensAndSetCookies(user, httpRequest, httpResponse);
     }
 
@@ -74,6 +81,7 @@ public class AuthService {
     public void logout(String rawRefreshToken, HttpServletResponse httpResponse) {
         refreshTokenService.revokeToken(rawRefreshToken);
         cookieService.clearAuthCookies(httpResponse);
+        log.info("Logout exitoso: refresh token revocado");
     }
 
     @Transactional
@@ -84,6 +92,7 @@ public class AuthService {
                         "Usuario no encontrado"));
         refreshTokenService.revokeAllTokensForUser(user);
         cookieService.clearAuthCookies(httpResponse);
+        log.info("Logout-all exitoso: userId={} email={}", user.getId(), user.getEmail());
     }
 
     @Transactional(readOnly = true)
