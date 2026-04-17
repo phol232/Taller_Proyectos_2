@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // "standalone" solo para Docker; Vercel gestiona su propio build
-  ...(process.env.VERCEL ? {} : { output: "standalone" }),
+  // "standalone" solo para Docker; Vercel y Cloudflare Pages gestionan su propio build
+  ...(process.env.VERCEL || process.env.CF_PAGES ? {} : { output: "standalone" }),
   async headers() {
     return [
       {
@@ -19,3 +19,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+

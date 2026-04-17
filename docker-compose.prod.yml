@@ -13,8 +13,8 @@ services:
       TZ: America/Lima
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://host.docker.internal:5432/horarios_db
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
