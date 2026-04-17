@@ -48,6 +48,9 @@ dependencies {
     // Dev Tools
     developmentOnly("org.springframework.boot:spring-boot-devtools")
 
+    // Actuator → /actuator/health endpoint for Docker healthcheck
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+
     // Spring Mail (JavaMailSender → envío de correos SMTP)
     implementation("org.springframework.boot:spring-boot-starter-mail")
 
