@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Genera un servidor Node.js standalone, requerido por el Dockerfile de producción
+  output: "standalone",
   async headers() {
     return [
       {
