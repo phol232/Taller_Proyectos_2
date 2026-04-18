@@ -2,6 +2,7 @@ package online.horarios_api.token.service;
 
 import lombok.RequiredArgsConstructor;
 import online.horarios_api.config.JwtProperties;
+import online.horarios_api.token.dto.SessionResponse;
 import online.horarios_api.token.entity.RefreshToken;
 import online.horarios_api.token.repository.RefreshTokenRepository;
 import online.horarios_api.user.entity.User;
@@ -17,6 +18,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -74,6 +77,32 @@ public class RefreshTokenService {
     @Transactional
     public void revokeAllTokensForUser(User user) {
         refreshTokenRepository.revokeAllByUserId(user.getId(), Instant.now());
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponse> listActiveSessions(UUID userId) {
+        return refreshTokenRepository
+                .findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(userId, Instant.now())
+                .stream()
+                .map(t -> new SessionResponse(
+                        t.getId(),
+                        t.getIpAddress(),
+                        t.getUserAgent(),
+                        t.getCreatedAt(),
+                        t.getExpiresAt()))
+                .toList();
+    }
+
+    @Transactional
+    public void revokeSessionById(UUID sessionId, UUID requestingUserId) {
+        RefreshToken token = refreshTokenRepository.findById(sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sesión no encontrada"));
+        if (!token.getUser().getId().equals(requestingUserId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No autorizado");
+        }
+        if (!token.isRevoked()) {
+            refreshTokenRepository.revokeByTokenHash(token.getTokenHash(), Instant.now());
+        }
     }
 
     @Scheduled(fixedRateString = "PT6H")

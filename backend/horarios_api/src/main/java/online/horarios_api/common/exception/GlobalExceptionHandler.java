@@ -1,6 +1,7 @@
 package online.horarios_api.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import online.horarios_api.profile.exception.DuplicateProfileFieldException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -79,6 +80,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ApiError("VALIDATION_ERROR", "Datos de entrada inválidos.", errors));
+    }
+
+    @ExceptionHandler(DuplicateProfileFieldException.class)
+    public ResponseEntity<ApiError> handleDuplicateProfileField(DuplicateProfileFieldException ex) {
+        log.warn("Campo de perfil duplicado: campo={} mensaje={}", ex.getField(), ex.getMessage());
+        Map<String, String> fieldErrors = Map.of(ex.getField(), ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ApiError("DUPLICATE_PROFILE_FIELD", ex.getMessage(), fieldErrors));
     }
 
     @ExceptionHandler(Exception.class)

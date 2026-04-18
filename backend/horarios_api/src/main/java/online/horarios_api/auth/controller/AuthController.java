@@ -10,11 +10,16 @@ import online.horarios_api.auth.dto.AuthResponse;
 import online.horarios_api.auth.dto.LoginRequest;
 import online.horarios_api.auth.dto.UserInfoResponse;
 import online.horarios_api.auth.service.AuthService;
+import online.horarios_api.token.dto.SessionResponse;
+import online.horarios_api.token.service.RefreshTokenService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
 
 
 @RestController
@@ -24,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final RefreshTokenService refreshTokenService;
 
     @Operation(summary = "Login con email y contraseña",
                description = "Emite access token y refresh token en cookies httpOnly.")
@@ -80,6 +86,26 @@ public class AuthController {
             HttpServletResponse httpResponse) {
 
         authService.logoutAll(jwt, httpResponse);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Listar sesiones activas del usuario")
+    @GetMapping("/sessions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<SessionResponse>> listSessions(
+            @AuthenticationPrincipal Jwt jwt) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        return ResponseEntity.ok(refreshTokenService.listActiveSessions(userId));
+    }
+
+    @Operation(summary = "Revocar una sesión específica por ID")
+    @DeleteMapping("/sessions/{sessionId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> revokeSession(
+            @PathVariable UUID sessionId,
+            @AuthenticationPrincipal Jwt jwt) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        refreshTokenService.revokeSessionById(sessionId, userId);
         return ResponseEntity.noContent().build();
     }
 }
