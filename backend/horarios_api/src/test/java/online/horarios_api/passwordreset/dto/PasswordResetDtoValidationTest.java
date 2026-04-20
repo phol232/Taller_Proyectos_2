@@ -2,6 +2,9 @@ package online.horarios_api.passwordreset.dto;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import online.horarios_api.passwordreset.infrastructure.in.web.dto.ForgotPasswordRequest;
+import online.horarios_api.passwordreset.infrastructure.in.web.dto.ResetPasswordRequest;
+import online.horarios_api.passwordreset.infrastructure.in.web.dto.VerifyOtpRequest;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
