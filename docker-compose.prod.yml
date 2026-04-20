@@ -3,7 +3,6 @@ services:
   # ── Base de datos PostgreSQL ────────────────────────────────
   db:
     image: postgres:16-alpine
-    container_name: planner-db-prod
     restart: always
     env_file:
       - .env
@@ -21,18 +20,10 @@ services:
       retries: 5
     networks:
       - app-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "5"
 
   # ── Backend Spring Boot ─────────────────────────────────────
   backend:
-    build:
-      context: ./backend/horarios_api
-      dockerfile: Dockerfile.prod
-    container_name: planner-backend-prod
+    image: ghcr.io/phol232/horarios-backend:latest
     restart: always
     env_file:
       - .env
@@ -43,8 +34,7 @@ services:
     expose:
       - "8080"
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
@@ -53,16 +43,11 @@ services:
       start_period: 90s
     networks:
       - app-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "5"
 
 volumes:
   postgres_data:
 
 networks:
   app-network:
-    driver: bridge
-
+    driver: overlay
+    attachable: true
