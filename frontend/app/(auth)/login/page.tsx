@@ -89,6 +89,7 @@ function LoginContent() {
         name: u.fullName,
         email: u.email,
         role: u.role,
+        avatarUrl: u.avatarUrl ?? undefined,
       });
       router.replace("/dashboard");
     } catch (err: unknown) {

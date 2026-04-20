@@ -18,15 +18,18 @@ interface RoleGuardProps {
  * La verificación real de permisos ocurre en el backend.
  */
 export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
-  const { isAuthenticated, role } = useAuthStore();
+  const { isAuthenticated, role, _hasHydrated } = useAuthStore();
   const { t } = useTranslation();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (_hasHydrated && !isAuthenticated) {
       router.replace("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [_hasHydrated, isAuthenticated, router]);
+
+  // Esperar hidratación antes de decidir — evita redirect falso al recargar
+  if (!_hasHydrated) return null;
 
   if (!isAuthenticated) return null;
 

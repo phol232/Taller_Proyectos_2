@@ -24,6 +24,7 @@ export default function CallbackPage() {
           name: data.fullName,
           email: data.email,
           role: data.role,
+          avatarUrl: data.avatarUrl ?? undefined,
         });
         router.replace("/dashboard");
       })

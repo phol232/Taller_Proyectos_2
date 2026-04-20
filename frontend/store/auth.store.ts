@@ -7,6 +7,8 @@ interface AuthState {
   user: User | null;
   role: Role | null;
   isAuthenticated: boolean;
+  _hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
   login: (user: User) => void;
   logout: () => void;
 }
@@ -17,6 +19,9 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       role: null,
       isAuthenticated: false,
+      _hasHydrated: false,
+
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
 
       login: (user) => {
         const normalized = { ...user, role: user.role?.toLowerCase() as Role };
@@ -28,6 +33,9 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "planner-uc-auth",
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
       // Solo persistir datos no sensibles; el JWT viaja en cookie httpOnly
       partialize: (state) => ({
         user: state.user,

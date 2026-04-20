@@ -1,5 +1,5 @@
 import axios from "axios";
-import { toast } from "sonner";
+import { toastError } from "@/lib/utils";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080",
@@ -20,9 +20,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (!error.response) {
-      toast.error("Error de conexión", {
-        description: "No se pudo comunicar con el servidor.",
-      });
+      toastError("Error de conexión", "No se pudo comunicar con el servidor.");
       return Promise.reject(error);
     }
 
@@ -36,19 +34,12 @@ api.interceptors.response.use(
         window.location.replace("/login");
       }
     } else if (status === 403) {
-      toast.error("Sin permisos", {
-        description: "Tu rol no tiene acceso a esta acción.",
-      });
+      toastError("Sin permisos", "Tu rol no tiene acceso a esta acción.");
     } else if (status === 409) {
       // Conflicto de recurso concurrente (RF-09)
-      toast.error("Conflicto de recurso", {
-        description:
-          data?.message ?? "El recurso ya fue asignado por otro usuario.",
-      });
+      toastError("Conflicto de recurso", data?.message ?? "El recurso ya fue asignado por otro usuario.");
     } else if (status >= 500) {
-      toast.error("Error del servidor", {
-        description: "Ocurrió un error interno. Intenta de nuevo.",
-      });
+      toastError("Error del servidor", "Ocurrió un error interno. Intenta de nuevo.");
     }
 
     return Promise.reject(error);

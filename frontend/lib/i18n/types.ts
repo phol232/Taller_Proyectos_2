@@ -25,6 +25,8 @@ export type TranslationDictionary = {
     expandMenu: string;
     collapseMenu: string;
     myProfile: string;
+    settings: string;
+    help: string;
     logout: string;
     nav: {
       home: string;
@@ -42,12 +44,22 @@ export type TranslationDictionary = {
       teachers: string;
       courses: string;
       classrooms: string;
+      account: string;
     };
   };
   navbar: {
     changeTheme: string;
     logout: string;
     logoutLabel: string;
+    notifications: string;
+    noNotifications: string;
+    profileLabel: string;
+    notificationWelcomeTitle: string;
+    notificationWelcomeDesc: string;
+    notificationScheduleTitle: string;
+    notificationScheduleDesc: string;
+    notificationSecurityTitle: string;
+    notificationSecurityDesc: string;
   };
   login: {
     plannerUC: string;
@@ -95,6 +107,22 @@ export type TranslationDictionary = {
     hidePassword: string;
     googleLoginError: string;
   };
+  notFound: {
+    badge: string;
+    title: string;
+    description: string;
+    primaryAction: string;
+    secondaryAction: string;
+    requestedPath: string;
+    statusTitle: string;
+    statusDescription: string;
+    rolloutTitle: string;
+    rolloutDescription: string;
+    outdatedLinkTitle: string;
+    outdatedLinkDescription: string;
+    nextStepTitle: string;
+    nextStepDescription: string;
+  };
   forgotPassword: {
     title: string;
     titleHighlight: string;
@@ -134,6 +162,7 @@ export type TranslationDictionary = {
     recoveryProblems: string;
     emailRequired: string;
     emailInvalid: string;
+    domainNotAllowed: string;
     codeSent: string;
     codeSentDesc: string;
     tooManyRequests: string;
@@ -241,9 +270,26 @@ export type TranslationDictionary = {
   profile: {
     title: string;
     description: string;
+    sectionAccount: string;
+    sectionPersonal: string;
+    fullNameLabel: string;
     emailLabel: string;
     roleLabel: string;
-    userIdLabel: string;
+    dniLabel: string;
+    dniPlaceholder: string;
+    phoneLabel: string;
+    phonePlaceholder: string;
+    sexLabel: string;
+    sexMale: string;
+    sexFemale: string;
+    sexOther: string;
+    sexPreferNotToSay: string;
+    ageLabel: string;
+    agePlaceholder: string;
+    saveChanges: string;
+    saving: string;
+    editProfile: string;
+    readonlyNote: string;
   };
   subpages: {
     students: { title: string; desc: string; phase: string };
@@ -261,4 +307,42 @@ export type TranslationDictionary = {
   };
   exportButton: string;
   weeklyGrid: string;
+  settings: {
+    title: string;
+    description: string;
+    sectionAppearance: string;
+    theme: string;
+    themeLight: string;
+    themeDark: string;
+    themeSystem: string;
+    language: string;
+    langEs: string;
+    langEn: string;
+    sectionNotifications: string;
+    notifEmail: string;
+    notifEmailDesc: string;
+    notifScheduleChanges: string;
+    notifScheduleChangesDesc: string;
+    sectionSessions: string;
+    sessionsDesc: string;
+    sessionCurrentDevice: string;
+    sessionIp: string;
+    sessionCreated: string;
+    sessionExpires: string;
+    revokeSession: string;
+    revokeSessionConfirm: string;
+    revokeSessionSuccess: string;
+    revokeSessionError: string;
+    revokeAllOther: string;
+    revokeAllOtherConfirm: string;
+    revokeAllOtherSuccess: string;
+    loadingSession: string;
+    noOtherSessions: string;
+    sectionDanger: string;
+    dangerDesc: string;
+    closeAllSessions: string;
+    closeAllSessionsDesc: string;
+    closeAllSessionsConfirm: string;
+    closeAllSessionsSuccess: string;
+  };
 };

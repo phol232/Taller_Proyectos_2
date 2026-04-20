@@ -8,8 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 
 /** Toast de error — dura 2 s */
 export const toastError = (title: string, description?: string) =>
-  toast.error(title, { description, duration: 2100 })
+  toast.error(title, { description, duration: 2000 })
 
-/** Toast de éxito — dura 1.5 s */
+/** Toast de éxito — dura 1 s */
 export const toastSuccess = (title: string, description?: string) =>
-  toast.success(title, { description, duration: 1300 })
+  toast.success(title, { description, duration: 1000 })
