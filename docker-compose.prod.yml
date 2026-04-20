@@ -31,8 +31,8 @@ services:
       TZ: America/Lima
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://db:5432/horarios_db
-    expose:
-      - "8080"
+    ports:
+      - "8080:8080"
     depends_on:
       - db
     healthcheck:

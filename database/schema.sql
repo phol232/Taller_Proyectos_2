@@ -91,6 +91,34 @@ CREATE TABLE password_reset_tokens (
 );
 
 -- ============================================================
+--  PERFILES DE USUARIO
+--  HU-XX: Gestión de Perfil de Usuario
+-- ============================================================
+
+-- Tipos enumerados para perfil
+CREATE TYPE sex_type AS ENUM ('MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY');
+
+-- Tabla de perfiles extendidos de usuario.
+-- Separada de 'users' para mantener autenticación desacoplada de datos personales.
+-- Se crea al completar por primera vez el perfil; 1:1 con users.
+CREATE TABLE profiles (
+    id          UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID            NOT NULL,
+    dni         VARCHAR(20),
+    phone       VARCHAR(20),
+    sex         sex_type,
+    age         SMALLINT        CHECK (age IS NULL OR (age >= 0 AND age <= 150)),
+    created_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_profile_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT uq_profiles_user_id UNIQUE (user_id),
+    CONSTRAINT uq_profiles_dni     UNIQUE (dni),
+    CONSTRAINT uq_profiles_phone   UNIQUE (phone)
+);
+
+-- ============================================================
 --  ÍNDICES
 -- ============================================================
 
@@ -272,12 +300,80 @@ BEGIN
 END;
 $$;
 
+-- -----------------------------------------------------------------------
+-- fn_upsert_profile
+-- Crea o actualiza el perfil de un usuario (INSERT ... ON CONFLICT).
+-- Devuelve la fila resultante.
+-- Notas:
+--   · dni y phone tienen restricciones UNIQUE en la tabla; si otro usuario
+--     ya los posee, PostgreSQL lanzará una violación de restricción
+--     (uq_profiles_dni / uq_profiles_phone) que la capa de servicio
+--     debe capturar y convertir en mensaje de error apropiado.
+--   · Se actualiza updated_at mediante el trigger trg_profiles_updated_at.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_upsert_profile(
+    p_user_id UUID,
+    p_dni     VARCHAR(20),
+    p_phone   VARCHAR(20),
+    p_sex     sex_type,
+    p_age     SMALLINT
+)
+RETURNS profiles
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+DECLARE
+    v_profile profiles;
+BEGIN
+    INSERT INTO profiles (user_id, dni, phone, sex, age)
+    VALUES (p_user_id, p_dni, p_phone, p_sex, p_age)
+    ON CONFLICT (user_id) DO UPDATE
+        SET dni   = EXCLUDED.dni,
+            phone = EXCLUDED.phone,
+            sex   = EXCLUDED.sex,
+            age   = EXCLUDED.age
+    RETURNING * INTO v_profile;
+
+    RETURN v_profile;
+END;
+$$;
+
+-- -----------------------------------------------------------------------
+-- fn_get_profile_by_user_id
+-- Devuelve el perfil de un usuario dado su user_id.
+-- Retorna NULL si aún no tiene perfil.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_get_profile_by_user_id(
+    p_user_id UUID
+)
+RETURNS profiles
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+DECLARE
+    v_profile profiles;
+BEGIN
+    SELECT * INTO v_profile
+    FROM   profiles
+    WHERE  user_id = p_user_id;
+
+    RETURN v_profile;
+END;
+$$;
+
 -- ============================================================
 --  TRIGGERS
 -- ============================================================
 
 CREATE TRIGGER trg_users_updated_at
     BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_set_updated_at();
+
+CREATE TRIGGER trg_profiles_updated_at
+    BEFORE UPDATE ON profiles
     FOR EACH ROW
     EXECUTE FUNCTION fn_set_updated_at();
 
