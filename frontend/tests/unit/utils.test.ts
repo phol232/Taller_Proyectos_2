@@ -36,7 +36,7 @@ describe("toastError()", () => {
     toastError("Credenciales inválidas");
     expect(toast.error).toHaveBeenCalledWith("Credenciales inválidas", {
       description: undefined,
-      duration: 2100,
+      duration: 2000,
     });
   });
 
@@ -44,7 +44,7 @@ describe("toastError()", () => {
     toastError("Error", "Algo salió mal");
     expect(toast.error).toHaveBeenCalledWith("Error", {
       description: "Algo salió mal",
-      duration: 2100,
+      duration: 2000,
     });
   });
 });
@@ -56,7 +56,7 @@ describe("toastSuccess()", () => {
     toastSuccess("Operación exitosa");
     expect(toast.success).toHaveBeenCalledWith("Operación exitosa", {
       description: undefined,
-      duration: 1300,
+      duration: 1000,
     });
   });
 
@@ -64,7 +64,7 @@ describe("toastSuccess()", () => {
     toastSuccess("Listo", "Todo fue guardado");
     expect(toast.success).toHaveBeenCalledWith("Listo", {
       description: "Todo fue guardado",
-      duration: 1300,
+      duration: 1000,
     });
   });
 });

@@ -1,10 +1,19 @@
 package online.horarios_api.passwordreset.service;
 
-import online.horarios_api.passwordreset.dto.VerifyOtpResponse;
-import online.horarios_api.passwordreset.entity.PasswordResetToken;
-import online.horarios_api.passwordreset.repository.PasswordResetTokenRepository;
-import online.horarios_api.user.entity.User;
-import online.horarios_api.user.repository.UserRepository;
+import online.horarios_api.passwordreset.domain.model.OtpVerificationResult;
+import online.horarios_api.passwordreset.application.usecase.PasswordResetService;
+import online.horarios_api.passwordreset.domain.model.PasswordResetToken;
+import online.horarios_api.passwordreset.domain.port.out.PasswordHasherPort;
+import online.horarios_api.passwordreset.domain.port.out.PasswordResetConfigPort;
+import online.horarios_api.passwordreset.domain.port.out.PasswordResetTokenPort;
+import online.horarios_api.shared.domain.exception.BadRequestException;
+import online.horarios_api.shared.domain.exception.TooManyRequestsException;
+import online.horarios_api.passwordreset.domain.port.out.NotificationPort;
+import online.horarios_api.passwordreset.domain.port.out.OtpGeneratorPort;
+import online.horarios_api.passwordreset.domain.port.out.PasswordChangePort;
+import online.horarios_api.shared.domain.model.UserInfo;
+import online.horarios_api.shared.domain.port.out.UserReadPort;
+import online.horarios_api.shared.domain.port.out.TokenHasherPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,13 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -34,84 +38,92 @@ import static org.mockito.Mockito.*;
 @DisplayName("PasswordResetService — lógica de negocio")
 class PasswordResetServiceTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private PasswordResetTokenRepository tokenRepository;
-    @Mock private EmailService emailService;
-
-    @Spy
-    private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    @Mock private UserReadPort userReadPort;
+    @Mock private PasswordResetTokenPort tokenPort;
+    @Mock private NotificationPort notificationPort;
+    @Mock private PasswordHasherPort passwordHasherPort;
+    @Mock private PasswordResetConfigPort configPort;
+    @Mock private TokenHasherPort tokenHasherPort;
+    @Mock private OtpGeneratorPort otpGeneratorPort;
+    @Mock private PasswordChangePort passwordChangePort;
 
     @InjectMocks
     private PasswordResetService service;
 
-    private User user;
+    private UserInfo userInfo;
+
+    // Real encoder for hash generation in tests
+    private final BCryptPasswordEncoder realEncoder = new BCryptPasswordEncoder();
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(service, "otpExpiryMinutes", 10);
-        ReflectionTestUtils.setField(service, "maxRequestsPerWindow", 3);
-        ReflectionTestUtils.setField(service, "rateLimitWindowMinutes", 15);
-        ReflectionTestUtils.setField(service, "maxVerifyAttempts", 5);
+        lenient().when(configPort.getOtpExpiryMinutes()).thenReturn(10);
+        lenient().when(configPort.getMaxRequestsPerWindow()).thenReturn(3);
+        lenient().when(configPort.getRateLimitWindowMinutes()).thenReturn(15);
+        lenient().when(configPort.getMaxVerifyAttempts()).thenReturn(5);
 
-        user = User.builder()
-                .id(UUID.randomUUID())
-                .email("user@continental.edu.pe")
-                .fullName("Usuario Test")
-                .build();
+        // Default: delegate encode/matches to real BCrypt
+        lenient().when(passwordHasherPort.encode(any())).thenAnswer(inv -> realEncoder.encode(inv.getArgument(0)));
+        lenient().when(passwordHasherPort.matches(any(), any())).thenAnswer(inv -> realEncoder.matches(inv.getArgument(0), inv.getArgument(1)));
+        lenient().when(tokenHasherPort.hash(any())).thenAnswer(inv -> sha256Hex(inv.getArgument(0)));
+        lenient().when(tokenHasherPort.generateRawToken()).thenReturn("secure-random-token-value");
+        lenient().when(otpGeneratorPort.generateOtp()).thenReturn("123456");
+
+        userInfo = new UserInfo(UUID.randomUUID(), "user@continental.edu.pe", "Usuario Test", "STUDENT", null);
     }
 
 
     @Test
     @DisplayName("requestOtp: correo existente → genera token y envía email")
     void requestOtp_existingUser_savesTokenAndSendsEmail() {
-        when(userRepository.findByEmailAndActiveTrue("user@continental.edu.pe"))
-                .thenReturn(Optional.of(user));
-        when(tokenRepository.countByUserAndCreatedAtAfter(eq(user), any(Instant.class)))
+        when(userReadPort.findActiveUserInfoByEmail("user@continental.edu.pe"))
+                .thenReturn(Optional.of(userInfo));
+        when(tokenPort.countRecentByUserId(eq(userInfo.id()), any(Instant.class)))
                 .thenReturn(0L);
 
         String result = service.requestOtp("user@continental.edu.pe");
 
         assertThat(result).contains("recibirás");
-        verify(tokenRepository).invalidatePreviousTokens(eq(user.getId()), any(Instant.class));
-        verify(tokenRepository).save(any(PasswordResetToken.class));
-        verify(emailService).sendPasswordResetOtp(eq(user.getEmail()), eq(user.getFullName()), any(String.class));
+        verify(tokenPort).invalidatePreviousTokens(eq(userInfo.id()), any(Instant.class));
+        verify(tokenPort).save(any(PasswordResetToken.class));
+        verify(notificationPort).sendPasswordResetOtp(eq(userInfo.email()), eq(userInfo.fullName()), any(String.class));
     }
 
     @Test
     @DisplayName("requestOtp: correo inexistente → respuesta genérica sin revelar info")
     void requestOtp_unknownEmail_returnsGenericMessage() {
-        when(userRepository.findByEmailAndActiveTrue(any())).thenReturn(Optional.empty());
+        when(userReadPort.findActiveUserInfoByEmail(any())).thenReturn(Optional.empty());
 
         String result = service.requestOtp("unknown@continental.edu.pe");
 
         assertThat(result).contains("recibirás");
-        verifyNoInteractions(tokenRepository);
-        verifyNoInteractions(emailService);
+        verifyNoInteractions(tokenPort);
+        verifyNoInteractions(notificationPort);
     }
 
     @Test
     @DisplayName("requestOtp: rate limit alcanzado → respuesta genérica sin enviar email")
     void requestOtp_rateLimitReached_doesNotSendEmail() {
-        when(userRepository.findByEmailAndActiveTrue(any())).thenReturn(Optional.of(user));
-        when(tokenRepository.countByUserAndCreatedAtAfter(eq(user), any(Instant.class)))
+        when(userReadPort.findActiveUserInfoByEmail(any())).thenReturn(Optional.of(userInfo));
+                when(tokenPort.countRecentByUserId(eq(userInfo.id()), any(Instant.class)))
                 .thenReturn(3L); // maxRequestsPerWindow = 3
 
         service.requestOtp("user@continental.edu.pe");
 
-        verify(tokenRepository, never()).save(any());
-        verify(emailService, never()).sendPasswordResetOtp(any(), any(), any());
+        verify(tokenPort, never()).save(any());
+        verify(notificationPort, never()).sendPasswordResetOtp(any(), any(), any());
     }
 
     @Test
     @DisplayName("requestOtp: OTP generado es de 6 dígitos numéricos")
     void requestOtp_generatedOtp_isSixDigits() {
-        when(userRepository.findByEmailAndActiveTrue(any())).thenReturn(Optional.of(user));
-        when(tokenRepository.countByUserAndCreatedAtAfter(any(), any())).thenReturn(0L);
+        when(userReadPort.findActiveUserInfoByEmail(any())).thenReturn(Optional.of(userInfo));
+                when(tokenPort.countRecentByUserId(any(), any())).thenReturn(0L);
 
         ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
         service.requestOtp("user@continental.edu.pe");
 
-        verify(emailService).sendPasswordResetOtp(any(), any(), otpCaptor.capture());
+        verify(notificationPort).sendPasswordResetOtp(any(), any(), otpCaptor.capture());
         String otp = otpCaptor.getValue();
         assertThat(otp).matches("^[0-9]{6}$");
     }
@@ -121,18 +133,15 @@ class PasswordResetServiceTest {
     @DisplayName("verifyOtp: OTP correcto → devuelve resetToken")
     void verifyOtp_correctOtp_returnsResetToken() {
         String rawOtp = "123456";
-        PasswordResetToken token = PasswordResetToken.builder()
-                .user(user)
-                .otpHash(passwordEncoder.encode(rawOtp))
-                .expiresAt(Instant.now().plusSeconds(600))
-                .verifyAttempts(0)
-                .build();
+        PasswordResetToken token = new PasswordResetToken(
+                null, userInfo.id(), realEncoder.encode(rawOtp), null,
+                Instant.now().plusSeconds(600), false, null, false, null, 0, null);
 
-        when(userRepository.findByEmailAndActiveTrue(any())).thenReturn(Optional.of(user));
-        when(tokenRepository.findTop1ByUserAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(eq(user), any()))
+        when(userReadPort.findActiveUserInfoByEmail(any())).thenReturn(Optional.of(userInfo));
+        when(tokenPort.findActiveTokenByUserId(eq(userInfo.id()), any()))
                 .thenReturn(Optional.of(token));
 
-        VerifyOtpResponse response = service.verifyOtp("user@continental.edu.pe", rawOtp);
+        OtpVerificationResult response = service.verifyOtp("user@continental.edu.pe", rawOtp);
 
         assertThat(response.resetToken()).isNotBlank();
         assertThat(token.isVerified()).isTrue();
@@ -140,56 +149,44 @@ class PasswordResetServiceTest {
     }
 
     @Test
-    @DisplayName("verifyOtp: OTP incorrecto → lanza 400")
+    @DisplayName("verifyOtp: OTP incorrecto → lanza BadRequestException")
     void verifyOtp_wrongOtp_throws400() {
-        PasswordResetToken token = PasswordResetToken.builder()
-                .user(user)
-                .otpHash(passwordEncoder.encode("999999"))
-                .expiresAt(Instant.now().plusSeconds(600))
-                .verifyAttempts(0)
-                .build();
+        PasswordResetToken token = new PasswordResetToken(
+                null, userInfo.id(), realEncoder.encode("999999"), null,
+                Instant.now().plusSeconds(600), false, null, false, null, 0, null);
 
-        when(userRepository.findByEmailAndActiveTrue(any())).thenReturn(Optional.of(user));
-        when(tokenRepository.findTop1ByUserAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(eq(user), any()))
+        when(userReadPort.findActiveUserInfoByEmail(any())).thenReturn(Optional.of(userInfo));
+        when(tokenPort.findActiveTokenByUserId(eq(userInfo.id()), any()))
                 .thenReturn(Optional.of(token));
 
         assertThatThrownBy(() -> service.verifyOtp("user@continental.edu.pe", "111111"))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
-                        .isEqualTo(HttpStatus.BAD_REQUEST));
+                .isInstanceOf(BadRequestException.class);
     }
 
     @Test
-    @DisplayName("verifyOtp: sin token activo → lanza 400")
+    @DisplayName("verifyOtp: sin token activo → lanza BadRequestException")
     void verifyOtp_noActiveToken_throws400() {
-        when(userRepository.findByEmailAndActiveTrue(any())).thenReturn(Optional.of(user));
-        when(tokenRepository.findTop1ByUserAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(any(), any()))
+        when(userReadPort.findActiveUserInfoByEmail(any())).thenReturn(Optional.of(userInfo));
+                when(tokenPort.findActiveTokenByUserId(any(), any()))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.verifyOtp("user@continental.edu.pe", "123456"))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
-                        .isEqualTo(HttpStatus.BAD_REQUEST));
+                .isInstanceOf(BadRequestException.class);
     }
 
     @Test
-    @DisplayName("verifyOtp: máximo de intentos superado → lanza 429 y marca token como usado")
+    @DisplayName("verifyOtp: máximo de intentos superado → lanza TooManyRequestsException y marca token como usado")
     void verifyOtp_maxAttemptsExceeded_throws429AndInvalidatesToken() {
-        PasswordResetToken token = PasswordResetToken.builder()
-                .user(user)
-                .otpHash(passwordEncoder.encode("999999"))
-                .expiresAt(Instant.now().plusSeconds(600))
-                .verifyAttempts(5) // maxVerifyAttempts = 5, +1 → 6 > 5
-                .build();
+        PasswordResetToken token = new PasswordResetToken(
+                null, userInfo.id(), realEncoder.encode("999999"), null,
+                Instant.now().plusSeconds(600), false, null, false, null, 5, null); // maxVerifyAttempts = 5, +1 → 6 > 5
 
-        when(userRepository.findByEmailAndActiveTrue(any())).thenReturn(Optional.of(user));
-        when(tokenRepository.findTop1ByUserAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(eq(user), any()))
+        when(userReadPort.findActiveUserInfoByEmail(any())).thenReturn(Optional.of(userInfo));
+        when(tokenPort.findActiveTokenByUserId(eq(userInfo.id()), any()))
                 .thenReturn(Optional.of(token));
 
         assertThatThrownBy(() -> service.verifyOtp("user@continental.edu.pe", "123456"))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
-                        .isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+                .isInstanceOf(TooManyRequestsException.class);
 
         assertThat(token.isUsed()).isTrue();
     }
@@ -201,36 +198,30 @@ class PasswordResetServiceTest {
         String rawResetToken = UUID.randomUUID().toString();
         String tokenHash = sha256Hex(rawResetToken);
 
-        PasswordResetToken token = PasswordResetToken.builder()
-                .user(user)
-                .otpHash("irrelevant")
-                .expiresAt(Instant.now().plusSeconds(600))
-                .verified(true)
-                .used(false)
-                .resetTokenHash(tokenHash)
-                .build();
+        PasswordResetToken token = new PasswordResetToken(
+                null, userInfo.id(), "irrelevant", tokenHash,
+                Instant.now().plusSeconds(600), true, null, false, null, 0, null);
 
-        when(tokenRepository.findByResetTokenHashAndVerifiedTrueAndUsedFalseAndExpiresAtAfter(eq(tokenHash), any()))
+        when(tokenPort.findByResetTokenHash(eq(tokenHash), any()))
                 .thenReturn(Optional.of(token));
 
         service.resetPassword(rawResetToken, "NewSecurePass1!");
 
-        verify(userRepository).save(user);
-        assertThat(passwordEncoder.matches("NewSecurePass1!", user.getPasswordHash())).isTrue();
+        ArgumentCaptor<String> hashCaptor = ArgumentCaptor.forClass(String.class);
+        verify(passwordChangePort).changePassword(eq(userInfo.id()), hashCaptor.capture());
+        assertThat(realEncoder.matches("NewSecurePass1!", hashCaptor.getValue())).isTrue();
         assertThat(token.isUsed()).isTrue();
         assertThat(token.getUsedAt()).isNotNull();
     }
 
     @Test
-    @DisplayName("resetPassword: token inválido o expirado → lanza 400")
+    @DisplayName("resetPassword: token inválido o expirado → lanza BadRequestException")
     void resetPassword_invalidToken_throws400() {
-        when(tokenRepository.findByResetTokenHashAndVerifiedTrueAndUsedFalseAndExpiresAtAfter(any(), any()))
+        when(tokenPort.findByResetTokenHash(any(), any()))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.resetPassword("bad-token", "NewPass1!"))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
-                        .isEqualTo(HttpStatus.BAD_REQUEST));
+                .isInstanceOf(BadRequestException.class);
     }
 
 

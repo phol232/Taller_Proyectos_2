@@ -5,6 +5,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  avatarUrl?: string;
 }
 
 export interface JWTPayload {

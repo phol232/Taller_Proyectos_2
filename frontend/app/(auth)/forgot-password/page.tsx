@@ -50,6 +50,10 @@ export default function ForgotPasswordPage() {
       setEmailError(t.forgotPassword.emailInvalid);
       return;
     }
+    if (!trimmed.toLowerCase().endsWith("@continental.edu.pe")) {
+      setEmailError(t.forgotPassword.domainNotAllowed);
+      return;
+    }
     setLoading(true);
     try {
       await api.post("/api/auth/password-reset/request", { email });

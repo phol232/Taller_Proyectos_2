@@ -1,11 +1,15 @@
 package online.horarios_api.passwordreset.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import online.horarios_api.passwordreset.dto.ForgotPasswordRequest;
-import online.horarios_api.passwordreset.dto.ResetPasswordRequest;
-import online.horarios_api.passwordreset.dto.VerifyOtpRequest;
-import online.horarios_api.passwordreset.dto.VerifyOtpResponse;
-import online.horarios_api.passwordreset.service.PasswordResetService;
+import online.horarios_api.passwordreset.infrastructure.in.web.PasswordResetController;
+import online.horarios_api.passwordreset.infrastructure.in.web.dto.ForgotPasswordRequest;
+import online.horarios_api.passwordreset.infrastructure.in.web.dto.ResetPasswordRequest;
+import online.horarios_api.passwordreset.infrastructure.in.web.dto.VerifyOtpRequest;
+import online.horarios_api.passwordreset.domain.model.OtpVerificationResult;
+import online.horarios_api.passwordreset.application.usecase.PasswordResetService;
+import online.horarios_api.shared.domain.exception.BadRequestException;
+import online.horarios_api.shared.domain.exception.TooManyRequestsException;
+import online.horarios_api.shared.infrastructure.web.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,12 +17,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -42,6 +44,7 @@ class PasswordResetControllerTest {
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setValidator(validator)
+                .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
 
@@ -90,7 +93,7 @@ class PasswordResetControllerTest {
     @DisplayName("POST /verify: OTP correcto → 200 con resetToken")
     void verifyOtp_correctOtp_returns200WithResetToken() throws Exception {
         when(passwordResetService.verifyOtp("user@continental.edu.pe", "123456"))
-                .thenReturn(new VerifyOtpResponse("reset-token-abc123"));
+                .thenReturn(new OtpVerificationResult("reset-token-abc123"));
 
         mockMvc.perform(post(VERIFY_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -116,7 +119,7 @@ class PasswordResetControllerTest {
     @DisplayName("POST /verify: OTP incorrecto (servicio lanza 400) → 400")
     void verifyOtp_wrongOtp_returns400FromService() throws Exception {
         when(passwordResetService.verifyOtp(any(), any()))
-                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP incorrecto"));
+                .thenThrow(new BadRequestException("OTP incorrecto"));
 
         mockMvc.perform(post(VERIFY_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -129,7 +132,7 @@ class PasswordResetControllerTest {
     @DisplayName("POST /verify: máximo de intentos (servicio lanza 429) → 429")
     void verifyOtp_maxAttempts_returns429() throws Exception {
         when(passwordResetService.verifyOtp(any(), any()))
-                .thenThrow(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Demasiados intentos"));
+                .thenThrow(new TooManyRequestsException("Demasiados intentos"));
 
         mockMvc.perform(post(VERIFY_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -167,7 +170,7 @@ class PasswordResetControllerTest {
     @Test
     @DisplayName("POST /reset: token inválido (servicio lanza 400) → 400")
     void resetPassword_invalidToken_returns400() throws Exception {
-        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token inválido"))
+        doThrow(new BadRequestException("Token inválido"))
                 .when(passwordResetService).resetPassword(any(), any());
 
         mockMvc.perform(post(RESET_URL)

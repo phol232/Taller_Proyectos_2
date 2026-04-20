@@ -67,4 +67,15 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+
+    // Cargar variables del .env para los tests
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") && it.contains("=") }
+            .forEach { line ->
+                val (key, value) = line.split("=", limit = 2)
+                environment(key.trim(), value.trim())
+            }
+    }
 }
