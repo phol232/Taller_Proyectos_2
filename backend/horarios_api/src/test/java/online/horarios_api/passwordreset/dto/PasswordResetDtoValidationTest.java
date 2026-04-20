@@ -89,6 +89,27 @@ class PasswordResetDtoValidationTest {
         var violations = validator.validate(new ResetPasswordRequest("token", "password1"));
         assertThat(violations)
                 .anyMatch(v -> v.getPropertyPath().toString().equals("newPassword"));
+        assertThat(violations)
+                .anyMatch(v -> v.getMessage().contains("una mayúscula"));
+        assertThat(violations)
+                .anyMatch(v -> v.getMessage().contains("un carácter especial"));
+    }
+
+    @Test
+    @DisplayName("ResetPasswordRequest: contraseña con espacio → falla con mensaje específico")
+    void resetRequest_password_with_space_fails() {
+        var violations = validator.validate(new ResetPasswordRequest("token", "BRayan27 @_"));
+        assertThat(violations)
+                .anyMatch(v -> v.getPropertyPath().toString().equals("newPassword"));
+        assertThat(violations)
+                .anyMatch(v -> v.getMessage().contains("espacios"));
+    }
+
+    @Test
+    @DisplayName("ResetPasswordRequest: contraseña con símbolos variados válidos → sin violaciones")
+    void resetRequest_password_with_multiple_special_characters_passes() {
+        var violations = validator.validate(new ResetPasswordRequest("token", "Brayan27_@#+."));
+        assertThat(violations).isEmpty();
     }
 
     @Test

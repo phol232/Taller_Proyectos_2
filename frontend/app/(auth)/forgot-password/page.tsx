@@ -18,8 +18,6 @@ const UC = {
   purpleLight: "#F3E8FF",
 };
 
-const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-
 type Step = "email" | "code" | "password" | "success";
 
 type ApiErrorResponse = {
@@ -34,6 +32,12 @@ function validateNewPasswordFields(
   messages: {
     minChars: string;
     passwordComplexity: string;
+    passwordMissingRequirements: string;
+    passwordRequirementUppercase: string;
+    passwordRequirementLowercase: string;
+    passwordRequirementNumber: string;
+    passwordRequirementSpecial: string;
+    passwordInvalidChars: string;
     repeatPassword: string;
     passwordsMismatch: string;
   }
@@ -42,8 +46,19 @@ function validateNewPasswordFields(
 
   if (newPass.length < 8) {
     errors.newPass = messages.minChars;
-  } else if (!PASSWORD_COMPLEXITY_REGEX.test(newPass)) {
-    errors.newPass = messages.passwordComplexity;
+  } else if (containsUnsupportedPasswordChars(newPass)) {
+    errors.newPass = messages.passwordInvalidChars;
+  } else if (!hasValidPasswordComplexity(newPass)) {
+    const missingRules: string[] = [];
+
+    if (![...newPass].some(isUppercaseChar)) missingRules.push(messages.passwordRequirementUppercase);
+    if (![...newPass].some(isLowercaseChar)) missingRules.push(messages.passwordRequirementLowercase);
+    if (![...newPass].some(isDigitChar)) missingRules.push(messages.passwordRequirementNumber);
+    if (![...newPass].some(isSpecialChar)) missingRules.push(messages.passwordRequirementSpecial);
+
+    errors.newPass = missingRules.length > 0
+      ? messages.passwordMissingRequirements.replace("{items}", missingRules.join(", "))
+      : messages.passwordComplexity;
   }
 
   if (!confirm) {
@@ -53,6 +68,43 @@ function validateNewPasswordFields(
   }
 
   return errors;
+}
+
+function hasValidPasswordComplexity(value: string) {
+  const characters = [...value];
+
+  return characters.some(isUppercaseChar)
+    && characters.some(isLowercaseChar)
+    && characters.some(isDigitChar)
+    && characters.some(isSpecialChar);
+}
+
+function containsUnsupportedPasswordChars(value: string) {
+  return [...value].some((character) => /\s/u.test(character) || isControlChar(character));
+}
+
+function isUppercaseChar(character: string) {
+  return /\p{Lu}/u.test(character);
+}
+
+function isLowercaseChar(character: string) {
+  return /\p{Ll}/u.test(character);
+}
+
+function isDigitChar(character: string) {
+  return /\p{Nd}/u.test(character);
+}
+
+function isSpecialChar(character: string) {
+  return !isUppercaseChar(character)
+    && !isLowercaseChar(character)
+    && !isDigitChar(character)
+    && !/\s/u.test(character)
+    && !isControlChar(character);
+}
+
+function isControlChar(character: string) {
+  return /\p{Cc}|\p{Cf}/u.test(character);
 }
 
 export default function ForgotPasswordPage() {
@@ -154,6 +206,12 @@ export default function ForgotPasswordPage() {
     const newErrors = validateNewPasswordFields(newPass, confirm, {
       minChars: t.forgotPassword.minChars,
       passwordComplexity: t.forgotPassword.passwordComplexity,
+      passwordMissingRequirements: t.forgotPassword.passwordMissingRequirements,
+      passwordRequirementUppercase: t.forgotPassword.passwordRequirementUppercase,
+      passwordRequirementLowercase: t.forgotPassword.passwordRequirementLowercase,
+      passwordRequirementNumber: t.forgotPassword.passwordRequirementNumber,
+      passwordRequirementSpecial: t.forgotPassword.passwordRequirementSpecial,
+      passwordInvalidChars: t.forgotPassword.passwordInvalidChars,
       repeatPassword: t.forgotPassword.repeatPassword,
       passwordsMismatch: t.forgotPassword.passwordsMismatch,
     });

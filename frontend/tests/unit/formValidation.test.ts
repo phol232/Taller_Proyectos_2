@@ -32,12 +32,41 @@ function validateForgotEmail(email: string) {
 }
 
 function validateNewPassword(newPass: string, confirm: string) {
-  const complexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  const newPassError = newPass.length < 8
-    ? "La contraseña debe tener al menos 8 caracteres."
-    : !complexityRegex.test(newPass)
-      ? "La contraseña debe incluir mayúscula, minúscula, número y carácter especial."
-      : "";
+  const isUppercaseChar = (character: string) => /\p{Lu}/u.test(character);
+  const isLowercaseChar = (character: string) => /\p{Ll}/u.test(character);
+  const isDigitChar = (character: string) => /\p{Nd}/u.test(character);
+  const isControlChar = (character: string) => /\p{Cc}|\p{Cf}/u.test(character);
+  const isSpecialChar = (character: string) => !isUppercaseChar(character)
+    && !isLowercaseChar(character)
+    && !isDigitChar(character)
+    && !/\s/u.test(character)
+    && !isControlChar(character);
+  const hasUnsupportedCharacters = [...newPass].some(
+    (character) => /\s/u.test(character) || isControlChar(character)
+  );
+
+  let newPassError = "";
+
+  if (newPass.length < 8) {
+    newPassError = "La contraseña debe tener al menos 8 caracteres.";
+  } else if (hasUnsupportedCharacters) {
+    newPassError = "La contraseña no puede contener espacios ni caracteres no visibles.";
+  } else if (
+    ![...newPass].some(isUppercaseChar)
+    || ![...newPass].some(isLowercaseChar)
+    || ![...newPass].some(isDigitChar)
+    || ![...newPass].some(isSpecialChar)
+  ) {
+    const missing: string[] = [];
+
+    if (![...newPass].some(isUppercaseChar)) missing.push("una mayúscula");
+    if (![...newPass].some(isLowercaseChar)) missing.push("una minúscula");
+    if (![...newPass].some(isDigitChar)) missing.push("un número");
+    if (![...newPass].some(isSpecialChar)) missing.push("un carácter especial");
+
+    newPassError = `La contraseña debe incluir: ${missing.join(", ")}.`;
+  }
+
   const confirmError = newPass !== confirm
     ? "Las contraseñas no coinciden."
     : "";
@@ -122,7 +151,18 @@ describe("validateNewPassword()", () => {
 
   it("contraseña sin complejidad requerida → error en newPassError", () => {
     const { newPassError } = validateNewPassword("password1", "password1");
+    expect(newPassError).toContain("una mayúscula");
     expect(newPassError).toContain("carácter especial");
+  });
+
+  it("contraseña con símbolos como _ y # → válida", () => {
+    const { newPassError } = validateNewPassword("BRayan27_@", "BRayan27_@");
+    expect(newPassError).toBe("");
+  });
+
+  it("contraseña con espacio → error específico", () => {
+    const { newPassError } = validateNewPassword("BRayan27 @_", "BRayan27 @_");
+    expect(newPassError).toContain("espacios");
   });
 
   it("contraseña vacía → error de longitud", () => {
