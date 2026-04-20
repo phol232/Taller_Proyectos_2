@@ -1,6 +1,5 @@
 services:
 
-  # ── Base de datos PostgreSQL ────────────────────────────────
   db:
     image: postgres:16-alpine
     restart: always
@@ -10,6 +9,8 @@ services:
       POSTGRES_DB: horarios_db
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
@@ -21,9 +22,9 @@ services:
     networks:
       - app-network
 
-  # ── Backend Spring Boot ─────────────────────────────────────
   backend:
     image: ghcr.io/phol232/horarios-backend:latest
+    pull_policy: always
     restart: always
     env_file:
       - .env

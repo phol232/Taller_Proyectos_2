@@ -172,6 +172,7 @@ export type TranslationDictionary = {
     invalidCode: string;
     invalidCodeDesc: string;
     minChars: string;
+    passwordComplexity: string;
     repeatPassword: string;
     passwordsMismatch: string;
     linkExpired: string;

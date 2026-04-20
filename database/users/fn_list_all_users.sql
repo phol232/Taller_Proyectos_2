@@ -1,0 +1,13 @@
+CREATE OR REPLACE FUNCTION fn_list_all_users()
+RETURNS SETOF users
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT *
+    FROM   users
+    ORDER  BY created_at DESC;
+END;
+$$;

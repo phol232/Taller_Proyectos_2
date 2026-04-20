@@ -32,9 +32,12 @@ function validateForgotEmail(email: string) {
 }
 
 function validateNewPassword(newPass: string, confirm: string) {
+  const complexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
   const newPassError = newPass.length < 8
     ? "La contraseña debe tener al menos 8 caracteres."
-    : "";
+    : !complexityRegex.test(newPass)
+      ? "La contraseña debe incluir mayúscula, minúscula, número y carácter especial."
+      : "";
   const confirmError = newPass !== confirm
     ? "Las contraseñas no coinciden."
     : "";
@@ -115,6 +118,11 @@ describe("validateNewPassword()", () => {
     const { newPassError, confirmError } = validateNewPassword("Password1!", "Password1!");
     expect(newPassError).toBe("");
     expect(confirmError).toBe("");
+  });
+
+  it("contraseña sin complejidad requerida → error en newPassError", () => {
+    const { newPassError } = validateNewPassword("password1", "password1");
+    expect(newPassError).toContain("carácter especial");
   });
 
   it("contraseña vacía → error de longitud", () => {

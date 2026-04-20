@@ -57,8 +57,6 @@ public class ProfileService implements GetProfileUseCase, UpsertProfileUseCase {
         return toResponse(saved, user);
     }
 
-    // ── helpers ───────────────────────────────────────────────────────
-
     private UserInfo resolveUser(UUID userId) {
         return userReadPort.findUserInfoById(userId)
                 .orElseThrow(() -> {

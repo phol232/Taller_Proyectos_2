@@ -8,6 +8,7 @@ import online.horarios_api.user.infrastructure.out.persistence.entity.OAuth2Link
 import online.horarios_api.user.infrastructure.out.persistence.entity.UserEntity;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,5 +50,19 @@ public class UserRepositoryAdapter implements UserPort {
     public OAuth2LinkedAccount saveOAuth2Account(OAuth2LinkedAccount account) {
         OAuth2LinkedAccountEntity entity = OAuth2LinkedAccountEntity.fromDomain(account);
         return oauth2JpaRepository.save(entity).toDomain();
+    }
+
+    @Override
+    public List<User> findAll() {
+        return userJpaRepository.findAll().stream()
+                .map(UserEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<User> findByFullNameContaining(String query) {
+        return userJpaRepository.findByFullNameContainingIgnoreCase(query).stream()
+                .map(UserEntity::toDomain)
+                .toList();
     }
 }

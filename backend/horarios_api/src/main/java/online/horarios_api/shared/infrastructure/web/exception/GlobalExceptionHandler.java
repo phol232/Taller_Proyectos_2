@@ -1,5 +1,6 @@
 package online.horarios_api.shared.infrastructure.web.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.DuplicateFieldException;
@@ -124,13 +125,17 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex,
+                                                     HttpServletRequest request) {
         Map<String, String> errors = ex.getBindingResult().getFieldErrors().stream()
                 .collect(Collectors.toMap(
                         FieldError::getField,
                         fe -> fe.getDefaultMessage() != null ? fe.getDefaultMessage() : "Valor inválido",
                         (a, b) -> a
                 ));
+
+        log.warn("Validación fallida: metodo={} ruta={} errores={}",
+                request.getMethod(), request.getRequestURI(), errors);
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)

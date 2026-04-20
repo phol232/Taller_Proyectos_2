@@ -18,7 +18,42 @@ const UC = {
   purpleLight: "#F3E8FF",
 };
 
+const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
 type Step = "email" | "code" | "password" | "success";
+
+type ApiErrorResponse = {
+  code?: string;
+  message?: string;
+  errors?: Record<string, string>;
+};
+
+function validateNewPasswordFields(
+  newPass: string,
+  confirm: string,
+  messages: {
+    minChars: string;
+    passwordComplexity: string;
+    repeatPassword: string;
+    passwordsMismatch: string;
+  }
+) {
+  const errors = { newPass: "", confirm: "" };
+
+  if (newPass.length < 8) {
+    errors.newPass = messages.minChars;
+  } else if (!PASSWORD_COMPLEXITY_REGEX.test(newPass)) {
+    errors.newPass = messages.passwordComplexity;
+  }
+
+  if (!confirm) {
+    errors.confirm = messages.repeatPassword;
+  } else if (newPass !== confirm) {
+    errors.confirm = messages.passwordsMismatch;
+  }
+
+  return errors;
+}
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -116,10 +151,13 @@ export default function ForgotPasswordPage() {
   /* ── Paso 3: Cambiar contraseña ──────────────────────── */
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
-    const newErrors = { newPass: "", confirm: "" };
-    if (newPass.length < 8) newErrors.newPass = t.forgotPassword.minChars;
-    if (!confirm) newErrors.confirm = t.forgotPassword.repeatPassword;
-    else if (newPass !== confirm) newErrors.confirm = t.forgotPassword.passwordsMismatch;
+    const newErrors = validateNewPasswordFields(newPass, confirm, {
+      minChars: t.forgotPassword.minChars,
+      passwordComplexity: t.forgotPassword.passwordComplexity,
+      repeatPassword: t.forgotPassword.repeatPassword,
+      passwordsMismatch: t.forgotPassword.passwordsMismatch,
+    });
+
     if (newErrors.newPass || newErrors.confirm) {
       setNewPassError(newErrors.newPass);
       setConfirmError(newErrors.confirm);
@@ -134,7 +172,13 @@ export default function ForgotPasswordPage() {
       setStep("success");
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } })?.response?.status;
-      if (status === 400) {
+      const data = (err as { response?: { data?: ApiErrorResponse } })?.response?.data;
+
+      if (status === 400 && data?.code === "VALIDATION_ERROR") {
+        const passwordError = data.errors?.newPassword ?? data.message ?? t.forgotPassword.passwordComplexity;
+        setNewPassError(passwordError);
+        toastError(t.forgotPassword.updateError, passwordError);
+      } else if (status === 400) {
         toastError(t.forgotPassword.linkExpired, t.forgotPassword.linkExpiredDesc);
         setStep("email");
         setCode(["", "", "", "", "", ""]);
@@ -415,6 +459,10 @@ export default function ForgotPasswordPage() {
                   </div>
                 </FormField>
 
+                <p className="text-xs text-gray-500">
+                  {t.forgotPassword.passwordComplexity}
+                </p>
+
                 <FormField
                   label={t.forgotPassword.confirmPasswordLabel}
                   htmlFor="confirm-pass"
@@ -444,7 +492,7 @@ export default function ForgotPasswordPage() {
                 <Button
                   type="submit"
                   className="w-full text-white font-medium"
-                  disabled={loading || newPass !== confirm || newPass.length < 8}
+                  disabled={loading || !newPass || !confirm}
                   style={{ backgroundColor: UC.purple }}
                 >
                   {loading ? t.forgotPassword.saving : t.forgotPassword.setNewPassword}
