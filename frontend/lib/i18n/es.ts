@@ -182,6 +182,7 @@ export const es: TranslationDictionary = {
     invalidCode: "Código incorrecto",
     invalidCodeDesc: "El código es inválido o ya expiró.",
     minChars: "Mínimo 8 caracteres.",
+    passwordComplexity: "Debe incluir mayúscula, minúscula, número y carácter especial.",
     repeatPassword: "Repite la nueva contraseña.",
     passwordsMismatch: "Las contraseñas no coinciden.",
     linkExpired: "Enlace expirado",

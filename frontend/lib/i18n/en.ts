@@ -182,6 +182,7 @@ export const en: TranslationDictionary = {
     invalidCode: "Incorrect code",
     invalidCodeDesc: "The code is invalid or has expired.",
     minChars: "Minimum 8 characters.",
+    passwordComplexity: "It must include uppercase, lowercase, number, and special character.",
     repeatPassword: "Repeat your new password.",
     passwordsMismatch: "Passwords do not match.",
     linkExpired: "Link expired",

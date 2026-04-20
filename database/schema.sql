@@ -363,6 +363,46 @@ BEGIN
 END;
 $$;
 
+-- -----------------------------------------------------------------------
+-- fn_list_all_users
+-- Devuelve todos los usuarios del sistema ordenados por fecha de creación.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_all_users()
+RETURNS SETOF users
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT *
+    FROM   users
+    ORDER  BY created_at DESC;
+END;
+$$;
+
+-- -----------------------------------------------------------------------
+-- fn_search_users_by_name
+-- Busca usuarios cuyo full_name contenga el texto indicado (case-insensitive).
+-- Útil para búsqueda en tiempo real desde el frontend.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_search_users_by_name(
+    p_query VARCHAR(255)
+)
+RETURNS SETOF users
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT *
+    FROM   users
+    WHERE  full_name ILIKE '%' || p_query || '%'
+    ORDER  BY full_name ASC;
+END;
+$$;
+
 -- ============================================================
 --  TRIGGERS
 -- ============================================================

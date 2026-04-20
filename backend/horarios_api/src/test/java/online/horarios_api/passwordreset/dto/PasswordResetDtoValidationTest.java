@@ -84,6 +84,14 @@ class PasswordResetDtoValidationTest {
     }
 
     @Test
+    @DisplayName("ResetPasswordRequest: contraseña sin complejidad requerida → falla")
+    void resetRequest_password_without_required_complexity_fails() {
+        var violations = validator.validate(new ResetPasswordRequest("token", "password1"));
+        assertThat(violations)
+                .anyMatch(v -> v.getPropertyPath().toString().equals("newPassword"));
+    }
+
+    @Test
     @DisplayName("ResetPasswordRequest: datos válidos → sin violaciones")
     void resetRequest_valid_passes() {
         var violations = validator.validate(new ResetPasswordRequest("some-uuid-token", "NewSecurePass1!"));

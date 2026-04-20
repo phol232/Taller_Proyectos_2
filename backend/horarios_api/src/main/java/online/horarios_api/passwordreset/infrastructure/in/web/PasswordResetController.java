@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.horarios_api.passwordreset.domain.model.OtpVerificationResult;
 import online.horarios_api.passwordreset.domain.port.in.RequestOtpUseCase;
 import online.horarios_api.passwordreset.domain.port.in.ResetPasswordUseCase;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth/password-reset")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Recuperación de contraseña", description = "Flujo OTP por correo electrónico")
 public class PasswordResetController {
 
@@ -38,8 +40,17 @@ public class PasswordResetController {
     public ResponseEntity<Map<String, String>> requestOtp(
             @Valid @RequestBody ForgotPasswordRequest request) {
 
-        String message = requestOtpUseCase.requestOtp(request.email());
-        return ResponseEntity.ok(Map.of("message", message));
+        log.info("[password-reset][request] solicitud recibida email={}", maskEmail(request.email()));
+
+        try {
+            String message = requestOtpUseCase.requestOtp(request.email());
+            log.info("[password-reset][request] solicitud procesada email={}", maskEmail(request.email()));
+            return ResponseEntity.ok(Map.of("message", message));
+        } catch (RuntimeException ex) {
+            log.warn("[password-reset][request] solicitud rechazada email={} motivo={}",
+                    maskEmail(request.email()), ex.getMessage());
+            throw ex;
+        }
     }
 
     @Operation(
@@ -51,7 +62,19 @@ public class PasswordResetController {
     public ResponseEntity<OtpVerificationResult> verifyOtp(
             @Valid @RequestBody VerifyOtpRequest request) {
 
-        return ResponseEntity.ok(verifyOtpUseCase.verifyOtp(request.email(), request.otp()));
+        log.info("[password-reset][verify] request recibida email={} otpLength={}",
+            maskEmail(request.email()), request.otp() == null ? 0 : request.otp().length());
+
+        try {
+            OtpVerificationResult result = verifyOtpUseCase.verifyOtp(request.email(), request.otp());
+            log.info("[password-reset][verify] OTP validado email={} resetTokenEmitido=true",
+                maskEmail(request.email()));
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException ex) {
+            log.warn("[password-reset][verify] OTP rechazado email={} motivo={}",
+                maskEmail(request.email()), ex.getMessage());
+            throw ex;
+        }
     }
 
     @Operation(
@@ -62,7 +85,30 @@ public class PasswordResetController {
     public ResponseEntity<Map<String, String>> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
 
-        resetPasswordUseCase.resetPassword(request.resetToken(), request.newPassword());
-        return ResponseEntity.ok(Map.of("message", "Contraseña actualizada correctamente."));
+        log.info("[password-reset][reset] request recibida resetTokenLength={} newPasswordLength={}",
+                request.resetToken() == null ? 0 : request.resetToken().length(),
+                request.newPassword() == null ? 0 : request.newPassword().length());
+
+        try {
+            resetPasswordUseCase.resetPassword(request.resetToken(), request.newPassword());
+            log.info("[password-reset][reset] contraseña actualizada correctamente");
+            return ResponseEntity.ok(Map.of("message", "Contraseña actualizada correctamente."));
+        } catch (RuntimeException ex) {
+            log.warn("[password-reset][reset] cambio rechazado motivo={}", ex.getMessage());
+            throw ex;
+        }
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "<empty>";
+        }
+
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***" + email.substring(Math.max(atIndex, 0));
+        }
+
+        return email.charAt(0) + "***" + email.substring(atIndex - 1);
     }
 }

@@ -43,3 +43,13 @@ jobs:
           tags: ghcr.io/phol232/horarios-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Trigger Dokploy redeploy
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -d '{"ref":"refs/heads/develop","repository":{"name":"Taller_Proyectos_2","full_name":"phol232/Taller_Proyectos_2"}}' \
+            https://dokploy.optrix.cloud/api/deploy/compose/BjacmFakCsRAGwe36iTz3
