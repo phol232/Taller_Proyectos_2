@@ -16,13 +16,16 @@ El proyecto Planner UC surge ante la necesidad de automatizar la planificación 
 
 ### 2. Descripción General del Proyecto
 
-Planner UC es un sistema web basado en arquitectura SPA + API REST que implementa un motor de satisfacción de restricciones (CSP) para generar automáticamente horarios académicos válidos. El sistema gestiona información académica y produce asignaciones que cumplen restricciones académicas, operativas y temporales definidas por la institución.
+Planner UC es un sistema web basado en arquitectura SPA + API REST que implementa un motor de satisfacción de restricciones (CSP) para generar automáticamente horarios académicos válidos. El sistema gestiona información académica (estudiantes, docentes, cursos y aulas) y produce asignaciones que cumplen restricciones académicas, operativas y temporales definidas por la institución.
 
-**Stack tecnológico (referencial, no restrictivo):**
-- Frontend: SPA (framework moderno compatible con Chrome, Firefox y Edge actuales).
-- Backend: API REST con lógica de negocio y motor CSP.
-- Base de datos: sistema relacional con soporte transaccional.
-- Autenticación: sesiones seguras o JWT con expiración.
+La solución se apoya en una arquitectura desacoplada, donde el frontend, backend y motor de optimización operan como componentes independientes, facilitando la escalabilidad, mantenibilidad y evolución del sistema
+
+**Stack tecnológico:**
+- Frontend: Next.js (SPA moderna) para la construcción de interfaces dinámicas, responsivas y compatibles con navegadores actuales (Chrome, Firefox y Edge).
+- Backend: Spring Boot, encargado de la lógica de negocio, gestión de entidades académicas, validaciones y exposición de endpoints REST.
+- Motor de Optimización (CSP): FastAPI, utilizado para implementar el motor de generación de horarios basado en algoritmos de satisfacción de restricciones, optimizado para procesamiento eficiente y comunicación vía API.
+- Base de datos: PostgreSQL, sistema relacional con soporte transaccional, utilizado para garantizar integridad, consistencia y persistencia de los datos académicos.
+- Contenedorización: Docker, empleado para empaquetar y desplegar los distintos componentes del sistema de manera aislada, facilitando la portabilidad y consistencia entre entornos de desarrollo y producción.
 
 ---
 
