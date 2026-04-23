@@ -2,10 +2,12 @@ import api from "@/lib/api";
 import type { SexType, ProfileResponse } from "@/types/entities";
 
 export interface UpsertProfilePayload {
-  dni:   string | null;
-  phone: string | null;
-  sex:   SexType | null;
-  age:   number | null;
+  dni:        string | null;
+  phone:      string | null;
+  sex:        SexType | null;
+  age:        number | null;
+  facultadId: string | null;
+  carreraId:  string | null;
 }
 
 export const profileApi = {

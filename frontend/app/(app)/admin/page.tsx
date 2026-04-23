@@ -10,6 +10,9 @@ import {
   GraduationCap,
   BookOpen,
   DoorOpen,
+  CalendarDays,
+  CalendarCheck,
+  Building2,
   ArrowRight,
   TrendingUp,
   ShieldCheck,
@@ -24,6 +27,9 @@ export default function AdminHomePage() {
     { label: t.admin.stats.teachers,   value: "—", sub: t.admin.stats.teachersDesc,   icon: <GraduationCap className="h-5 w-5" />,  href: "/admin/teachers" },
     { label: t.admin.stats.courses,    value: "—", sub: t.admin.stats.coursesDesc,    icon: <BookOpen className="h-5 w-5" />,        href: "/admin/courses" },
     { label: t.admin.stats.classrooms, value: "—", sub: t.admin.stats.classroomsDesc, icon: <DoorOpen className="h-5 w-5" />,        href: "/admin/classrooms" },
+    { label: "Facultades", value: "—", sub: "Facultades y carreras del catálogo.", icon: <Building2 className="h-5 w-5" />, href: "/admin/facultades" },
+    { label: "Períodos", value: "—", sub: "Ciclos configurados para la planificación.", icon: <CalendarDays className="h-5 w-5" />, href: "/admin/academic-periods" },
+    { label: "Ofertas", value: "—", sub: "Cursos abiertos por período y sección.", icon: <CalendarCheck className="h-5 w-5" />, href: "/admin/course-offerings" },
   ];
 
   const QUICK_LINKS = [
@@ -31,6 +37,9 @@ export default function AdminHomePage() {
     { title: t.admin.links.teachersTitle,   description: t.admin.links.teachersDesc,   href: "/admin/teachers",   icon: <GraduationCap className="h-5 w-5" /> },
     { title: t.admin.links.coursesTitle,    description: t.admin.links.coursesDesc,    href: "/admin/courses",    icon: <BookOpen className="h-5 w-5" /> },
     { title: t.admin.links.classroomsTitle, description: t.admin.links.classroomsDesc, href: "/admin/classrooms", icon: <DoorOpen className="h-5 w-5" /> },
+    { title: "Facultades y carreras", description: "Gestiona el catálogo de facultades y sus carreras asociadas.", href: "/admin/facultades", icon: <Building2 className="h-5 w-5" /> },
+    { title: "Períodos académicos", description: "Define ciclos, rango de fechas y tope general de créditos.", href: "/admin/academic-periods", icon: <CalendarDays className="h-5 w-5" /> },
+    { title: "Ofertas de cursos", description: "Abre cursos por período, crea secciones y asigna docentes candidatos.", href: "/admin/course-offerings", icon: <CalendarCheck className="h-5 w-5" /> },
   ];
 
   const SYSTEM_CARDS: { label: string; value: string; icon: React.ReactNode; accent?: boolean }[] = [
@@ -44,7 +53,7 @@ export default function AdminHomePage() {
       description={t.admin.description}
     >
       {/* Métricas principales */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-4 mb-8 md:grid-cols-3 xl:grid-cols-6">
         {STAT_CARDS.map((card) => (
           <Link key={card.label} href={card.href} className="group block">
             <Card className="p-5 bg-white dark:bg-[#1a1a1a] border border-gray-100 dark:border-white/8 shadow-none rounded-xl hover:border-gray-200 dark:hover:border-white/15 hover:shadow-sm transition-all">

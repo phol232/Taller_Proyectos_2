@@ -1,18 +1,20 @@
 import { z } from "zod";
 
 export const teacherSchema = z.object({
+  userId: z.string().uuid("El usuario debe ser un UUID válido").optional().nullable().or(z.literal("")),
   code: z
     .string()
     .min(1, "El código es obligatorio")
-    .max(20, "Máximo 20 caracteres"),
-  name: z
+    .max(50, "Máximo 50 caracteres"),
+  fullName: z
     .string()
     .min(2, "El nombre es obligatorio")
-    .max(100, "Máximo 100 caracteres"),
+    .max(255, "Máximo 255 caracteres"),
   specialty: z
     .string()
     .min(2, "La especialidad es obligatoria")
-    .max(100, "Máximo 100 caracteres"),
+    .max(255, "Máximo 255 caracteres"),
+  isActive: z.boolean().default(true),
 });
 
 export type TeacherFormValues = z.infer<typeof teacherSchema>;

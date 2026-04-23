@@ -8,7 +8,7 @@ export const courseSchema = z.object({
   name: z
     .string()
     .min(2, "El nombre es obligatorio")
-    .max(100, "Máximo 100 caracteres"),
+    .max(255, "Máximo 255 caracteres"),
   credits: z
     .number({ error: "Los créditos deben ser un número" })
     .int()
@@ -18,6 +18,8 @@ export const courseSchema = z.object({
     .number({ error: "Las horas deben ser un número" })
     .int()
     .min(1, "Mínimo 1 hora semanal"),
+  requiredRoomType: z.string().max(100, "Máximo 100 caracteres").optional().nullable(),
+  isActive: z.boolean().default(true),
   prerequisites: z.array(z.string()).default([]),
 });
 

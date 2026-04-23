@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Mail, Shield, Pencil, Save, X, CreditCard, Phone, User2, CalendarDays } from "lucide-react";
+import { Mail, Shield, Pencil, Save, X, CreditCard, Phone, User2, CalendarDays, GraduationCap, BookOpen } from "lucide-react";
 import { toastError, toastSuccess } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/lib/i18n";
 import { profileApi } from "@/lib/profileApi";
+import { adminApi } from "@/lib/adminApi";
 import { Input } from "@/components/ui/input";
 import type { SexType } from "@/types/entities";
+import type { FacultadAdmin, CarreraAdmin } from "@/types/admin";
 
 const UC_PURPLE = "#6B21A8";
 
@@ -26,6 +28,8 @@ interface ProfileForm {
   phone: string;
   sex: SexOption;
   age: string;
+  facultadId: string;
+  carreraId: string;
 }
 
 function FieldLabel({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
@@ -43,8 +47,14 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving]   = useState(false);
   const [loading, setLoading] = useState(true);
-  const [form, setForm]   = useState<ProfileForm>({ dni: "", phone: "", sex: "", age: "" });
-  const [saved, setSaved] = useState<ProfileForm>({ dni: "", phone: "", sex: "", age: "" });
+  const [form, setForm]   = useState<ProfileForm>({ dni: "", phone: "", sex: "", age: "", facultadId: "", carreraId: "" });
+  const [saved, setSaved] = useState<ProfileForm>({ dni: "", phone: "", sex: "", age: "", facultadId: "", carreraId: "" });
+
+  const [facultades, setFacultades] = useState<FacultadAdmin[]>([]);
+  const [carreras, setCarreras] = useState<CarreraAdmin[]>([]);
+  const [carrerasLoading, setCarrerasLoading] = useState(false);
+
+  const isStudent = user?.role === "student" || user?.role === "admin";
 
   const roleColor = ROLE_COLORS[user?.role ?? "student"];
   const initial   = (user?.name ?? "U").charAt(0).toUpperCase();
@@ -57,6 +67,8 @@ export default function ProfilePage() {
           phone: data.phone ?? "",
           sex:   (data.sex as SexOption) ?? "",
           age:   data.age != null ? String(data.age) : "",
+          facultadId: data.facultadId ?? "",
+          carreraId:  data.carreraId  ?? "",
         };
         setForm(loaded);
         setSaved(loaded);
@@ -64,6 +76,28 @@ export default function ProfilePage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Carga catálogo de facultades cuando el usuario es estudiante.
+  useEffect(() => {
+    if (!isStudent) return;
+    adminApi.listCatalogFacultades()
+      .then(setFacultades)
+      .catch(() => {});
+  }, [isStudent]);
+
+  // Carga carreras filtradas por facultad seleccionada.
+  useEffect(() => {
+    if (!isStudent) return;
+    if (!form.facultadId) {
+      setCarreras([]);
+      return;
+    }
+    setCarrerasLoading(true);
+    adminApi.listCatalogCarreras(form.facultadId)
+      .then(setCarreras)
+      .catch(() => setCarreras([]))
+      .finally(() => setCarrerasLoading(false));
+  }, [isStudent, form.facultadId]);
 
   function handleEdit()   { setSaved({ ...form }); setEditing(true);  }
   function handleCancel() { setForm({ ...saved }); setEditing(false); }
@@ -89,12 +123,16 @@ export default function ProfilePage() {
         phone: form.phone.trim() || null,
         sex:   (form.sex as SexType) || null,
         age:   form.age !== "" ? Number(form.age) : null,
+        facultadId: form.facultadId || null,
+        carreraId:  form.carreraId  || null,
       });
       const updated: ProfileForm = {
         dni:   data.dni   ?? "",
         phone: data.phone ?? "",
         sex:   (data.sex as SexOption) ?? "",
         age:   data.age != null ? String(data.age) : "",
+        facultadId: data.facultadId ?? "",
+        carreraId:  data.carreraId  ?? "",
       };
       setForm(updated);
       setSaved(updated);
@@ -283,6 +321,50 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Section: Información académica (solo estudiantes) */}
+        {isStudent && (
+          <div className="px-6 pt-5 pb-6 border-t border-gray-100 dark:border-white/8">
+            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-4">
+              Información académica
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <FieldLabel icon={GraduationCap}>Facultad</FieldLabel>
+                <select
+                  value={form.facultadId}
+                  onChange={e => {
+                    const nextFacultadId = e.target.value;
+                    setForm(prev => ({ ...prev, facultadId: nextFacultadId, carreraId: "" }));
+                  }}
+                  disabled={!editing}
+                  className="h-12 w-full rounded-lg border border-input bg-transparent px-3 text-sm text-gray-900 dark:text-white dark:bg-input/30 outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 disabled:bg-input/50 dark:disabled:bg-input/80 appearance-none cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <option value="" className="dark:bg-[#111]">—</option>
+                  {facultades.map(f => (
+                    <option key={f.id} value={f.id} className="dark:bg-[#111]">{f.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel icon={BookOpen}>Carrera</FieldLabel>
+                <select
+                  value={form.carreraId}
+                  onChange={e => setForm(prev => ({ ...prev, carreraId: e.target.value }))}
+                  disabled={!editing || !form.facultadId || carrerasLoading}
+                  className="h-12 w-full rounded-lg border border-input bg-transparent px-3 text-sm text-gray-900 dark:text-white dark:bg-input/30 outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 disabled:bg-input/50 dark:disabled:bg-input/80 appearance-none cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <option value="" className="dark:bg-[#111]">
+                    {!form.facultadId ? "Selecciona una facultad primero" : carrerasLoading ? "Cargando…" : "—"}
+                  </option>
+                  {carreras.map(c => (
+                    <option key={c.id} value={c.id} className="dark:bg-[#111]">{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer: Save / Cancel — solo cuando editing */}
         {editing && (
