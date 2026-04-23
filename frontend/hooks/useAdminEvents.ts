@@ -18,8 +18,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
  * Subscribes to the admin SSE stream and invokes the handler
  * whenever one of the specified events is received from the backend.
  *
- * Automatically reconnects on transient errors (EventSource default behavior).
- * The cookie-based JWT is sent because `withCredentials: true` is used.
+ * - Automatically reconnects on transient errors (EventSource default behavior).
+ * - Triggers the handler on reconnect so data is refreshed even if an event
+ *   was missed while the connection was down.
+ * - The cookie-based JWT is sent because `withCredentials: true` is used.
  */
 export function useAdminEvents(
   events: AdminEventName | AdminEventName[],
@@ -37,8 +39,19 @@ export function useAdminEvents(
 
     list.forEach((name) => source.addEventListener(name, listener));
 
+    // Reload data on reconnect: if the connection dropped and we missed an event,
+    // the first open after a reconnect triggers a fresh fetch.
+    let isFirstOpen = true;
+    source.onopen = () => {
+      if (isFirstOpen) {
+        isFirstOpen = false;
+        return;
+      }
+      // Reconnected after a drop — refresh to avoid stale state.
+      handlerRef.current();
+    };
+
     source.onerror = () => {
-      // EventSource reintenta automáticamente; solo logueamos en dev.
       if (process.env.NODE_ENV !== "production") {
         console.debug("[useAdminEvents] SSE conexión perdida, reintentando...");
       }

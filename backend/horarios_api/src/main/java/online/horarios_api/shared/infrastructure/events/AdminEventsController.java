@@ -2,6 +2,7 @@ package online.horarios_api.shared.infrastructure.events;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,7 +22,12 @@ public class AdminEventsController {
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Stream SSE con eventos de cambio en recursos admin")
-    public SseEmitter stream() {
+    public SseEmitter stream(HttpServletResponse response) {
+        // Required by the SSE spec; without it browsers and proxies may buffer the stream.
+        response.setHeader("Cache-Control", "no-cache");
+        // Disables response buffering in nginx / other reverse proxies.
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Connection", "keep-alive");
         return publisher.subscribe();
     }
 }
