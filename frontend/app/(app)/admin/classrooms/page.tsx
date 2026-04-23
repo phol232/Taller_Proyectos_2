@@ -13,6 +13,7 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { classroomSchema } from "@/lib/validators/classroom.schema";
 import { toastError, toastSuccess } from "@/lib/utils";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import type { ClassroomAdmin, AvailabilitySlot } from "@/types/admin";
 
 type ClassroomFormState = {
@@ -55,6 +56,8 @@ export default function ClassroomsPage() {
   useEffect(() => {
     void loadClassrooms(query);
   }, [query]);
+
+  useAdminEvents("classrooms.changed", () => void loadClassrooms(query));
 
   async function loadClassrooms(search: string) {
     setLoading(true);

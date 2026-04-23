@@ -26,6 +26,7 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { SelectField } from "@/components/admin/SelectField";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { toastError, toastSuccess, cn } from "@/lib/utils";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import type { CarreraAdmin, FacultadAdmin } from "@/types/admin";
 
 // ─── Formularios ─────────────────────────────────────────────────────────────
@@ -124,6 +125,11 @@ export default function FacultadesPage() {
       setCarreras([]);
     }
   }, [selectedFacultadId, loadCarreras]);
+
+  useAdminEvents("facultades.changed", () => void loadFacultades());
+  useAdminEvents("carreras.changed", () => {
+    if (selectedFacultadId) void loadCarreras(selectedFacultadId);
+  });
 
   // ─── Facultad: crear / editar ───────────────────────────────────────
 

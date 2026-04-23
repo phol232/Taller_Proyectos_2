@@ -14,6 +14,7 @@ import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { teacherSchema } from "@/lib/validators/teacher.schema";
 import { toastError, toastSuccess } from "@/lib/utils";
 import { joinFullName, splitFullName } from "@/lib/fullName";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import type { TeacherAdmin, AvailabilitySlot } from "@/types/admin";
 
 type TeacherFormState = {
@@ -56,6 +57,8 @@ export default function TeachersPage() {
   useEffect(() => {
     void loadTeachers(query);
   }, [query]);
+
+  useAdminEvents("teachers.changed", () => void loadTeachers(query));
 
   async function loadTeachers(search: string) {
     setLoading(true);
