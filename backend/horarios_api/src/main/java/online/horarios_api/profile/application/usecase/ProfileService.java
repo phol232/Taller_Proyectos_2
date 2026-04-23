@@ -94,6 +94,8 @@ public class ProfileService implements GetProfileUseCase, UpsertProfileUseCase {
                 profile.getPhone(),
                 profile.getSex(),
                 profile.getAge() != null ? profile.getAge().intValue() : null,
+                profile.getFacultadId(),
+                profile.getCarreraId(),
                 profile.getCreatedAt(),
                 profile.getUpdatedAt()
         );
@@ -106,7 +108,7 @@ public class ProfileService implements GetProfileUseCase, UpsertProfileUseCase {
                 user.fullName(),
                 user.email(),
                 user.role(),
-                null, null, null, null, null, null
+                null, null, null, null, null, null, null, null
         );
     }
 

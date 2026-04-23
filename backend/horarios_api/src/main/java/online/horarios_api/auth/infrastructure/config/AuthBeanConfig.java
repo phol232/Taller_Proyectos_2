@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 public class AuthBeanConfig {
 
     @Bean

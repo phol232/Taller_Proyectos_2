@@ -42,6 +42,12 @@ public class ProfileEntity {
     @Column(columnDefinition = "smallint")
     private Short age;
 
+    @Column(name = "facultad_id")
+    private UUID facultadId;
+
+    @Column(name = "carrera_id")
+    private UUID carreraId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -53,7 +59,7 @@ public class ProfileEntity {
     // ── Mappers ───────────────────────────────────────────────────────
 
     public Profile toDomain() {
-        return new Profile(id, userId, dni, phone, sex, age, createdAt, updatedAt);
+        return new Profile(id, userId, dni, phone, sex, age, facultadId, carreraId, createdAt, updatedAt);
     }
 
     public static ProfileEntity fromDomain(Profile profile) {
@@ -64,6 +70,8 @@ public class ProfileEntity {
                 .phone(profile.getPhone())
                 .sex(profile.getSex())
                 .age(profile.getAge())
+                .facultadId(profile.getFacultadId())
+                .carreraId(profile.getCarreraId())
                 .createdAt(profile.getCreatedAt())
                 .updatedAt(profile.getUpdatedAt())
                 .build();
