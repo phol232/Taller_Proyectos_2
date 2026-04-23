@@ -3,6 +3,7 @@ package online.horarios_api.shared.infrastructure.web.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import online.horarios_api.shared.domain.exception.BadRequestException;
+import online.horarios_api.shared.domain.exception.ConflictException;
 import online.horarios_api.shared.domain.exception.DuplicateFieldException;
 import online.horarios_api.shared.domain.exception.ForbiddenException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
@@ -79,6 +80,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(new ApiError("DUPLICATE_FIELD", ex.getMessage(), fieldErrors));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiError> handleConflict(ConflictException ex) {
+        log.warn("Conflicto de operación: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ApiError("CONFLICT", ex.getMessage()));
     }
 
 

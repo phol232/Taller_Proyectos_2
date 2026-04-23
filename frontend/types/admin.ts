@@ -1,0 +1,137 @@
+export type ScheduleDay = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY";
+
+export interface AvailabilitySlot {
+  day: ScheduleDay;
+  startTime: string;
+  endTime: string;
+  available: boolean;
+}
+
+export interface CourseAdmin {
+  id: string;
+  code: string;
+  name: string;
+  credits: number;
+  weeklyHours: number;
+  requiredRoomType: string | null;
+  isActive: boolean;
+  prerequisites: string[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface TeacherAdmin {
+  id: string;
+  userId: string | null;
+  code: string;
+  fullName: string;
+  specialty: string;
+  isActive: boolean;
+  availability: AvailabilitySlot[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ClassroomAdmin {
+  id: string;
+  code: string;
+  name: string;
+  capacity: number;
+  type: string;
+  isActive: boolean;
+  availability: AvailabilitySlot[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface StudentAdmin {
+  id: string;
+  userId: string | null;
+  code: string;
+  fullName: string;
+  email: string | null;
+  cycle: number;
+  career: string | null;
+  facultadId: string | null;
+  carreraId: string | null;
+  creditLimit: number;
+  isActive: boolean;
+  approvedCourses: string[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface FacultadAdmin {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface CarreraAdmin {
+  id: string;
+  facultadId: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface AcademicPeriodAdmin {
+  id: string;
+  code: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  status: "PLANNING" | "ACTIVE" | "CLOSED";
+  maxStudentCredits: number;
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface SectionTeacherCandidate {
+  teacherId: string;
+  priorityWeight: number;
+}
+
+export interface CourseSectionUpsertInput {
+  sectionCode: string;
+  vacancyLimit: number;
+  status: "DRAFT" | "ACTIVE" | "CANCELLED";
+  teacherCandidates: SectionTeacherCandidate[];
+}
+
+export interface CourseSectionAdmin {
+  id: string;
+  sectionCode: string;
+  vacancyLimit: number;
+  status: "DRAFT" | "ACTIVE" | "CANCELLED";
+  teacherCandidates: SectionTeacherCandidate[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface CourseOfferingUpsertInput {
+  academicPeriodId: string;
+  courseId: string;
+  expectedEnrollment: number;
+  status: "DRAFT" | "ACTIVE" | "CANCELLED";
+  sections: CourseSectionUpsertInput[];
+}
+
+export interface CourseOfferingAdmin {
+  id: string;
+  academicPeriodId: string;
+  courseId: string;
+  expectedEnrollment: number;
+  status: "DRAFT" | "ACTIVE" | "CANCELLED";
+  sections: CourseSectionAdmin[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ApiErrorResponse {
+  code?: string;
+  message?: string;
+  fieldErrors?: Record<string, string>;
+}

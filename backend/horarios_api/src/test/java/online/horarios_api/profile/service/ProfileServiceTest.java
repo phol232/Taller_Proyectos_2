@@ -57,7 +57,7 @@ class ProfileServiceTest {
         UUID userId = UUID.randomUUID();
         UUID profileId = UUID.randomUUID();
         UserInfo user = buildUserInfo(userId);
-        ProfileData command = new ProfileData(" 12345678 ", " 999888777 ", SexType.MALE, 22);
+        ProfileData command = new ProfileData(" 12345678 ", " 999888777 ", SexType.MALE, 22, null, null);
 
         when(userReadPort.findUserInfoById(userId)).thenReturn(Optional.of(user));
         when(profilePort.findByUserId(userId)).thenReturn(Optional.empty());
@@ -65,7 +65,8 @@ class ProfileServiceTest {
             Profile profile = invocation.getArgument(0);
             return new Profile(profileId, profile.getUserId(),
                     profile.getDni(), profile.getPhone(), profile.getSex(),
-                    profile.getAge(), null, null);
+                    profile.getAge(), profile.getFacultadId(), profile.getCarreraId(),
+                    null, null);
         });
 
         ProfileInfo result = service.upsertProfile(userId, command);
@@ -83,7 +84,7 @@ class ProfileServiceTest {
     void upsertProfile_duplicateDni_throwsConflict() {
         UUID userId = UUID.randomUUID();
         UserInfo user = buildUserInfo(userId);
-        ProfileData command = new ProfileData("12345678", null, null, null);
+        ProfileData command = new ProfileData("12345678", null, null, null, null, null);
 
         when(userReadPort.findUserInfoById(userId)).thenReturn(Optional.of(user));
         when(profilePort.existsByDniAndUserIdNot(eq("12345678"), eq(userId))).thenReturn(true);

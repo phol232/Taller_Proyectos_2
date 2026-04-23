@@ -1,10 +1,17 @@
 -- ============================================================
---  Planner UC — Database Schema
+--  Planner UC — Database Schema (Clean)
 --  HU-01: Gestión de Autenticación y Sesiones
 --  Base: PostgreSQL 15+
 -- ============================================================
+-- Este archivo contiene SOLO:
+--   - Extensiones
+--   - Tipos/Enums
+--   - Tablas
+--   - Constraints
+--   - Índices
+--   - Definición de Triggers (las funciones están en archivos separados)
+-- ============================================================
 
--- Extensión para generación de UUIDs
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
@@ -12,18 +19,17 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ============================================================
 
 CREATE TYPE user_role AS ENUM ('ADMIN', 'COORDINATOR', 'TEACHER', 'STUDENT');
+CREATE TYPE sex_type AS ENUM ('MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY');
+CREATE TYPE day_of_week AS ENUM ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY');
 
 -- ============================================================
 --  TABLAS DE AUTENTICACIÓN
 -- ============================================================
 
--- Tabla base de usuarios.
--- Soporta login local (email + contraseña) y OAuth2 (Google).
--- Para usuarios solo-OAuth2, password_hash es NULL.
 CREATE TABLE users (
     id              UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     email           VARCHAR(255)    NOT NULL,
-    password_hash   VARCHAR(255),                           -- NULL para usuarios solo-OAuth2
+    password_hash   VARCHAR(255),
     full_name       VARCHAR(255)    NOT NULL,
     role            user_role       NOT NULL,
     is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
@@ -35,13 +41,11 @@ CREATE TABLE users (
     CONSTRAINT uq_users_email UNIQUE (email)
 );
 
--- Cuentas OAuth2 vinculadas a un usuario del sistema.
--- Permite que un mismo usuario vincule múltiples proveedores en el futuro.
 CREATE TABLE oauth2_linked_accounts (
     id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           UUID         NOT NULL,
-    provider          VARCHAR(50)  NOT NULL,                -- 'google', 'github', etc.
-    provider_subject  VARCHAR(255) NOT NULL,                -- claim 'sub' del proveedor
+    provider          VARCHAR(50)  NOT NULL,
+    provider_subject  VARCHAR(255) NOT NULL,
     provider_email    VARCHAR(255),
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
@@ -51,16 +55,14 @@ CREATE TABLE oauth2_linked_accounts (
         UNIQUE (provider, provider_subject)
 );
 
--- Refresh tokens con rotación.
--- Se almacena únicamente el hash SHA-256 del token real (nunca el token en claro).
 CREATE TABLE refresh_tokens (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID        NOT NULL,
-    token_hash  VARCHAR(64) NOT NULL,                       -- SHA-256 hex del token real
+    token_hash  VARCHAR(64) NOT NULL,
     expires_at  TIMESTAMPTZ NOT NULL,
     revoked     BOOLEAN     NOT NULL DEFAULT FALSE,
     revoked_at  TIMESTAMPTZ,
-    ip_address  VARCHAR(45),                                -- IPv4 (15) o IPv6 (45)
+    ip_address  VARCHAR(45),
     user_agent  TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -70,14 +72,11 @@ CREATE TABLE refresh_tokens (
         UNIQUE (token_hash)
 );
 
--- Tokens OTP para recuperación de contraseña.
--- El código de 6 dígitos se almacena como hash BCrypt (nunca en claro).
--- Flujo: solicitar OTP → verificar OTP → obtener reset_token → cambiar contraseña.
 CREATE TABLE password_reset_tokens (
     id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           UUID        NOT NULL,
-    otp_hash          VARCHAR(255) NOT NULL,     -- BCrypt hash del código OTP de 6 dígitos
-    reset_token_hash  VARCHAR(64),               -- SHA-256 del token de reset (se establece al verificar el OTP)
+    otp_hash          VARCHAR(255) NOT NULL,
+    reset_token_hash  VARCHAR(64),
     expires_at        TIMESTAMPTZ NOT NULL,
     verified          BOOLEAN     NOT NULL DEFAULT FALSE,
     verified_at       TIMESTAMPTZ,
@@ -92,15 +91,8 @@ CREATE TABLE password_reset_tokens (
 
 -- ============================================================
 --  PERFILES DE USUARIO
---  HU-XX: Gestión de Perfil de Usuario
 -- ============================================================
 
--- Tipos enumerados para perfil
-CREATE TYPE sex_type AS ENUM ('MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY');
-
--- Tabla de perfiles extendidos de usuario.
--- Separada de 'users' para mantener autenticación desacoplada de datos personales.
--- Se crea al completar por primera vez el perfil; 1:1 con users.
 CREATE TABLE profiles (
     id          UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID            NOT NULL,
@@ -119,301 +111,591 @@ CREATE TABLE profiles (
 );
 
 -- ============================================================
+--  CATÁLOGO: FACULTADES Y CARRERAS
+-- ============================================================
+
+CREATE TABLE facultades (
+    id          UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    code        VARCHAR(20)     NOT NULL,
+    name        VARCHAR(255)    NOT NULL,
+    is_active   BOOLEAN         NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_facultades_code UNIQUE (code)
+);
+
+CREATE TABLE carreras (
+    id           UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+    facultad_id  UUID           NOT NULL,
+    code         VARCHAR(20),
+    name         VARCHAR(255)   NOT NULL,
+    is_active    BOOLEAN        NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_carreras_facultad
+        FOREIGN KEY (facultad_id) REFERENCES facultades(id) ON DELETE CASCADE,
+    CONSTRAINT uq_carreras_code UNIQUE (code)
+);
+
+-- ============================================================
+--  DOMINIO ACADÉMICO Y SCHEDULING
+-- ============================================================
+
+CREATE TABLE academic_periods (
+    id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    code                VARCHAR(50)  NOT NULL,
+    name                VARCHAR(150) NOT NULL,
+    starts_at           DATE         NOT NULL,
+    ends_at             DATE         NOT NULL,
+    status              VARCHAR(20)  NOT NULL DEFAULT 'PLANNING',
+    max_student_credits INTEGER      NOT NULL DEFAULT 22 CHECK (max_student_credits > 0),
+    is_active           BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_academic_periods_code UNIQUE (code),
+    CONSTRAINT chk_academic_periods_dates CHECK (ends_at >= starts_at),
+    CONSTRAINT chk_academic_periods_status CHECK (status IN ('PLANNING', 'ACTIVE', 'CLOSED'))
+);
+
+CREATE TABLE time_slots (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    day_of_week day_of_week  NOT NULL,
+    start_time  TIME         NOT NULL,
+    end_time    TIME         NOT NULL,
+    slot_order  INTEGER      NOT NULL,
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_time_slots_value UNIQUE (day_of_week, start_time, end_time),
+    CONSTRAINT chk_time_slots_range CHECK (end_time > start_time)
+);
+
+CREATE TABLE teachers (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID,
+    code        VARCHAR(50)  NOT NULL,
+    full_name   VARCHAR(255) NOT NULL,
+    specialty   VARCHAR(255) NOT NULL,
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_teachers_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT uq_teachers_code UNIQUE (code),
+    CONSTRAINT uq_teachers_user_id UNIQUE (user_id)
+);
+
+CREATE TABLE classrooms (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    code        VARCHAR(50)  NOT NULL,
+    name        VARCHAR(255) NOT NULL,
+    capacity    INTEGER      NOT NULL CHECK (capacity > 0),
+    room_type   VARCHAR(100) NOT NULL,
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_classrooms_code UNIQUE (code)
+);
+
+CREATE TABLE courses (
+    id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    code                VARCHAR(50)  NOT NULL,
+    name                VARCHAR(255) NOT NULL,
+    credits             INTEGER      NOT NULL CHECK (credits BETWEEN 1 AND 6),
+    weekly_hours        INTEGER      NOT NULL CHECK (weekly_hours >= 1),
+    required_room_type  VARCHAR(100),
+    is_active           BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_courses_code UNIQUE (code)
+);
+
+CREATE TABLE students (
+    id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID,
+    code          VARCHAR(50)  NOT NULL,
+    full_name     VARCHAR(255) NOT NULL,
+    cycle         INTEGER      NOT NULL CHECK (cycle > 0),
+    career        VARCHAR(255),
+    credit_limit  INTEGER      NOT NULL DEFAULT 22 CHECK (credit_limit > 0),
+    is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_students_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT uq_students_code UNIQUE (code),
+    CONSTRAINT uq_students_user_id UNIQUE (user_id)
+);
+
+CREATE TABLE profiles_add_facultad_carrera (
+    dummy INTEGER
+);
+ALTER TABLE profiles ADD COLUMN facultad_id UUID NULL REFERENCES facultades(id) ON DELETE SET NULL;
+ALTER TABLE profiles ADD COLUMN carrera_id  UUID NULL REFERENCES carreras(id)   ON DELETE SET NULL;
+DROP TABLE profiles_add_facultad_carrera;
+
+CREATE INDEX IF NOT EXISTS idx_profiles_facultad_id ON profiles(facultad_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_carrera_id  ON profiles(carrera_id);
+
+ALTER TABLE students ADD COLUMN facultad_id UUID NULL REFERENCES facultades(id) ON DELETE SET NULL;
+ALTER TABLE students ADD COLUMN carrera_id  UUID NULL REFERENCES carreras(id)   ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_students_facultad_id ON students(facultad_id);
+CREATE INDEX IF NOT EXISTS idx_students_carrera_id  ON students(carrera_id);
+
+CREATE TABLE teacher_availability (
+    id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    teacher_id   UUID         NOT NULL,
+    time_slot_id UUID         NOT NULL,
+    is_available BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_teacher_availability_teacher
+        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+    CONSTRAINT fk_teacher_availability_slot
+        FOREIGN KEY (time_slot_id) REFERENCES time_slots(id) ON DELETE CASCADE,
+    CONSTRAINT uq_teacher_availability UNIQUE (teacher_id, time_slot_id)
+);
+
+CREATE TABLE classroom_availability (
+    id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    classroom_id UUID         NOT NULL,
+    time_slot_id UUID         NOT NULL,
+    is_available BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_classroom_availability_classroom
+        FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE CASCADE,
+    CONSTRAINT fk_classroom_availability_slot
+        FOREIGN KEY (time_slot_id) REFERENCES time_slots(id) ON DELETE CASCADE,
+    CONSTRAINT uq_classroom_availability UNIQUE (classroom_id, time_slot_id)
+);
+
+CREATE TABLE course_prerequisites (
+    id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id              UUID         NOT NULL,
+    prerequisite_course_id UUID         NOT NULL,
+    created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_prereq_course
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_course_prereq_required
+        FOREIGN KEY (prerequisite_course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT uq_course_prerequisites UNIQUE (course_id, prerequisite_course_id),
+    CONSTRAINT chk_course_prerequisites_self CHECK (course_id <> prerequisite_course_id)
+);
+
+CREATE TABLE student_completed_courses (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id   UUID        NOT NULL,
+    course_id    UUID        NOT NULL,
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_student_completed_student
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    CONSTRAINT fk_student_completed_course
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT uq_student_completed_courses UNIQUE (student_id, course_id)
+);
+
+CREATE TABLE course_offerings (
+    id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    academic_period_id   UUID         NOT NULL,
+    course_id            UUID         NOT NULL,
+    expected_enrollment  INTEGER      NOT NULL DEFAULT 0 CHECK (expected_enrollment >= 0),
+    status               VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_offerings_period
+        FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE CASCADE,
+    CONSTRAINT fk_course_offerings_course
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT uq_course_offerings UNIQUE (academic_period_id, course_id),
+    CONSTRAINT chk_course_offerings_status CHECK (status IN ('DRAFT', 'ACTIVE', 'CANCELLED'))
+);
+
+CREATE TABLE course_sections (
+    id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_offering_id UUID         NOT NULL,
+    section_code       VARCHAR(20)  NOT NULL,
+    vacancy_limit      INTEGER      NOT NULL CHECK (vacancy_limit > 0),
+    status             VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_sections_offering
+        FOREIGN KEY (course_offering_id) REFERENCES course_offerings(id) ON DELETE CASCADE,
+    CONSTRAINT uq_course_sections UNIQUE (course_offering_id, section_code),
+    CONSTRAINT chk_course_sections_status CHECK (status IN ('DRAFT', 'ACTIVE', 'CANCELLED'))
+);
+
+CREATE TABLE section_teacher_candidates (
+    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    section_id      UUID         NOT NULL,
+    teacher_id      UUID         NOT NULL,
+    priority_weight NUMERIC(8,4) NOT NULL DEFAULT 1.0 CHECK (priority_weight >= 0),
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_section_teacher_candidates_section
+        FOREIGN KEY (section_id) REFERENCES course_sections(id) ON DELETE CASCADE,
+    CONSTRAINT fk_section_teacher_candidates_teacher
+        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+    CONSTRAINT uq_section_teacher_candidates UNIQUE (section_id, teacher_id)
+);
+
+CREATE TABLE teaching_schedules (
+    id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    academic_period_id UUID         NOT NULL,
+    version            INTEGER      NOT NULL DEFAULT 1 CHECK (version > 0),
+    status             VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
+    created_by         UUID,
+    confirmed_by       UUID,
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    confirmed_at       TIMESTAMPTZ,
+
+    CONSTRAINT fk_teaching_schedules_period
+        FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE CASCADE,
+    CONSTRAINT fk_teaching_schedules_created_by
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT fk_teaching_schedules_confirmed_by
+        FOREIGN KEY (confirmed_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT chk_teaching_schedules_status CHECK (status IN ('DRAFT', 'CONFIRMED', 'CANCELLED'))
+);
+
+CREATE UNIQUE INDEX uq_teaching_schedules_confirmed_per_period
+    ON teaching_schedules(academic_period_id)
+    WHERE status = 'CONFIRMED';
+
+CREATE TABLE section_assignments (
+    id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    teaching_schedule_id UUID         NOT NULL,
+    section_id           UUID         NOT NULL,
+    teacher_id           UUID         NOT NULL,
+    classroom_id         UUID         NOT NULL,
+    assignment_status    VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_section_assignments_schedule
+        FOREIGN KEY (teaching_schedule_id) REFERENCES teaching_schedules(id) ON DELETE CASCADE,
+    CONSTRAINT fk_section_assignments_section
+        FOREIGN KEY (section_id) REFERENCES course_sections(id) ON DELETE CASCADE,
+    CONSTRAINT fk_section_assignments_teacher
+        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_section_assignments_classroom
+        FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE RESTRICT,
+    CONSTRAINT uq_section_assignments UNIQUE (teaching_schedule_id, section_id),
+    CONSTRAINT chk_section_assignments_status CHECK (assignment_status IN ('DRAFT', 'CONFIRMED', 'CANCELLED'))
+);
+
+CREATE TABLE section_assignment_slots (
+    id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    section_assignment_id UUID        NOT NULL,
+    teaching_schedule_id UUID         NOT NULL,
+    section_id           UUID         NOT NULL,
+    teacher_id           UUID         NOT NULL,
+    classroom_id         UUID         NOT NULL,
+    time_slot_id         UUID         NOT NULL,
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_section_assignment_slots_assignment
+        FOREIGN KEY (section_assignment_id) REFERENCES section_assignments(id) ON DELETE CASCADE,
+    CONSTRAINT fk_section_assignment_slots_schedule
+        FOREIGN KEY (teaching_schedule_id) REFERENCES teaching_schedules(id) ON DELETE CASCADE,
+    CONSTRAINT fk_section_assignment_slots_section
+        FOREIGN KEY (section_id) REFERENCES course_sections(id) ON DELETE CASCADE,
+    CONSTRAINT fk_section_assignment_slots_teacher
+        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_section_assignment_slots_classroom
+        FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_section_assignment_slots_slot
+        FOREIGN KEY (time_slot_id) REFERENCES time_slots(id) ON DELETE RESTRICT,
+    CONSTRAINT uq_section_assignment_slots_assignment UNIQUE (section_assignment_id, time_slot_id),
+    CONSTRAINT uq_section_assignment_slots_teacher UNIQUE (teaching_schedule_id, teacher_id, time_slot_id),
+    CONSTRAINT uq_section_assignment_slots_classroom UNIQUE (teaching_schedule_id, classroom_id, time_slot_id)
+);
+
+CREATE TABLE student_schedules (
+    id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id         UUID         NOT NULL,
+    academic_period_id UUID         NOT NULL,
+    status             VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
+    generated_by       UUID,
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    confirmed_at       TIMESTAMPTZ,
+
+    CONSTRAINT fk_student_schedules_student
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    CONSTRAINT fk_student_schedules_period
+        FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE CASCADE,
+    CONSTRAINT fk_student_schedules_generated_by
+        FOREIGN KEY (generated_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT chk_student_schedules_status CHECK (status IN ('DRAFT', 'CONFIRMED', 'CANCELLED'))
+);
+
+CREATE UNIQUE INDEX uq_student_schedules_active_per_period
+    ON student_schedules(student_id, academic_period_id)
+    WHERE status IN ('DRAFT', 'CONFIRMED');
+
+CREATE TABLE student_schedule_items (
+    id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_schedule_id UUID         NOT NULL,
+    student_id          UUID         NOT NULL,
+    section_id          UUID         NOT NULL,
+    course_id           UUID         NOT NULL,
+    item_status         VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_student_schedule_items_schedule
+        FOREIGN KEY (student_schedule_id) REFERENCES student_schedules(id) ON DELETE CASCADE,
+    CONSTRAINT fk_student_schedule_items_student
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    CONSTRAINT fk_student_schedule_items_section
+        FOREIGN KEY (section_id) REFERENCES course_sections(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_student_schedule_items_course
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE RESTRICT,
+    CONSTRAINT uq_student_schedule_items_section UNIQUE (student_schedule_id, section_id),
+    CONSTRAINT uq_student_schedule_items_course UNIQUE (student_schedule_id, course_id),
+    CONSTRAINT chk_student_schedule_items_status CHECK (item_status IN ('ACTIVE', 'REMOVED'))
+);
+
+CREATE TABLE solver_runs (
+    id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_type         VARCHAR(20)  NOT NULL,
+    academic_period_id UUID       NOT NULL,
+    student_id       UUID,
+    status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    requested_by     UUID,
+    time_limit_ms    INTEGER      NOT NULL DEFAULT 30000 CHECK (time_limit_ms > 0),
+    input_hash       VARCHAR(128),
+    result_summary   TEXT,
+    started_at       TIMESTAMPTZ,
+    finished_at      TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_solver_runs_period
+        FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE CASCADE,
+    CONSTRAINT fk_solver_runs_student
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    CONSTRAINT fk_solver_runs_requested_by
+        FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT chk_solver_runs_type CHECK (run_type IN ('TEACHER', 'STUDENT')),
+    CONSTRAINT chk_solver_runs_status CHECK (status IN ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED'))
+);
+
+CREATE TABLE solver_run_conflicts (
+    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    solver_run_id   UUID         NOT NULL,
+    conflict_type   VARCHAR(50)  NOT NULL,
+    resource_type   VARCHAR(50),
+    resource_id     UUID,
+    section_id      UUID,
+    time_slot_id    UUID,
+    message         TEXT         NOT NULL,
+    details_json    JSONB,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_solver_run_conflicts_run
+        FOREIGN KEY (solver_run_id) REFERENCES solver_runs(id) ON DELETE CASCADE,
+    CONSTRAINT fk_solver_run_conflicts_section
+        FOREIGN KEY (section_id) REFERENCES course_sections(id) ON DELETE SET NULL,
+    CONSTRAINT fk_solver_run_conflicts_slot
+        FOREIGN KEY (time_slot_id) REFERENCES time_slots(id) ON DELETE SET NULL
+);
+
+CREATE TABLE schedule_feedback_events (
+    id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type          VARCHAR(50)  NOT NULL,
+    academic_period_id  UUID         NOT NULL,
+    student_id          UUID,
+    teaching_schedule_id UUID,
+    student_schedule_id UUID,
+    section_id          UUID,
+    assignment_id       UUID,
+    actor_user_id       UUID,
+    event_payload_json  JSONB,
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_schedule_feedback_events_period
+        FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE CASCADE,
+    CONSTRAINT fk_schedule_feedback_events_student
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE SET NULL,
+    CONSTRAINT fk_schedule_feedback_events_teaching_schedule
+        FOREIGN KEY (teaching_schedule_id) REFERENCES teaching_schedules(id) ON DELETE SET NULL,
+    CONSTRAINT fk_schedule_feedback_events_student_schedule
+        FOREIGN KEY (student_schedule_id) REFERENCES student_schedules(id) ON DELETE SET NULL,
+    CONSTRAINT fk_schedule_feedback_events_section
+        FOREIGN KEY (section_id) REFERENCES course_sections(id) ON DELETE SET NULL,
+    CONSTRAINT fk_schedule_feedback_events_assignment
+        FOREIGN KEY (assignment_id) REFERENCES section_assignments(id) ON DELETE SET NULL,
+    CONSTRAINT fk_schedule_feedback_events_actor
+        FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE ml_feature_snapshots (
+    id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    snapshot_type    VARCHAR(50)  NOT NULL,
+    related_entity_type VARCHAR(50) NOT NULL,
+    related_entity_id UUID        NOT NULL,
+    features_json    JSONB        NOT NULL,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ml_training_runs (
+    id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_name        VARCHAR(100) NOT NULL,
+    dataset_version   VARCHAR(100) NOT NULL,
+    target_name       VARCHAR(100) NOT NULL,
+    library_name      VARCHAR(50)  NOT NULL,
+    library_version   VARCHAR(50)  NOT NULL,
+    metrics_json      JSONB,
+    artifact_path     TEXT,
+    status            VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    started_at        TIMESTAMPTZ,
+    finished_at       TIMESTAMPTZ,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_ml_training_runs_status CHECK (status IN ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED'))
+);
+
+CREATE TABLE ml_model_registry (
+    id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_name        VARCHAR(100) NOT NULL,
+    model_type        VARCHAR(50)  NOT NULL,
+    target_name       VARCHAR(100) NOT NULL,
+    library_name      VARCHAR(50)  NOT NULL,
+    library_version   VARCHAR(50)  NOT NULL,
+    artifact_path     TEXT         NOT NULL,
+    feature_schema_json JSONB      NOT NULL,
+    metrics_json      JSONB,
+    status            VARCHAR(20)  NOT NULL DEFAULT 'TRAINED',
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    activated_at      TIMESTAMPTZ,
+
+    CONSTRAINT chk_ml_model_registry_status CHECK (status IN ('TRAINED', 'ACTIVE', 'ARCHIVED'))
+);
+
+CREATE TABLE ml_prediction_logs (
+    id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_id         UUID         NOT NULL,
+    solver_run_id     UUID,
+    prediction_type  VARCHAR(50)  NOT NULL,
+    entity_type      VARCHAR(50)  NOT NULL,
+    entity_id        UUID         NOT NULL,
+    score            NUMERIC(12,6) NOT NULL,
+    explanation_json JSONB,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_ml_prediction_logs_model
+        FOREIGN KEY (model_id) REFERENCES ml_model_registry(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ml_prediction_logs_run
+        FOREIGN KEY (solver_run_id) REFERENCES solver_runs(id) ON DELETE SET NULL
+);
+
+-- ============================================================
 --  ÍNDICES
 -- ============================================================
 
-CREATE INDEX idx_users_email
-    ON users(email);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
 
-CREATE INDEX idx_users_role
-    ON users(role);
+CREATE INDEX idx_oauth2_user_id ON oauth2_linked_accounts(user_id);
+CREATE INDEX idx_oauth2_provider_subject ON oauth2_linked_accounts(provider, provider_subject);
 
-CREATE INDEX idx_oauth2_user_id
-    ON oauth2_linked_accounts(user_id);
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_hash ON refresh_tokens(token_hash);
+CREATE INDEX idx_refresh_tokens_active ON refresh_tokens(expires_at) WHERE revoked = FALSE;
 
-CREATE INDEX idx_oauth2_provider_subject
-    ON oauth2_linked_accounts(provider, provider_subject);
+CREATE INDEX idx_prt_user_id ON password_reset_tokens(user_id);
+CREATE INDEX idx_prt_reset_token_hash ON password_reset_tokens(reset_token_hash) WHERE reset_token_hash IS NOT NULL;
+CREATE INDEX idx_prt_active ON password_reset_tokens(user_id, expires_at) WHERE used = FALSE;
 
-CREATE INDEX idx_refresh_tokens_user_id
-    ON refresh_tokens(user_id);
+CREATE INDEX idx_carreras_facultad_id ON carreras(facultad_id);
 
-CREATE INDEX idx_refresh_tokens_hash
-    ON refresh_tokens(token_hash);
+CREATE INDEX idx_time_slots_active ON time_slots(day_of_week, start_time) WHERE is_active = TRUE;
 
--- Índice parcial: solo tokens vigentes (optimiza las consultas de validación)
-CREATE INDEX idx_refresh_tokens_active
-    ON refresh_tokens(expires_at)
-    WHERE revoked = FALSE;
+CREATE INDEX idx_teachers_user_id ON teachers(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_teachers_active ON teachers(is_active) WHERE is_active = TRUE;
 
-CREATE INDEX idx_prt_user_id
-    ON password_reset_tokens(user_id);
+CREATE INDEX idx_classrooms_active ON classrooms(is_active) WHERE is_active = TRUE;
 
-CREATE INDEX idx_prt_reset_token_hash
-    ON password_reset_tokens(reset_token_hash)
-    WHERE reset_token_hash IS NOT NULL;
+CREATE INDEX idx_courses_active ON courses(is_active) WHERE is_active = TRUE;
 
--- Índice parcial: tokens de reset activos (no usados, no expirados)
-CREATE INDEX idx_prt_active
-    ON password_reset_tokens(user_id, expires_at)
-    WHERE used = FALSE;
+CREATE INDEX idx_students_user_id ON students(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_students_active ON students(is_active) WHERE is_active = TRUE;
 
--- ============================================================
---  FUNCIONES — Lógica de negocio encapsulada en la base de datos
--- ============================================================
+CREATE INDEX idx_teacher_availability_teacher_id ON teacher_availability(teacher_id);
+CREATE INDEX idx_teacher_availability_slot_id ON teacher_availability(time_slot_id);
 
--- -----------------------------------------------------------------------
--- fn_set_updated_at
--- Trigger function genérica: actualiza automáticamente la columna updated_at.
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_set_updated_at()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$;
+CREATE INDEX idx_classroom_availability_classroom_id ON classroom_availability(classroom_id);
+CREATE INDEX idx_classroom_availability_slot_id ON classroom_availability(time_slot_id);
 
--- -----------------------------------------------------------------------
--- fn_revoke_refresh_token
--- Revoca un refresh token específico por su hash SHA-256.
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_revoke_refresh_token(
-    p_token_hash VARCHAR(64),
-    p_now        TIMESTAMPTZ
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-BEGIN
-    UPDATE refresh_tokens
-    SET    revoked    = TRUE,
-           revoked_at = p_now
-    WHERE  token_hash = p_token_hash
-      AND  revoked    = FALSE;
-END;
-$$;
+CREATE INDEX idx_course_prerequisites_course_id ON course_prerequisites(course_id);
+CREATE INDEX idx_course_prerequisites_required_id ON course_prerequisites(prerequisite_course_id);
 
--- -----------------------------------------------------------------------
--- fn_revoke_all_user_tokens
--- Revoca todos los refresh tokens activos de un usuario.
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_revoke_all_user_tokens(
-    p_user_id UUID,
-    p_now     TIMESTAMPTZ
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-BEGIN
-    UPDATE refresh_tokens
-    SET    revoked    = TRUE,
-           revoked_at = p_now
-    WHERE  user_id = p_user_id
-      AND  revoked  = FALSE;
-END;
-$$;
+CREATE INDEX idx_student_completed_courses_student_id ON student_completed_courses(student_id);
+CREATE INDEX idx_student_completed_courses_course_id ON student_completed_courses(course_id);
 
--- -----------------------------------------------------------------------
--- fn_delete_user_expired_tokens
--- Elimina tokens expirados o revocados de un usuario (limpieza pre-creación).
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_delete_user_expired_tokens(
-    p_user_id UUID,
-    p_now     TIMESTAMPTZ
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-BEGIN
-    DELETE FROM refresh_tokens
-    WHERE  user_id = p_user_id
-      AND  (revoked = TRUE OR expires_at < p_now);
-END;
-$$;
+CREATE INDEX idx_course_offerings_period_id ON course_offerings(academic_period_id);
+CREATE INDEX idx_course_offerings_course_id ON course_offerings(course_id);
 
--- -----------------------------------------------------------------------
--- fn_delete_all_expired_tokens
--- Limpieza global de tokens expirados o revocados (job periódico).
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_delete_all_expired_tokens(
-    p_now TIMESTAMPTZ
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-BEGIN
-    DELETE FROM refresh_tokens
-    WHERE  revoked    = TRUE
-       OR  expires_at < p_now;
-END;
-$$;
+CREATE INDEX idx_course_sections_offering_id ON course_sections(course_offering_id);
 
--- -----------------------------------------------------------------------
--- fn_deactivate_user
--- Desactivación lógica de usuario (soft-delete, no elimina la fila).
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_deactivate_user(
-    p_user_id UUID
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-BEGIN
-    UPDATE users
-    SET    is_active = FALSE
-    WHERE  id = p_user_id;
-END;
-$$;
+CREATE INDEX idx_section_teacher_candidates_section_id ON section_teacher_candidates(section_id);
+CREATE INDEX idx_section_teacher_candidates_teacher_id ON section_teacher_candidates(teacher_id);
 
--- -----------------------------------------------------------------------
--- fn_invalidate_user_prt
--- Marca como usados todos los tokens de recuperación activos de un usuario.
--- Se invoca antes de emitir un nuevo OTP para invalidar los anteriores.
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_invalidate_user_prt(
-    p_user_id UUID,
-    p_now     TIMESTAMPTZ
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-BEGIN
-    UPDATE password_reset_tokens
-    SET    used    = TRUE,
-           used_at = p_now
-    WHERE  user_id = p_user_id
-      AND  used    = FALSE;
-END;
-$$;
+CREATE INDEX idx_teaching_schedules_period_id ON teaching_schedules(academic_period_id);
 
--- -----------------------------------------------------------------------
--- fn_upsert_profile
--- Crea o actualiza el perfil de un usuario (INSERT ... ON CONFLICT).
--- Devuelve la fila resultante.
--- Notas:
---   · dni y phone tienen restricciones UNIQUE en la tabla; si otro usuario
---     ya los posee, PostgreSQL lanzará una violación de restricción
---     (uq_profiles_dni / uq_profiles_phone) que la capa de servicio
---     debe capturar y convertir en mensaje de error apropiado.
---   · Se actualiza updated_at mediante el trigger trg_profiles_updated_at.
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_upsert_profile(
-    p_user_id UUID,
-    p_dni     VARCHAR(20),
-    p_phone   VARCHAR(20),
-    p_sex     sex_type,
-    p_age     SMALLINT
-)
-RETURNS profiles
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-DECLARE
-    v_profile profiles;
-BEGIN
-    INSERT INTO profiles (user_id, dni, phone, sex, age)
-    VALUES (p_user_id, p_dni, p_phone, p_sex, p_age)
-    ON CONFLICT (user_id) DO UPDATE
-        SET dni   = EXCLUDED.dni,
-            phone = EXCLUDED.phone,
-            sex   = EXCLUDED.sex,
-            age   = EXCLUDED.age
-    RETURNING * INTO v_profile;
+CREATE INDEX idx_section_assignments_schedule_id ON section_assignments(teaching_schedule_id);
+CREATE INDEX idx_section_assignments_teacher_id ON section_assignments(teacher_id);
+CREATE INDEX idx_section_assignments_classroom_id ON section_assignments(classroom_id);
 
-    RETURN v_profile;
-END;
-$$;
+CREATE INDEX idx_section_assignment_slots_schedule_id ON section_assignment_slots(teaching_schedule_id);
+CREATE INDEX idx_section_assignment_slots_section_id ON section_assignment_slots(section_id);
+CREATE INDEX idx_section_assignment_slots_slot_id ON section_assignment_slots(time_slot_id);
 
--- -----------------------------------------------------------------------
--- fn_get_profile_by_user_id
--- Devuelve el perfil de un usuario dado su user_id.
--- Retorna NULL si aún no tiene perfil.
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_get_profile_by_user_id(
-    p_user_id UUID
-)
-RETURNS profiles
-LANGUAGE plpgsql
-STABLE
-SECURITY INVOKER
-AS $$
-DECLARE
-    v_profile profiles;
-BEGIN
-    SELECT * INTO v_profile
-    FROM   profiles
-    WHERE  user_id = p_user_id;
+CREATE INDEX idx_student_schedules_student_id ON student_schedules(student_id);
+CREATE INDEX idx_student_schedules_period_id ON student_schedules(academic_period_id);
 
-    RETURN v_profile;
-END;
-$$;
+CREATE INDEX idx_student_schedule_items_schedule_id ON student_schedule_items(student_schedule_id);
+CREATE INDEX idx_student_schedule_items_student_id ON student_schedule_items(student_id);
+CREATE INDEX idx_student_schedule_items_section_id ON student_schedule_items(section_id);
 
--- -----------------------------------------------------------------------
--- fn_list_all_users
--- Devuelve todos los usuarios del sistema ordenados por fecha de creación.
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_list_all_users()
-RETURNS SETOF users
-LANGUAGE plpgsql
-STABLE
-SECURITY INVOKER
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT *
-    FROM   users
-    ORDER  BY created_at DESC;
-END;
-$$;
+CREATE INDEX idx_solver_runs_period_id ON solver_runs(academic_period_id);
+CREATE INDEX idx_solver_runs_student_id ON solver_runs(student_id) WHERE student_id IS NOT NULL;
+CREATE INDEX idx_solver_runs_status ON solver_runs(status);
 
--- -----------------------------------------------------------------------
--- fn_search_users_by_name
--- Busca usuarios cuyo full_name contenga el texto indicado (case-insensitive).
--- Útil para búsqueda en tiempo real desde el frontend.
--- -----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_search_users_by_name(
-    p_query VARCHAR(255)
-)
-RETURNS SETOF users
-LANGUAGE plpgsql
-STABLE
-SECURITY INVOKER
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT *
-    FROM   users
-    WHERE  full_name ILIKE '%' || p_query || '%'
-    ORDER  BY full_name ASC;
-END;
-$$;
+CREATE INDEX idx_solver_run_conflicts_run_id ON solver_run_conflicts(solver_run_id);
 
--- ============================================================
---  TRIGGERS
--- ============================================================
+CREATE INDEX idx_schedule_feedback_events_period_id ON schedule_feedback_events(academic_period_id);
 
-CREATE TRIGGER trg_users_updated_at
-    BEFORE UPDATE ON users
-    FOR EACH ROW
-    EXECUTE FUNCTION fn_set_updated_at();
-
-CREATE TRIGGER trg_profiles_updated_at
-    BEFORE UPDATE ON profiles
-    FOR EACH ROW
-    EXECUTE FUNCTION fn_set_updated_at();
+CREATE INDEX idx_ml_model_registry_status ON ml_model_registry(status);
+CREATE INDEX idx_ml_prediction_logs_model_id ON ml_prediction_logs(model_id);
+CREATE INDEX idx_ml_prediction_logs_run_id ON ml_prediction_logs(solver_run_id) WHERE solver_run_id IS NOT NULL;
 

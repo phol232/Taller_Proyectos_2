@@ -13,6 +13,8 @@ public record ProfileInfo(
     String  phone,
     SexType sex,
     Integer age,
+    UUID    facultadId,
+    UUID    carreraId,
     Instant createdAt,
     Instant updatedAt
 ) {}

@@ -38,9 +38,8 @@ public class ProfileRepositoryAdapter implements ProfilePort {
             ProfileEntity entity = ProfileEntity.fromDomain(profile);
             return jpaRepository.save(entity).toDomain();
         } catch (DataIntegrityViolationException ex) {
-            String detail = ex.getMostSpecificCause() != null
-                    ? ex.getMostSpecificCause().getMessage().toLowerCase()
-                    : "";
+            String rawDetail = ex.getMostSpecificCause().getMessage();
+            String detail = rawDetail != null ? rawDetail.toLowerCase() : "";
             if (detail.contains("uq_profiles_dni")) {
                 throw new DuplicateProfileFieldException("dni",
                         "El DNI ya está registrado por otro usuario.");

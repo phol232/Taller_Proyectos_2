@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import online.horarios_api.profile.domain.model.SexType;
 
+import java.util.UUID;
+
 public record ProfileRequest(
 
     @Pattern(regexp = "^[0-9]{0,8}$",
@@ -19,5 +21,8 @@ public record ProfileRequest(
 
     @Min(value = 0,   message = "La edad no puede ser negativa")
     @Max(value = 150, message = "La edad no puede superar 150")
-    Integer age
+    Integer age,
+
+    UUID facultadId,
+    UUID carreraId
 ) {}

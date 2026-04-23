@@ -14,6 +14,7 @@ import online.horarios_api.shared.domain.model.UserInfo;
 import online.horarios_api.shared.infrastructure.config.AppProperties;
 import online.horarios_api.shared.domain.exception.DomainException;
 import online.horarios_api.shared.infrastructure.web.RequestMetadataExtractor;
+import online.horarios_api.student.domain.port.in.StudentProvisioningUseCase;
 import online.horarios_api.user.domain.port.in.OAuth2UserResolutionUseCase;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -36,6 +37,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final OAuth2UserResolutionUseCase   oAuth2UserResolutionUseCase;
     private final AppProperties                 appProperties;
     private final AuthCookiePort                cookiePort;
+    private final StudentProvisioningUseCase    studentProvisioningUseCase;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest  request,
@@ -55,7 +57,20 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         try {
             OAuth2UserInfo oauth2UserInfo = mapToOAuth2UserInfo(oidcUser, registrationId);
             UserInfo user = oAuth2UserResolutionUseCase.findOrCreateOAuth2User(oauth2UserInfo);
+// Aprovisionamiento automático: si el usuario es STUDENT y aún no
+            // tiene registro en `students`, se crea uno base. Errores se logean
+            // pero nunca interrumpen el flujo de login.
+            if ("STUDENT".equals(user.role())) {
+                try {
+                    studentProvisioningUseCase.provisionStudentIfAbsent(
+                            user.id(), user.email(), user.fullName());
+                } catch (Exception ex) {
+                    log.warn("No se pudo provisionar estudiante para userId={}: {}",
+                            user.id(), ex.getMessage());
+                }
+            }
 
+            
             RequestMetadata metadata = RequestMetadataExtractor.extract(request);
             AuthResult authResult = oAuth2AuthUseCase.loginOAuth2(user, metadata);
 

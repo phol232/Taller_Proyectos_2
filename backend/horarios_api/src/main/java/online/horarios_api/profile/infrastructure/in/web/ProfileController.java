@@ -52,7 +52,9 @@ public class ProfileController {
                 request.dni(),
                 request.phone(),
                 request.sex(),
-                request.age()
+                request.age(),
+                request.facultadId(),
+                request.carreraId()
         );
         return ResponseEntity.ok(upsertProfileUseCase.upsertProfile(userId, command));
     }

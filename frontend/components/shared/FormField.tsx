@@ -5,45 +5,47 @@ import { AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 interface FormFieldProps {
-  /** Texto del label */
   label: string;
-  /** htmlFor del label → id del input */
   htmlFor?: string;
-  /** Mensaje de error; si está presente muestra borde rojo y texto */
   error?: string;
-  /** Elemento opcional a la derecha del label (ej: "¿Olvidaste tu contraseña?") */
   labelRight?: React.ReactNode;
+  description?: string;
   children: React.ReactNode;
 }
 
-/**
- * Wrapper reutilizable: Label + Input slot + mensaje de error debajo.
- * Pasa `aria-invalid={!!error}` al <Input> para el borde rojo automático.
- */
 export function FormField({
   label,
   htmlFor,
   error,
   labelRight,
+  description,
   children,
 }: FormFieldProps) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <Label htmlFor={htmlFor} className="text-gray-600">
-          {label}
-        </Label>
-        {labelRight}
+    <div className="space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <Label htmlFor={htmlFor} className="text-[14px] font-medium text-[#171717]">
+            {label}
+          </Label>
+          {description && (
+            <p className="text-xs leading-5 text-[#666666]">
+              {description}
+            </p>
+          )}
+        </div>
+        {labelRight && <div className="shrink-0">{labelRight}</div>}
       </div>
 
-      {children}
-
-      {error && (
-        <p className="flex items-center gap-1 text-xs text-red-500">
-          <AlertCircle className="h-3 w-3 shrink-0" />
-          {error}
-        </p>
-      )}
+      <div className="space-y-2">
+        {children}
+        {error && (
+          <p className="flex items-center gap-1.5 text-xs text-red-500">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

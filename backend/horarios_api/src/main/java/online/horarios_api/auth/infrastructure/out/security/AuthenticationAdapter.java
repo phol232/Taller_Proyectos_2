@@ -30,7 +30,14 @@ public class AuthenticationAdapter implements AuthenticationPort {
             throw new UnauthorizedException("Credenciales inválidas");
         }
 
-        AuthenticatedUserDetails principal = (AuthenticatedUserDetails) result.getPrincipal();
-        return principal.getUserInfo();
+        Object rawPrincipal = result.getPrincipal();
+        if (rawPrincipal == null || !(rawPrincipal instanceof AuthenticatedUserDetails principal)) {
+            throw new UnauthorizedException("Credenciales inválidas");
+        }
+        UserInfo userInfo = principal.getUserInfo();
+        if (userInfo == null) {
+            throw new UnauthorizedException("Credenciales inválidas");
+        }
+        return userInfo;
     }
 }

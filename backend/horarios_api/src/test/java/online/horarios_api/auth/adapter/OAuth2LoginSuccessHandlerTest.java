@@ -10,6 +10,7 @@ import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.model.OAuth2UserInfo;
 import online.horarios_api.shared.domain.model.UserInfo;
 import online.horarios_api.shared.infrastructure.config.AppProperties;
+import online.horarios_api.student.domain.port.in.StudentProvisioningUseCase;
 import online.horarios_api.user.domain.port.in.OAuth2UserResolutionUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,6 +43,7 @@ class OAuth2LoginSuccessHandlerTest {
     @Mock private AppProperties appProperties;
     @Mock private AppProperties.FrontendProperties frontendProperties;
     @Mock private AuthCookiePort cookiePort;
+    @Mock private StudentProvisioningUseCase studentProvisioningUseCase;
 
     private OAuth2LoginSuccessHandler handler;
     private MockHttpServletRequest request;
@@ -58,7 +60,8 @@ class OAuth2LoginSuccessHandlerTest {
                 oAuth2AuthUseCase,
                 oAuth2UserResolutionUseCase,
                 appProperties,
-                cookiePort
+                cookiePort,
+                studentProvisioningUseCase
         );
 
         request = new MockHttpServletRequest();
