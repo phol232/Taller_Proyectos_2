@@ -1,6 +1,6 @@
 services:
 
-  # ── Base de datos PostgreSQL ────────────────────────────────
+  # ── Base de datos PostgreSQL 
   db:
     image: postgres:16-alpine
     container_name: planner-db
