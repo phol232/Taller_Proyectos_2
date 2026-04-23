@@ -12,6 +12,7 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { courseOfferingSchema } from "@/lib/validators/course-offering.schema";
 import { toastError, toastSuccess } from "@/lib/utils";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import type {
   AcademicPeriodAdmin,
   CourseAdmin,
@@ -81,6 +82,14 @@ export default function CourseOfferingsPage() {
   useEffect(() => {
     void loadOfferings(query);
   }, [query]);
+
+  useAdminEvents(
+    ["course-offerings.changed", "courses.changed", "academic-periods.changed", "teachers.changed"],
+    () => {
+      void loadOfferings(query);
+      void loadDependencies();
+    },
+  );
 
   async function loadDependencies() {
     try {

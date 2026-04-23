@@ -14,6 +14,7 @@ import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { studentSchema } from "@/lib/validators/student.schema";
 import { toastError, toastSuccess } from "@/lib/utils";
 import { joinFullName, splitFullName } from "@/lib/fullName";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import type { CarreraAdmin, FacultadAdmin, StudentAdmin } from "@/types/admin";
 
 type StudentFormState = {
@@ -69,6 +70,8 @@ export default function StudentsPage() {
   useEffect(() => {
     void loadStudents(query);
   }, [query]);
+
+  useAdminEvents("students.changed", () => void loadStudents(query));
 
   useEffect(() => {
     adminApi.listCatalogFacultades().then(setFacultades).catch(() => {});

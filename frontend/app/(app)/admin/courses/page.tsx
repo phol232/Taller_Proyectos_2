@@ -14,6 +14,7 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { courseSchema } from "@/lib/validators/course.schema";
 import { toastError, toastSuccess } from "@/lib/utils";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import type { CourseAdmin } from "@/types/admin";
 
 type CourseFormState = {
@@ -58,6 +59,8 @@ export default function CoursesPage() {
   useEffect(() => {
     void loadCourses(query);
   }, [query]);
+
+  useAdminEvents("courses.changed", () => void loadCourses(query));
 
   async function loadCourses(search: string) {
     setLoading(true);

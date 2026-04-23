@@ -54,6 +54,12 @@ dependencies {
     // Spring Mail (JavaMailSender → envío de correos SMTP)
     implementation("org.springframework.boot:spring-boot-starter-mail")
 
+    // AOP → logging aspect with timing (aspectjweaver managed by Spring Boot BOM)
+    implementation("org.aspectj:aspectjweaver")
+
+    // Redis → pub/sub para SSE multi-instancia
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+
     // .env file support (lee backend/horarios_api/.env automáticamente)
     implementation("me.paulschwarz:spring-dotenv:4.0.0")
 

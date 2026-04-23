@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiError> handleUnauthorized(UnauthorizedException ex) {
-        log.debug("Excepción de autorización: {}", ex.getMessage());
+        log.warn("Acceso no autorizado: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(new ApiError("UNAUTHORIZED", ex.getMessage()));
@@ -43,7 +43,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(NotFoundException ex) {
-        log.debug("Recurso no encontrado: {}", ex.getMessage());
+        log.info("Recurso no encontrado: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(new ApiError("NOT_FOUND", ex.getMessage()));
@@ -51,7 +51,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiError> handleBadRequest(BadRequestException ex) {
-        log.debug("Solicitud inválida: {}", ex.getMessage());
+        log.warn("Solicitud inválida: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ApiError("BAD_REQUEST", ex.getMessage()));
@@ -93,7 +93,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({BadCredentialsException.class, UsernameNotFoundException.class})
     public ResponseEntity<ApiError> handleBadCredentials(Exception ex) {
-        log.debug("Fallo de autenticación: {}", ex.getMessage());
+        log.warn("Fallo de autenticación: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(new ApiError("INVALID_CREDENTIALS", INVALID_CREDENTIALS_MSG));
@@ -153,7 +153,7 @@ public class GlobalExceptionHandler {
 
         @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        log.warn("Conflicto de integridad de datos: {}", ex.getMessage());
+        log.warn("Conflicto de integridad de datos: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(new ApiError("DATA_CONFLICT",

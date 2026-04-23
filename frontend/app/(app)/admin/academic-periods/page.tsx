@@ -12,6 +12,7 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { academicPeriodSchema } from "@/lib/validators/academic-period.schema";
 import { toastError, toastSuccess } from "@/lib/utils";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import type { AcademicPeriodAdmin } from "@/types/admin";
 
 type AcademicPeriodFormState = {
@@ -56,6 +57,8 @@ export default function AcademicPeriodsPage() {
   useEffect(() => {
     void loadPeriods(query);
   }, [query]);
+
+  useAdminEvents("academic-periods.changed", () => void loadPeriods(query));
 
   async function loadPeriods(search: string) {
     setLoading(true);

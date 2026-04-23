@@ -1,6 +1,6 @@
 services:
 
-  # ── Base de datos PostgreSQL ────────────────────────────────
+  # ── Base de datos PostgreSQL 
   db:
     image: postgres:16-alpine
     container_name: planner-db
@@ -19,6 +19,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Redis (SSE pub/sub) ─────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: planner-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ── Backend Spring Boot ─────────────────────────────────────
   backend:
     build:
@@ -30,11 +46,15 @@ services:
       - ./backend/horarios_api/.env
     environment:
       DB_URL: jdbc:postgresql://db:5432/horarios_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       TZ: America/Lima
     ports:
       - "8080:8080"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # ── Frontend Next.js ────────────────────────────────────────
@@ -51,3 +71,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
