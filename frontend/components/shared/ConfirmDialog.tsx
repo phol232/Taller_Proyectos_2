@@ -23,6 +23,8 @@ interface ConfirmDialogProps {
   variant?: "default" | "destructive";
   isLoading?: boolean;
   confirmLabel?: string;
+  /** z-index del popup. El overlay usa zIndex - 5. Default 50. */
+  zIndex?: number;
 }
 
 export default function ConfirmDialog({
@@ -34,6 +36,7 @@ export default function ConfirmDialog({
   variant = "default",
   isLoading = false,
   confirmLabel,
+  zIndex,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const isDestructive = variant === "destructive";
@@ -43,6 +46,8 @@ export default function ConfirmDialog({
       <AlertDialogContent
         className="max-w-sm rounded-xl border-0 bg-white p-6 shadow-xl dark:bg-[#1a1a1a]"
         onOverlayClick={() => !isLoading && onOpenChange(false)}
+        style={zIndex ? { zIndex } : undefined}
+        overlayStyle={zIndex ? { zIndex: zIndex - 5 } : undefined}
       >
         <AlertDialogHeader className="mb-2">
           <AlertDialogTitle className="text-[17px] font-semibold text-gray-900 dark:text-white">
