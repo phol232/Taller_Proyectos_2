@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
+import SessionExpiredDialog from "@/components/shared/SessionExpiredDialog";
 import { I18nProvider } from "@/lib/i18n";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -31,6 +32,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <I18nProvider>
             {children}
+            <SessionExpiredDialog />
             <Toaster richColors closeButton position="bottom-right" expand visibleToasts={5} />
           </I18nProvider>
         </ThemeProvider>
