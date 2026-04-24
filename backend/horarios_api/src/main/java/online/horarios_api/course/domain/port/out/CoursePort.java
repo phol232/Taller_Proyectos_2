@@ -14,6 +14,7 @@ public interface CoursePort {
     Optional<Course> findById(UUID courseId);
     List<Course> findAll();
     List<Course> searchByCodeOrName(String query);
+    List<Course> findByCodes(List<String> codes);
     Page<Course> findAllPaged(int page, int pageSize);
     Page<Course> searchPaged(String query, int page, int pageSize);
     void deactivate(UUID courseId);

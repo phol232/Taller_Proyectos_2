@@ -71,6 +71,23 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
 
     @Override
     @Transactional(readOnly = true)
+    public List<Course> findCoursesByCodes(List<String> codes) {
+        if (codes == null || codes.isEmpty()) {
+            return List.of();
+        }
+        List<String> normalized = codes.stream()
+                .filter(c -> c != null && !c.isBlank())
+                .map(c -> c.trim().toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
+        if (normalized.isEmpty()) {
+            return List.of();
+        }
+        return coursePort.findByCodes(normalized);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<Course> listCoursesPaged(int page, int pageSize) {
         return coursePort.findAllPaged(page, pageSize);
     }

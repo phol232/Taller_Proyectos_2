@@ -10,6 +10,7 @@ public interface CourseQueryUseCase {
     Course getCourse(UUID courseId);
     List<Course> listCourses();
     List<Course> searchCourses(String query);
+    List<Course> findCoursesByCodes(List<String> codes);
     Page<Course> listCoursesPaged(int page, int pageSize);
     Page<Course> searchCoursesPaged(String query, int page, int pageSize);
 }

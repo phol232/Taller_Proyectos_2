@@ -51,6 +51,17 @@ public class CourseController {
         return ResponseEntity.ok(courseQueryUseCase.searchCoursesPaged(q, page, pageSize).map(CourseResponse::from));
     }
 
+    @PostMapping("/by-codes")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Obtener cursos por lista de códigos")
+    public ResponseEntity<java.util.List<CourseResponse>> findByCodes(@RequestBody java.util.List<String> codes) {
+        return ResponseEntity.ok(
+                courseQueryUseCase.findCoursesByCodes(codes).stream()
+                        .map(CourseResponse::from)
+                        .toList()
+        );
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Crear curso")

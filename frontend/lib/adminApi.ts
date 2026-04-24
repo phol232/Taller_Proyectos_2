@@ -42,6 +42,10 @@ export const adminApi = {
     (await api.get<PagedResult<CourseAdmin>>("/api/courses", { params: { page, pageSize } })).data,
   searchCourses: async (query: string, page = 1, pageSize = 12) =>
     (await api.get<PagedResult<CourseAdmin>>("/api/courses/search", { params: { q: query, page, pageSize } })).data,
+  findCoursesByCodes: async (codes: string[]) => {
+    if (!codes || codes.length === 0) return [] as CourseAdmin[];
+    return (await api.post<CourseAdmin[]>("/api/courses/by-codes", codes)).data;
+  },
   createCourse: async (payload: Partial<CourseAdmin>) =>
     (await api.post<CourseAdmin>("/api/courses", payload)).data,
   updateCourse: async (id: string, payload: Partial<CourseAdmin>) =>
