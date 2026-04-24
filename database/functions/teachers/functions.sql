@@ -59,62 +59,97 @@ END;
 $$;
 
 -- ----------------------------------------------------------
--- fn_get_teacher_by_id
+-- fn_get_teacher_by_id (con email JOIN)
 -- ----------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_get_teacher_by_id(
     p_teacher_id UUID
 )
-RETURNS teachers
-LANGUAGE plpgsql
-STABLE
-SECURITY INVOKER
-AS $$
-DECLARE
-    v_teacher teachers;
-BEGIN
-    SELECT * INTO v_teacher
-    FROM   teachers
-    WHERE  id = p_teacher_id;
-    RETURN v_teacher;
-END;
-$$;
-
--- ----------------------------------------------------------
--- fn_list_all_teachers
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_list_all_teachers()
-RETURNS SETOF teachers
+RETURNS TABLE(
+    id          UUID,
+    user_id     UUID,
+    code        VARCHAR(50),
+    full_name   VARCHAR(255),
+    specialty   VARCHAR(255),
+    is_active   BOOLEAN,
+    email       VARCHAR(255),
+    created_at  TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ
+)
 LANGUAGE plpgsql
 STABLE
 SECURITY INVOKER
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT *
-    FROM   teachers
-    ORDER  BY full_name ASC;
+    SELECT t.id, t.user_id, t.code, t.full_name, t.specialty, t.is_active,
+           u.email, t.created_at, t.updated_at
+    FROM   teachers t
+    LEFT JOIN users u ON u.id = t.user_id
+    WHERE  t.id = p_teacher_id;
 END;
 $$;
 
 -- ----------------------------------------------------------
--- fn_search_teachers
+-- fn_list_all_teachers (con email JOIN)
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_all_teachers()
+RETURNS TABLE(
+    id          UUID,
+    user_id     UUID,
+    code        VARCHAR(50),
+    full_name   VARCHAR(255),
+    specialty   VARCHAR(255),
+    is_active   BOOLEAN,
+    email       VARCHAR(255),
+    created_at  TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT t.id, t.user_id, t.code, t.full_name, t.specialty, t.is_active,
+           u.email, t.created_at, t.updated_at
+    FROM   teachers t
+    LEFT JOIN users u ON u.id = t.user_id
+    ORDER  BY t.full_name ASC;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_search_teachers (con email JOIN)
 -- ----------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_search_teachers(
     p_query VARCHAR(255)
 )
-RETURNS SETOF teachers
+RETURNS TABLE(
+    id          UUID,
+    user_id     UUID,
+    code        VARCHAR(50),
+    full_name   VARCHAR(255),
+    specialty   VARCHAR(255),
+    is_active   BOOLEAN,
+    email       VARCHAR(255),
+    created_at  TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ
+)
 LANGUAGE plpgsql
 STABLE
 SECURITY INVOKER
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT *
-    FROM   teachers
-    WHERE  code ILIKE '%' || p_query || '%'
-       OR  full_name ILIKE '%' || p_query || '%'
-       OR  specialty ILIKE '%' || p_query || '%'
-    ORDER  BY full_name ASC;
+    SELECT t.id, t.user_id, t.code, t.full_name, t.specialty, t.is_active,
+           u.email, t.created_at, t.updated_at
+    FROM   teachers t
+    LEFT JOIN users u ON u.id = t.user_id
+    WHERE  t.code ILIKE '%' || p_query || '%'
+       OR  t.full_name ILIKE '%' || p_query || '%'
+       OR  t.specialty ILIKE '%' || p_query || '%'
+       OR  u.email ILIKE '%' || p_query || '%'
+    ORDER  BY t.full_name ASC;
 END;
 $$;
 
@@ -231,5 +266,82 @@ AS $$
 BEGIN
     DELETE FROM teacher_availability
     WHERE  teacher_id = p_teacher_id;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_list_teachers_paged
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_teachers_paged(
+    p_page      INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 12
+)
+RETURNS TABLE(
+    id          UUID,
+    user_id     UUID,
+    code        VARCHAR(50),
+    full_name   VARCHAR(255),
+    specialty   VARCHAR(255),
+    is_active   BOOLEAN,
+    email       VARCHAR(255),
+    created_at  TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ,
+    total_count BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT t.id, t.user_id, t.code, t.full_name, t.specialty, t.is_active,
+           u.email, t.created_at, t.updated_at,
+           COUNT(*) OVER()::BIGINT AS total_count
+    FROM   teachers t
+    LEFT JOIN users u ON u.id = t.user_id
+    ORDER  BY t.full_name ASC
+    LIMIT  GREATEST(p_page_size, 1)
+    OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_search_teachers_paged
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_search_teachers_paged(
+    p_query     VARCHAR(255),
+    p_page      INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 12
+)
+RETURNS TABLE(
+    id          UUID,
+    user_id     UUID,
+    code        VARCHAR(50),
+    full_name   VARCHAR(255),
+    specialty   VARCHAR(255),
+    is_active   BOOLEAN,
+    email       VARCHAR(255),
+    created_at  TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ,
+    total_count BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT t.id, t.user_id, t.code, t.full_name, t.specialty, t.is_active,
+           u.email, t.created_at, t.updated_at,
+           COUNT(*) OVER()::BIGINT AS total_count
+    FROM   teachers t
+    LEFT JOIN users u ON u.id = t.user_id
+    WHERE  t.code      ILIKE '%' || p_query || '%'
+       OR  t.full_name ILIKE '%' || p_query || '%'
+       OR  t.specialty ILIKE '%' || p_query || '%'
+       OR  u.email     ILIKE '%' || p_query || '%'
+    ORDER  BY t.full_name ASC
+    LIMIT  GREATEST(p_page_size, 1)
+    OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
 END;
 $$;

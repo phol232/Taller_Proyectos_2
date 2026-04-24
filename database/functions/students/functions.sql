@@ -332,3 +332,90 @@ BEGIN
     WHERE  student_id = p_student_id;
 END;
 $$;
+
+-- ----------------------------------------------------------
+-- fn_list_students_paged
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_students_paged(
+    p_page      INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 12
+)
+RETURNS TABLE(
+    id            UUID,
+    user_id       UUID,
+    code          VARCHAR(50),
+    full_name     VARCHAR(255),
+    cycle         INTEGER,
+    career        VARCHAR(255),
+    credit_limit  INTEGER,
+    is_active     BOOLEAN,
+    facultad_id   UUID,
+    carrera_id    UUID,
+    email         VARCHAR(255),
+    created_at    TIMESTAMPTZ,
+    updated_at    TIMESTAMPTZ,
+    total_count   BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT s.id, s.user_id, s.code, s.full_name, s.cycle, s.career,
+           s.credit_limit, s.is_active, s.facultad_id, s.carrera_id,
+           u.email, s.created_at, s.updated_at,
+           COUNT(*) OVER()::BIGINT AS total_count
+    FROM   students s
+    LEFT JOIN users u ON u.id = s.user_id
+    ORDER  BY s.full_name ASC
+    LIMIT  GREATEST(p_page_size, 1)
+    OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_search_students_paged
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_search_students_paged(
+    p_query     VARCHAR(255),
+    p_page      INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 12
+)
+RETURNS TABLE(
+    id            UUID,
+    user_id       UUID,
+    code          VARCHAR(50),
+    full_name     VARCHAR(255),
+    cycle         INTEGER,
+    career        VARCHAR(255),
+    credit_limit  INTEGER,
+    is_active     BOOLEAN,
+    facultad_id   UUID,
+    carrera_id    UUID,
+    email         VARCHAR(255),
+    created_at    TIMESTAMPTZ,
+    updated_at    TIMESTAMPTZ,
+    total_count   BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT s.id, s.user_id, s.code, s.full_name, s.cycle, s.career,
+           s.credit_limit, s.is_active, s.facultad_id, s.carrera_id,
+           u.email, s.created_at, s.updated_at,
+           COUNT(*) OVER()::BIGINT AS total_count
+    FROM   students s
+    LEFT JOIN users u ON u.id = s.user_id
+    WHERE  s.code      ILIKE '%' || p_query || '%'
+       OR  s.full_name ILIKE '%' || p_query || '%'
+       OR  s.career    ILIKE '%' || p_query || '%'
+       OR  u.email     ILIKE '%' || p_query || '%'
+    ORDER  BY s.full_name ASC
+    LIMIT  GREATEST(p_page_size, 1)
+    OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
+END;
+$$;

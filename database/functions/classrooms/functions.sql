@@ -232,3 +232,75 @@ BEGIN
     WHERE  classroom_id = p_classroom_id;
 END;
 $$;
+
+-- ----------------------------------------------------------
+-- fn_list_classrooms_paged
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_classrooms_paged(
+    p_page      INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 12
+)
+RETURNS TABLE(
+    id          UUID,
+    code        VARCHAR(50),
+    name        VARCHAR(255),
+    capacity    INTEGER,
+    room_type   VARCHAR(100),
+    is_active   BOOLEAN,
+    created_at  TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ,
+    total_count BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT cl.id, cl.code, cl.name, cl.capacity, cl.room_type,
+           cl.is_active, cl.created_at, cl.updated_at,
+           COUNT(*) OVER()::BIGINT AS total_count
+    FROM   classrooms cl
+    ORDER  BY cl.code ASC
+    LIMIT  GREATEST(p_page_size, 1)
+    OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_search_classrooms_paged
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_search_classrooms_paged(
+    p_query     VARCHAR(255),
+    p_page      INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 12
+)
+RETURNS TABLE(
+    id          UUID,
+    code        VARCHAR(50),
+    name        VARCHAR(255),
+    capacity    INTEGER,
+    room_type   VARCHAR(100),
+    is_active   BOOLEAN,
+    created_at  TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ,
+    total_count BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT cl.id, cl.code, cl.name, cl.capacity, cl.room_type,
+           cl.is_active, cl.created_at, cl.updated_at,
+           COUNT(*) OVER()::BIGINT AS total_count
+    FROM   classrooms cl
+    WHERE  cl.code      ILIKE '%' || p_query || '%'
+       OR  cl.name      ILIKE '%' || p_query || '%'
+       OR  cl.room_type ILIKE '%' || p_query || '%'
+    ORDER  BY cl.code ASC
+    LIMIT  GREATEST(p_page_size, 1)
+    OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
+END;
+$$;
