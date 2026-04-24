@@ -179,9 +179,16 @@ export default function CoursesPage() {
     setPage(1);
   }
 
+  const anyModalOpenRef = useRef(false);
+  useEffect(() => {
+    anyModalOpenRef.current = prereqModalOpen || dialogOpen;
+  }, [prereqModalOpen, dialogOpen]);
+
   useEffect(() => { void loadCourses(query, page); }, [query, page, loadCourses]);
   useAdminEvents("courses.changed", () => {
-    void loadCourses(query, page);
+    if (!anyModalOpenRef.current) {
+      void loadCourses(query, page);
+    }
   });
 
   const roomTypes = useMemo(
