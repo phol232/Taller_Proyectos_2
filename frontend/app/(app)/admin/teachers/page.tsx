@@ -54,24 +54,35 @@ export default function TeachersPage() {
   const [confirmDelete, setConfirmDelete] = useState<TeacherAdmin | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
   useEffect(() => {
-    void loadTeachers(query);
-  }, [query]);
+    void loadTeachers(query, page);
+  }, [query, page]);
 
-  useAdminEvents("teachers.changed", () => void loadTeachers(query));
+  useAdminEvents("teachers.changed", () => void loadTeachers(query, page));
 
-  async function loadTeachers(search: string) {
+  async function loadTeachers(search: string, pg = page) {
     setLoading(true);
     try {
       const data = search.trim()
-        ? await adminApi.searchTeachers(search.trim())
-        : await adminApi.listTeachers();
-      setTeachers(data);
+        ? await adminApi.searchTeachers(search.trim(), pg)
+        : await adminApi.listTeachers(pg);
+      setTeachers(data.content);
+      setTotalPages(data.totalPages);
+      setTotalCount(data.totalCount);
     } catch (error) {
       toastError("No se pudieron cargar los docentes", getApiErrorMessage(error, "Intenta nuevamente."));
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSearchChange(value: string) {
+    setQuery(value);
+    setPage(1);
   }
 
   const specialties = useMemo(
@@ -200,12 +211,11 @@ export default function TeachersPage() {
     <>
       <CrudPageLayout
         title="Docentes"
-        description="Gestiona docentes, especialidades y disponibilidad horaria."
         data={filtered}
         getRowId={(teacher) => teacher.id}
         isLoading={loading}
         searchValue={query}
-        onSearchChange={setQuery}
+        onSearchChange={handleSearchChange}
         searchPlaceholder="Buscar..."
         dialogOpen={dialogOpen}
         onDialogOpenChange={setDialogOpen}
@@ -215,6 +225,10 @@ export default function TeachersPage() {
         onSubmit={handleSubmit}
         isSubmitting={submitting}
         dialogContentClassName="sm:max-w-[63rem]"
+        totalCount={totalCount}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
         filters={
           <FiltersPopover
             activeCount={activeFiltersCount}
@@ -239,6 +253,7 @@ export default function TeachersPage() {
         columns={[
           { key: "code", label: "Código", sortable: true, sortAccessor: (t) => t.code, render: (t) => t.code },
           { key: "name", label: "Nombre", sortable: true, sortAccessor: (t) => t.fullName, render: (t) => t.fullName },
+          { key: "email", label: "Correo", sortable: true, sortAccessor: (t) => t.email ?? "", render: (t) => t.email ?? "—" },
           { key: "specialty", label: "Especialidad", sortable: true, sortAccessor: (t) => t.specialty, render: (t) => t.specialty },
           { key: "slots", label: "Franjas", sortable: true, sortAccessor: (t) => t.availability.length, render: (t) => t.availability.length },
           {
@@ -312,6 +327,11 @@ export default function TeachersPage() {
             <FormField label="Especialidad" error={errors.specialty}>
               <Input value={form.specialty} onChange={(event) => setForm((prev) => ({ ...prev, specialty: event.target.value }))} />
             </FormField>
+            {editing && (
+              <FormField label="Correo institucional">
+                <Input value={editing.email ?? "—"} disabled readOnly />
+              </FormField>
+            )}
           </div>
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-[#171717]">Disponibilidad horaria</h3>

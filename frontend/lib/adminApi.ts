@@ -4,12 +4,15 @@ import type {
   ApiErrorResponse,
   CarreraAdmin,
   ClassroomAdmin,
+  CreateUserInput,
   CourseAdmin,
   CourseOfferingAdmin,
   CourseOfferingUpsertInput,
   FacultadAdmin,
+  PagedResult,
   StudentAdmin,
   TeacherAdmin,
+  UserAdmin,
 } from "@/types/admin";
 
 export function getApiErrorMessage(error: unknown, fallback: string): string {
@@ -24,9 +27,21 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 export const adminApi = {
-  listCourses: async () => (await api.get<CourseAdmin[]>("/api/courses")).data,
-  searchCourses: async (query: string) =>
-    (await api.get<CourseAdmin[]>("/api/courses/search", { params: { q: query } })).data,
+  listUsers: async (page = 1) =>
+    (await api.get<PagedResult<UserAdmin>>("/api/users", { params: { page, pageSize: 12 } })).data,
+  searchUsers: async (query: string, page = 1) =>
+    (await api.get<PagedResult<UserAdmin>>("/api/users/search", { params: { q: query, page, pageSize: 12 } })).data,
+  createUser: async (payload: CreateUserInput) =>
+    (await api.post<UserAdmin>("/api/users", payload)).data,
+  activateUser: async (id: string) =>
+    (await api.post<UserAdmin>(`/api/users/${id}/activate`)).data,
+  deactivateUser: async (id: string) =>
+    (await api.post<UserAdmin>(`/api/users/${id}/deactivate`)).data,
+
+  listCourses: async (page = 1) =>
+    (await api.get<PagedResult<CourseAdmin>>("/api/courses", { params: { page, pageSize: 12 } })).data,
+  searchCourses: async (query: string, page = 1) =>
+    (await api.get<PagedResult<CourseAdmin>>("/api/courses/search", { params: { q: query, page, pageSize: 12 } })).data,
   createCourse: async (payload: Partial<CourseAdmin>) =>
     (await api.post<CourseAdmin>("/api/courses", payload)).data,
   updateCourse: async (id: string, payload: Partial<CourseAdmin>) =>
@@ -34,9 +49,10 @@ export const adminApi = {
   deactivateCourse: async (id: string) => api.post(`/api/courses/${id}/deactivate`),
   deleteCourse: async (id: string) => api.delete(`/api/courses/${id}`),
 
-  listTeachers: async () => (await api.get<TeacherAdmin[]>("/api/teachers")).data,
-  searchTeachers: async (query: string) =>
-    (await api.get<TeacherAdmin[]>("/api/teachers/search", { params: { q: query } })).data,
+  listTeachers: async (page = 1) =>
+    (await api.get<PagedResult<TeacherAdmin>>("/api/teachers", { params: { page, pageSize: 12 } })).data,
+  searchTeachers: async (query: string, page = 1) =>
+    (await api.get<PagedResult<TeacherAdmin>>("/api/teachers/search", { params: { q: query, page, pageSize: 12 } })).data,
   createTeacher: async (payload: Partial<TeacherAdmin>) =>
     (await api.post<TeacherAdmin>("/api/teachers", payload)).data,
   updateTeacher: async (id: string, payload: Partial<TeacherAdmin>) =>
@@ -44,9 +60,10 @@ export const adminApi = {
   deactivateTeacher: async (id: string) => api.post(`/api/teachers/${id}/deactivate`),
   deleteTeacher: async (id: string) => api.delete(`/api/teachers/${id}`),
 
-  listClassrooms: async () => (await api.get<ClassroomAdmin[]>("/api/classrooms")).data,
-  searchClassrooms: async (query: string) =>
-    (await api.get<ClassroomAdmin[]>("/api/classrooms/search", { params: { q: query } })).data,
+  listClassrooms: async (page = 1) =>
+    (await api.get<PagedResult<ClassroomAdmin>>("/api/classrooms", { params: { page, pageSize: 12 } })).data,
+  searchClassrooms: async (query: string, page = 1) =>
+    (await api.get<PagedResult<ClassroomAdmin>>("/api/classrooms/search", { params: { q: query, page, pageSize: 12 } })).data,
   createClassroom: async (payload: Partial<ClassroomAdmin>) =>
     (await api.post<ClassroomAdmin>("/api/classrooms", payload)).data,
   updateClassroom: async (id: string, payload: Partial<ClassroomAdmin>) =>
@@ -54,9 +71,10 @@ export const adminApi = {
   deactivateClassroom: async (id: string) => api.post(`/api/classrooms/${id}/deactivate`),
   deleteClassroom: async (id: string) => api.delete(`/api/classrooms/${id}`),
 
-  listStudents: async () => (await api.get<StudentAdmin[]>("/api/students")).data,
-  searchStudents: async (query: string) =>
-    (await api.get<StudentAdmin[]>("/api/students/search", { params: { q: query } })).data,
+  listStudents: async (page = 1) =>
+    (await api.get<PagedResult<StudentAdmin>>("/api/students", { params: { page, pageSize: 12 } })).data,
+  searchStudents: async (query: string, page = 1) =>
+    (await api.get<PagedResult<StudentAdmin>>("/api/students/search", { params: { q: query, page, pageSize: 12 } })).data,
   createStudent: async (payload: Partial<StudentAdmin>) =>
     (await api.post<StudentAdmin>("/api/students", payload)).data,
   updateStudent: async (id: string, payload: Partial<StudentAdmin>) =>

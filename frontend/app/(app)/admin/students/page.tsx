@@ -67,11 +67,15 @@ export default function StudentsPage() {
   const [carreras, setCarreras] = useState<CarreraAdmin[]>([]);
   const [carrerasLoading, setCarrerasLoading] = useState(false);
 
-  useEffect(() => {
-    void loadStudents(query);
-  }, [query]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
 
-  useAdminEvents("students.changed", () => void loadStudents(query));
+  useEffect(() => {
+    void loadStudents(query, page);
+  }, [query, page]);
+
+  useAdminEvents("students.changed", () => void loadStudents(query, page));
 
   useEffect(() => {
     adminApi.listCatalogFacultades().then(setFacultades).catch(() => {});
@@ -90,18 +94,25 @@ export default function StudentsPage() {
       .finally(() => setCarrerasLoading(false));
   }, [form.facultadId]);
 
-  async function loadStudents(search: string) {
+  async function loadStudents(search: string, pg = page) {
     setLoading(true);
     try {
       const data = search.trim()
-        ? await adminApi.searchStudents(search.trim())
-        : await adminApi.listStudents();
-      setStudents(data);
+        ? await adminApi.searchStudents(search.trim(), pg)
+        : await adminApi.listStudents(pg);
+      setStudents(data.content);
+      setTotalPages(data.totalPages);
+      setTotalCount(data.totalCount);
     } catch (error) {
       toastError("No se pudieron cargar los estudiantes", getApiErrorMessage(error, "Intenta nuevamente."));
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSearchChange(value: string) {
+    setQuery(value);
+    setPage(1);
   }
 
   const careers = useMemo(
@@ -245,12 +256,11 @@ export default function StudentsPage() {
     <>
       <CrudPageLayout
         title="Estudiantes"
-        description="Gestiona estudiantes, ciclo, carrera y cursos aprobados."
         data={filteredStudents}
         getRowId={(student) => student.id}
         isLoading={loading}
         searchValue={query}
-        onSearchChange={setQuery}
+        onSearchChange={handleSearchChange}
         searchPlaceholder="Buscar..."
         dialogOpen={dialogOpen}
         onDialogOpenChange={setDialogOpen}
@@ -259,6 +269,10 @@ export default function StudentsPage() {
         onCreate={openCreate}
         onSubmit={handleSubmit}
         isSubmitting={submitting}
+        totalCount={totalCount}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
         filters={
           <FiltersPopover
             activeCount={activeFiltersCount}
