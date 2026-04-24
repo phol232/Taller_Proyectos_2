@@ -151,7 +151,7 @@ public class GlobalExceptionHandler {
                 .body(new ApiError("VALIDATION_ERROR", "Datos de entrada inválidos.", errors));
     }
 
-        @ExceptionHandler(DataIntegrityViolationException.class)
+    @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         log.warn("Conflicto de integridad de datos: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity
@@ -159,8 +159,14 @@ public class GlobalExceptionHandler {
                 .body(new ApiError("DATA_CONFLICT",
                         "La operación entra en conflicto con datos existentes."));
     }
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleGeneric(Exception ex) {
+    public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri != null && uri.startsWith("/api/admin/events")) {
+            log.warn("Excepción ignorada en endpoint SSE {}: {}", uri, ex.getMessage());
+            return null;
+        }
         log.error("Error no controlado: {}", ex.getMessage(), ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)

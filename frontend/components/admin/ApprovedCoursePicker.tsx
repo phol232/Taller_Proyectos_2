@@ -33,7 +33,7 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
   React.useEffect(() => { setMounted(true); }, []);
 
   React.useEffect(() => {
-    adminApi.listCourses().then(setAllCourses).catch(() => {});
+    adminApi.listCourses().then((data) => setAllCourses(data.content)).catch(() => {});
   }, []);
 
   // Close dropdown on outside click (both input area and portal dropdown)
@@ -61,7 +61,7 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
     const timeout = setTimeout(async () => {
       try {
         const data = await adminApi.searchCourses(trimmed);
-        setResults(data.filter((c) => !value.includes(c.code)));
+        setResults(data.content.filter((c) => !value.includes(c.code)));
       } catch {
         setResults([]);
       } finally {

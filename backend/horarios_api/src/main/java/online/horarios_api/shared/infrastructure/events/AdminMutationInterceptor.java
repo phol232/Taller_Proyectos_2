@@ -3,17 +3,15 @@ package online.horarios_api.shared.infrastructure.events;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.Map;
 
-/**
- * Intercepts admin CRUD mutations and publishes SSE events after a successful response.
- * Maps URL path prefixes to event names so connected clients can refresh their data.
- */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class AdminMutationInterceptor implements HandlerInterceptor {
 
     private static final Map<String, String> PATH_TO_EVENT = Map.of(
@@ -45,6 +43,7 @@ public class AdminMutationInterceptor implements HandlerInterceptor {
         String path = request.getRequestURI();
         for (Map.Entry<String, String> entry : PATH_TO_EVENT.entrySet()) {
             if (path.startsWith(entry.getKey())) {
+                log.info("AdminMutationInterceptor: {} {} → publish '{}'", method, path, entry.getValue());
                 publisher.publish(entry.getValue());
                 return;
             }

@@ -99,8 +99,8 @@ export default function CourseOfferingsPage() {
         adminApi.listTeachers(),
       ]);
       setPeriods(periodData);
-      setCourses(courseData);
-      setTeachers(teacherData);
+      setCourses(courseData.content);
+      setTeachers(teacherData.content);
     } catch (error) {
       toastError("No se pudieron cargar dependencias", getApiErrorMessage(error, "Intenta nuevamente."));
     }
@@ -275,7 +275,6 @@ export default function CourseOfferingsPage() {
     <>
     <CrudPageLayout
       title="Ofertas de cursos"
-      description="Gestiona la apertura de cursos por período, secciones y docentes candidatos."
       data={filtered}
       getRowId={(offering) => offering.id}
       isLoading={loading}

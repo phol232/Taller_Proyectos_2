@@ -3,6 +3,7 @@ package online.horarios_api.student.application.usecase;
 import lombok.RequiredArgsConstructor;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.student.domain.model.Student;
 import online.horarios_api.student.domain.model.StudentData;
 import online.horarios_api.student.domain.port.in.StudentCommandUseCase;
@@ -67,6 +68,21 @@ public class StudentService implements StudentCommandUseCase, StudentQueryUseCas
             return studentPort.findAll();
         }
         return studentPort.searchByCodeOrName(query.trim());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Student> listStudentsPaged(int page, int pageSize) {
+        return studentPort.findAllPaged(page, pageSize);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Student> searchStudentsPaged(String query, int page, int pageSize) {
+        if (query == null || query.isBlank()) {
+            return studentPort.findAllPaged(page, pageSize);
+        }
+        return studentPort.searchPaged(query.trim(), page, pageSize);
     }
 
     private Student ensureExists(UUID studentId) {

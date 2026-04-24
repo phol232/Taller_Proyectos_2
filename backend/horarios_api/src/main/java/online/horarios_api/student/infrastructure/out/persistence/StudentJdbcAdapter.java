@@ -3,6 +3,7 @@ package online.horarios_api.student.infrastructure.out.persistence;
 import lombok.RequiredArgsConstructor;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.DuplicateFieldException;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.student.domain.model.Student;
 import online.horarios_api.student.domain.model.StudentData;
 import online.horarios_api.student.domain.port.out.StudentPort;
@@ -130,6 +131,42 @@ public class StudentJdbcAdapter implements StudentPort {
                 .stream()
                 .map(this::enrich)
                 .toList();
+    }
+
+    @Override
+    public Page<Student> findAllPaged(int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, pageSize);
+        long[] total = {0L};
+        List<Student> raw = jdbcTemplate.query(
+                "SELECT * FROM fn_list_students_paged(?, ?)",
+                (rs, rowNum) -> {
+                    if (rowNum == 0) total[0] = rs.getLong("total_count");
+                    return baseMapper.mapRow(rs, rowNum);
+                },
+                safePage, safeSize
+        );
+        long totalCount = raw.isEmpty() ? 0L : total[0];
+        List<Student> enriched = raw.stream().map(this::enrich).toList();
+        return Page.of(enriched, safePage, safeSize, totalCount);
+    }
+
+    @Override
+    public Page<Student> searchPaged(String query, int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, pageSize);
+        long[] total = {0L};
+        List<Student> raw = jdbcTemplate.query(
+                "SELECT * FROM fn_search_students_paged(?, ?, ?)",
+                (rs, rowNum) -> {
+                    if (rowNum == 0) total[0] = rs.getLong("total_count");
+                    return baseMapper.mapRow(rs, rowNum);
+                },
+                query, safePage, safeSize
+        );
+        long totalCount = raw.isEmpty() ? 0L : total[0];
+        List<Student> enriched = raw.stream().map(this::enrich).toList();
+        return Page.of(enriched, safePage, safeSize, totalCount);
     }
 
     @Override

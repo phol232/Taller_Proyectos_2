@@ -53,24 +53,35 @@ export default function ClassroomsPage() {
   const [confirmDelete, setConfirmDelete] = useState<ClassroomAdmin | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
   useEffect(() => {
-    void loadClassrooms(query);
-  }, [query]);
+    void loadClassrooms(query, page);
+  }, [query, page]);
 
-  useAdminEvents("classrooms.changed", () => void loadClassrooms(query));
+  useAdminEvents("classrooms.changed", () => void loadClassrooms(query, page));
 
-  async function loadClassrooms(search: string) {
+  async function loadClassrooms(search: string, pg = page) {
     setLoading(true);
     try {
       const data = search.trim()
-        ? await adminApi.searchClassrooms(search.trim())
-        : await adminApi.listClassrooms();
-      setClassrooms(data);
+        ? await adminApi.searchClassrooms(search.trim(), pg)
+        : await adminApi.listClassrooms(pg);
+      setClassrooms(data.content);
+      setTotalPages(data.totalPages);
+      setTotalCount(data.totalCount);
     } catch (error) {
       toastError("No se pudieron cargar las aulas", getApiErrorMessage(error, "Intenta nuevamente."));
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSearchChange(value: string) {
+    setQuery(value);
+    setPage(1);
   }
 
   const types = useMemo(
@@ -190,12 +201,11 @@ export default function ClassroomsPage() {
     <>
       <CrudPageLayout
         title="Aulas"
-        description="Gestiona aulas, capacidad, tipo y disponibilidad horaria."
         data={filtered}
         getRowId={(classroom) => classroom.id}
         isLoading={loading}
         searchValue={query}
-        onSearchChange={setQuery}
+        onSearchChange={handleSearchChange}
         searchPlaceholder="Buscar..."
         dialogOpen={dialogOpen}
         onDialogOpenChange={setDialogOpen}
@@ -204,6 +214,10 @@ export default function ClassroomsPage() {
         onCreate={openCreate}
         onSubmit={handleSubmit}
         isSubmitting={submitting}
+        totalCount={totalCount}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
         filters={
           <FiltersPopover
             activeCount={activeFiltersCount}

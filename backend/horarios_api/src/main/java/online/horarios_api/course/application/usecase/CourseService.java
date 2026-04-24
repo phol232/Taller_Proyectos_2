@@ -6,6 +6,7 @@ import online.horarios_api.course.domain.model.CourseData;
 import online.horarios_api.course.domain.port.in.CourseCommandUseCase;
 import online.horarios_api.course.domain.port.in.CourseQueryUseCase;
 import online.horarios_api.course.domain.port.out.CoursePort;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,6 +67,21 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
             return coursePort.findAll();
         }
         return coursePort.searchByCodeOrName(query.trim());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Course> listCoursesPaged(int page, int pageSize) {
+        return coursePort.findAllPaged(page, pageSize);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Course> searchCoursesPaged(String query, int page, int pageSize) {
+        if (query == null || query.isBlank()) {
+            return coursePort.findAllPaged(page, pageSize);
+        }
+        return coursePort.searchPaged(query.trim(), page, pageSize);
     }
 
     private Course ensureExists(UUID courseId) {

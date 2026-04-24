@@ -1,5 +1,13 @@
 export type ScheduleDay = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY";
 
+export interface PagedResult<T> {
+  content: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface AvailabilitySlot {
   day: ScheduleDay;
   startTime: string;
@@ -25,6 +33,7 @@ export interface TeacherAdmin {
   userId: string | null;
   code: string;
   fullName: string;
+  email: string | null;
   specialty: string;
   isActive: boolean;
   availability: AvailabilitySlot[];
@@ -61,11 +70,35 @@ export interface StudentAdmin {
   updatedAt: string | null;
 }
 
+export interface UserAdmin {
+  id: string;
+  email: string;
+  passwordHash: string | null;
+  fullName: string;
+  role: "ADMIN" | "COORDINATOR" | "TEACHER" | "STUDENT";
+  active: boolean;
+  emailVerified: boolean;
+  avatarUrl: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface CreateUserInput {
+  email: string;
+  password: string;
+  fullName: string;
+  role: UserAdmin["role"];
+  active: boolean;
+  emailVerified: boolean;
+}
+
 export interface FacultadAdmin {
   id: string;
   code: string;
   name: string;
   isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface CarreraAdmin {
@@ -74,6 +107,8 @@ export interface CarreraAdmin {
   code: string;
   name: string;
   isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface AcademicPeriodAdmin {

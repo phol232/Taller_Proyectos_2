@@ -9,7 +9,7 @@ interface PageShellProps {
 export default function PageShell({ title, description, actions, children }: PageShellProps) {
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col px-8 py-8">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className={`flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${description ? "mb-8" : "mb-5"}`}>
         <div className="max-w-[720px]">
           <h1 className="text-[32px] font-semibold leading-[1.05] text-[#171717] dark:text-white" style={{ letterSpacing: "-1.28px" }}>
             {title}

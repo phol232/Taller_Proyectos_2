@@ -9,6 +9,7 @@ import online.horarios_api.classroom.domain.port.in.ClassroomCommandUseCase;
 import online.horarios_api.classroom.domain.port.in.ClassroomQueryUseCase;
 import online.horarios_api.classroom.infrastructure.in.web.dto.ClassroomRequest;
 import online.horarios_api.classroom.infrastructure.in.web.dto.ClassroomResponse;
+import online.horarios_api.shared.domain.model.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -27,11 +28,11 @@ public class ClassroomController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Listar aulas")
-    public ResponseEntity<List<ClassroomResponse>> listAll() {
-        return ResponseEntity.ok(classroomQueryUseCase.listClassrooms().stream()
-                .map(ClassroomResponse::from)
-                .toList());
+    @Operation(summary = "Listar aulas (paginado)")
+    public ResponseEntity<Page<ClassroomResponse>> listAll(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize) {
+        return ResponseEntity.ok(classroomQueryUseCase.listClassroomsPaged(page, pageSize).map(ClassroomResponse::from));
     }
 
     @GetMapping("/{id}")
@@ -43,11 +44,12 @@ public class ClassroomController {
 
     @GetMapping("/search")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Buscar aulas")
-    public ResponseEntity<List<ClassroomResponse>> search(@RequestParam String q) {
-        return ResponseEntity.ok(classroomQueryUseCase.searchClassrooms(q).stream()
-                .map(ClassroomResponse::from)
-                .toList());
+    @Operation(summary = "Buscar aulas (paginado)")
+    public ResponseEntity<Page<ClassroomResponse>> search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize) {
+        return ResponseEntity.ok(classroomQueryUseCase.searchClassroomsPaged(q, page, pageSize).map(ClassroomResponse::from));
     }
 
     @PostMapping

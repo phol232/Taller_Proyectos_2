@@ -1,5 +1,6 @@
 package online.horarios_api.user.domain.port.out;
 
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.user.domain.model.OAuth2LinkedAccount;
 import online.horarios_api.user.domain.model.User;
 
@@ -17,6 +18,10 @@ public interface UserPort {
 
     User save(User user);
 
+    User create(User user);
+
+    User setAccessStatus(UUID userId, boolean active);
+
     Optional<OAuth2LinkedAccount> findOAuth2Account(String provider, String providerSubject);
 
     OAuth2LinkedAccount saveOAuth2Account(OAuth2LinkedAccount account);
@@ -24,4 +29,8 @@ public interface UserPort {
     List<User> findAll();
 
     List<User> findByFullNameContaining(String query);
+
+    Page<User> findAllPaged(int page, int pageSize);
+
+    Page<User> findByFullNameContainingPaged(String query, int page, int pageSize);
 }

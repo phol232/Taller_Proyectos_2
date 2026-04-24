@@ -253,3 +253,76 @@ BEGIN
     ORDER  BY c.code ASC;
 END;
 $$;
+
+-- ----------------------------------------------------------
+-- fn_list_courses_paged
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_courses_paged(
+    p_page      INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 12
+)
+RETURNS TABLE(
+    id                   UUID,
+    code                 VARCHAR(50),
+    name                 VARCHAR(255),
+    credits              INTEGER,
+    weekly_hours         INTEGER,
+    required_room_type   VARCHAR(100),
+    is_active            BOOLEAN,
+    created_at           TIMESTAMPTZ,
+    updated_at           TIMESTAMPTZ,
+    total_count          BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT c.id, c.code, c.name, c.credits, c.weekly_hours,
+           c.required_room_type, c.is_active, c.created_at, c.updated_at,
+           COUNT(*) OVER()::BIGINT AS total_count
+    FROM   courses c
+    ORDER  BY c.code ASC
+    LIMIT  GREATEST(p_page_size, 1)
+    OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_search_courses_paged
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_search_courses_paged(
+    p_query     VARCHAR(255),
+    p_page      INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 12
+)
+RETURNS TABLE(
+    id                   UUID,
+    code                 VARCHAR(50),
+    name                 VARCHAR(255),
+    credits              INTEGER,
+    weekly_hours         INTEGER,
+    required_room_type   VARCHAR(100),
+    is_active            BOOLEAN,
+    created_at           TIMESTAMPTZ,
+    updated_at           TIMESTAMPTZ,
+    total_count          BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT c.id, c.code, c.name, c.credits, c.weekly_hours,
+           c.required_room_type, c.is_active, c.created_at, c.updated_at,
+           COUNT(*) OVER()::BIGINT AS total_count
+    FROM   courses c
+    WHERE  c.code ILIKE '%' || p_query || '%'
+       OR  c.name ILIKE '%' || p_query || '%'
+    ORDER  BY c.code ASC
+    LIMIT  GREATEST(p_page_size, 1)
+    OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
+END;
+$$;

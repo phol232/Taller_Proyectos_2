@@ -56,8 +56,9 @@ function DialogContent({
       <DialogOverlay className={overlayClassName} style={overlayStyle} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        initialFocus={false}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-white p-5 text-sm text-[#171717] shadow-[rgba(0,0,0,0.08)_0px_0px_0px_1px,rgba(0,0,0,0.08)_0px_12px_32px_-12px,rgba(0,0,0,0.06)_0px_24px_64px_-24px] duration-100 outline-none sm:max-w-lg data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-background p-5 text-sm text-foreground shadow-[rgba(0,0,0,0.08)_0px_0px_0px_1px,rgba(0,0,0,0.08)_0px_12px_32px_-12px,rgba(0,0,0,0.06)_0px_24px_64px_-24px] duration-100 outline-none sm:max-w-lg data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -69,7 +70,7 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-3 right-3 rounded-md text-[#666666] hover:bg-[#f5f5f5] hover:text-[#171717]"
+                className="absolute top-3 right-3 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
                 size="icon-sm"
               />
             }
@@ -105,7 +106,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 border-t border-[#ebebeb] bg-[#fafafa] px-5 py-3.5 sm:flex-row sm:justify-end",
+        "flex flex-col-reverse gap-2 border-t border-border bg-muted/30 px-5 py-3.5 sm:flex-row sm:justify-end",
         className
       )}
       {...props}
@@ -125,7 +126,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "font-heading text-[28px] leading-[1.05] font-semibold tracking-[-1.12px] text-[#171717]",
+        "font-heading text-[28px] leading-[1.05] font-semibold tracking-[-1.12px] text-foreground",
         className
       )}
       {...props}
@@ -141,7 +142,7 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "max-w-[52ch] text-sm leading-6 text-[#4d4d4d] *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        "max-w-[52ch] text-sm leading-6 text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
         className
       )}
       {...props}

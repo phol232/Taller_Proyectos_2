@@ -11,6 +11,7 @@ public record Teacher(
         UUID userId,
         String code,
         String fullName,
+        String email,
         String specialty,
         boolean isActive,
         List<AvailabilitySlot> availability,

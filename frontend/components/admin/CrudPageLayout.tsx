@@ -27,7 +27,7 @@ import React from "react";
 
 interface CrudPageLayoutProps<T> {
   title: string;
-  description: string;
+  description?: string;
   data: T[];
   columns: AdminColumn<T>[];
   getRowId: (row: T) => string;
@@ -49,6 +49,14 @@ interface CrudPageLayoutProps<T> {
   dialogContentClassName?: string;
   /** Cuando true, usa un Slide-over Panel lateral en vez del Dialog centrado. */
   useSheet?: boolean;
+  /** Total de registros (para paginación). */
+  totalCount?: number;
+  /** Página actual (1-based). */
+  page?: number;
+  /** Total de páginas. */
+  totalPages?: number;
+  /** Callback al cambiar de página. */
+  onPageChange?: (page: number) => void;
 }
 
 export function CrudPageLayout<T>({
@@ -72,6 +80,10 @@ export function CrudPageLayout<T>({
   filters,
   dialogContentClassName,
   useSheet = false,
+  totalCount,
+  page,
+  totalPages,
+  onPageChange,
 }: CrudPageLayoutProps<T>) {
   return (
     <PageShell
@@ -101,7 +113,7 @@ export function CrudPageLayout<T>({
           </div>
           {filters}
           <div className="ml-auto text-xs text-[#666666]">
-            {data.length} {data.length === 1 ? "registro" : "registros"}
+            {totalCount ?? data.length} {(totalCount ?? data.length) === 1 ? "registro" : "registros"}
           </div>
         </div>
         <CardContent className="p-4">
@@ -112,6 +124,29 @@ export function CrudPageLayout<T>({
             isLoading={isLoading}
           />
         </CardContent>
+        {totalPages !== undefined && totalPages > 1 && onPageChange && (
+          <div className="flex items-center justify-between border-t border-[#ebebeb] px-4 py-3 text-sm">
+            <span className="text-[#666666]">
+              Página {page} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onPageChange((page ?? 1) - 1)}
+                disabled={(page ?? 1) <= 1}
+                className="rounded border border-[#ebebeb] px-3 py-1 text-xs disabled:opacity-40 hover:bg-[#f5f5f5] transition-colors"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => onPageChange((page ?? 1) + 1)}
+                disabled={(page ?? 1) >= totalPages}
+                className="rounded border border-[#ebebeb] px-3 py-1 text-xs disabled:opacity-40 hover:bg-[#f5f5f5] transition-colors"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {useSheet ? (

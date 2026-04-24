@@ -1,5 +1,20 @@
-import axios from "axios";
+import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
+import {
+  closeExpiredSession,
+  normalizeAuthUser,
+  queueSessionRecovery,
+  registerSessionRefreshHandler,
+} from "@/lib/sessionRecovery";
 import { toastError } from "@/lib/utils";
+import type { AuthResponse } from "@/types/auth";
+
+type ApiErrorData = {
+  message?: string;
+};
+
+type RetriableRequestConfig = InternalAxiosRequestConfig & {
+  _sessionRetry?: boolean;
+};
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080",
@@ -15,23 +30,63 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+function getRequestUrl(error: AxiosError<ApiErrorData>) {
+  return error.config?.url ?? error.response?.config.url ?? "";
+}
+
+function isSessionRecoveryExcluded(url: string) {
+  return (
+    url.includes("/api/auth/login") ||
+    url.includes("/api/auth/refresh") ||
+    url.includes("/api/auth/password-reset/") ||
+    url.includes("/api/auth/logout")
+  );
+}
+
+function redirectToLogin() {
+  if (typeof window !== "undefined") {
+    window.location.replace("/login");
+  }
+}
+
+registerSessionRefreshHandler(async () => {
+  const { data } = await api.post<AuthResponse>("/api/auth/refresh");
+  return { user: normalizeAuthUser(data.user) };
+});
+
 // ─── Response interceptor ─────────────────────────────────────────────────
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  (error: AxiosError<ApiErrorData>) => {
     if (!error.response) {
       toastError("Error de conexión", "No se pudo comunicar con el servidor.");
       return Promise.reject(error);
     }
 
     const { status, data } = error.response;
+    const url = getRequestUrl(error);
 
     if (status === 401) {
-      // Solo redirigir si el 401 NO viene de un endpoint de auth
-      // (login/password-reset devuelven 401 como respuesta normal de negocio)
-      const isAuthEndpoint = error.config?.url?.includes("/api/auth/");
-      if (!isAuthEndpoint && typeof window !== "undefined") {
-        window.location.replace("/login");
+      if (url.includes("/api/auth/refresh")) {
+        closeExpiredSession(error);
+        redirectToLogin();
+        return Promise.reject(error);
+      }
+
+      if (!isSessionRecoveryExcluded(url) && error.config) {
+        const originalConfig = error.config as RetriableRequestConfig;
+
+        if (originalConfig._sessionRetry) {
+          closeExpiredSession(error);
+          redirectToLogin();
+          return Promise.reject(error);
+        }
+
+        originalConfig._sessionRetry = true;
+        return queueSessionRecovery<AxiosResponse>(
+          () => api.request(originalConfig),
+          error
+        );
       }
     } else if (status === 403) {
       toastError("Sin permisos", "Tu rol no tiene acceso a esta acción.");

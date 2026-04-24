@@ -8,6 +8,15 @@ export interface User {
   avatarUrl?: string;
 }
 
+export interface AuthUserResponse {
+  id: string;
+  name?: string;
+  fullName?: string;
+  email: string;
+  role: Role | string;
+  avatarUrl?: string | null;
+}
+
 export interface JWTPayload {
   sub: string;
   email: string;
@@ -22,6 +31,5 @@ export interface LoginCredentials {
 }
 
 export interface AuthResponse {
-  token: string;
-  user: User;
+  user: AuthUserResponse;
 }

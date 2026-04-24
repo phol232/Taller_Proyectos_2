@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.DuplicateFieldException;
 import online.horarios_api.shared.domain.model.AvailabilitySlot;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.shared.domain.model.ScheduleDay;
 import online.horarios_api.teacher.domain.model.Teacher;
 import online.horarios_api.teacher.domain.model.TeacherData;
@@ -31,6 +32,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
             rs.getObject("user_id", UUID.class),
             rs.getString("code"),
             rs.getString("full_name"),
+            rs.getString("email"),
             rs.getString("specialty"),
             rs.getBoolean("is_active"),
             List.of(),
@@ -42,7 +44,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
     public Teacher create(TeacherData command) {
         try {
             Teacher created = jdbcTemplate.queryForObject(
-                    "SELECT * FROM fn_create_teacher(?, ?, ?, ?, ?)",
+                    "SELECT *, NULL::varchar AS email FROM fn_create_teacher(?, ?, ?, ?, ?)",
                     baseMapper,
                     command.userId(),
                     command.code(),
@@ -61,7 +63,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
     public Teacher update(UUID teacherId, TeacherData command) {
         try {
             Teacher updated = jdbcTemplate.queryForObject(
-                    "SELECT * FROM fn_update_teacher(?, ?, ?, ?, ?, ?)",
+                    "SELECT *, NULL::varchar AS email FROM fn_update_teacher(?, ?, ?, ?, ?, ?)",
                     baseMapper,
                     teacherId,
                     command.userId(),
@@ -107,6 +109,42 @@ public class TeacherJdbcAdapter implements TeacherPort {
     }
 
     @Override
+    public Page<Teacher> findAllPaged(int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, pageSize);
+        long[] total = {0L};
+        List<Teacher> raw = jdbcTemplate.query(
+                "SELECT * FROM fn_list_teachers_paged(?, ?)",
+                (rs, rowNum) -> {
+                    if (rowNum == 0) total[0] = rs.getLong("total_count");
+                    return baseMapper.mapRow(rs, rowNum);
+                },
+                safePage, safeSize
+        );
+        long totalCount = raw.isEmpty() ? 0L : total[0];
+        List<Teacher> enriched = raw.stream().map(this::enrich).toList();
+        return Page.of(enriched, safePage, safeSize, totalCount);
+    }
+
+    @Override
+    public Page<Teacher> searchPaged(String query, int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, pageSize);
+        long[] total = {0L};
+        List<Teacher> raw = jdbcTemplate.query(
+                "SELECT * FROM fn_search_teachers_paged(?, ?, ?)",
+                (rs, rowNum) -> {
+                    if (rowNum == 0) total[0] = rs.getLong("total_count");
+                    return baseMapper.mapRow(rs, rowNum);
+                },
+                query, safePage, safeSize
+        );
+        long totalCount = raw.isEmpty() ? 0L : total[0];
+        List<Teacher> enriched = raw.stream().map(this::enrich).toList();
+        return Page.of(enriched, safePage, safeSize, totalCount);
+    }
+
+    @Override
     public void deactivate(UUID teacherId) {
         jdbcTemplate.queryForObject("SELECT fn_deactivate_teacher(?)", Object.class, teacherId);
     }
@@ -131,6 +169,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
                 baseTeacher.userId(),
                 baseTeacher.code(),
                 baseTeacher.fullName(),
+                baseTeacher.email(),
                 baseTeacher.specialty(),
                 baseTeacher.isActive(),
                 loadAvailability(baseTeacher.id()),
@@ -188,4 +227,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
     private Instant toInstant(ResultSet rs, String column) throws SQLException {
         return rs.getTimestamp(column) != null ? rs.getTimestamp(column).toInstant() : null;
     }
+
 }
+
+

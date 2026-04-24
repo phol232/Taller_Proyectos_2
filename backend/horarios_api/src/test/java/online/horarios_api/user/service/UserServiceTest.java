@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.when;
 class UserServiceTest {
 
     @Mock private UserPort userPort;
+    @Mock private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UserService service;
@@ -108,6 +110,22 @@ class UserServiceTest {
         verify(userPort).saveOAuth2Account(any(OAuth2LinkedAccount.class));
         assertThat(result.id()).isEqualTo(userId);
         assertThat(result.email()).isEqualTo("new@continental.edu.pe");
+    }
+
+    @Test
+    @DisplayName("setUserStatus: desactiva usuario y delega sincronización al puerto")
+    void setUserStatus_deactivatesUser() {
+        UUID userId = UUID.randomUUID();
+        User inactive = new User(userId, "user@continental.edu.pe", null, "Usuario Test",
+                Role.STUDENT, false, false, null, null, null);
+
+        when(userPort.findById(userId)).thenReturn(Optional.of(inactive));
+        when(userPort.setAccessStatus(userId, false)).thenReturn(inactive);
+
+        User result = service.setUserStatus(userId, false);
+
+        assertThat(result.isActive()).isFalse();
+        assertThat(result.isEmailVerified()).isFalse();
     }
 
     private User buildUser(UUID id, String email) {

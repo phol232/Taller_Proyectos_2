@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.teacher.domain.model.TeacherData;
 import online.horarios_api.teacher.domain.port.in.TeacherCommandUseCase;
 import online.horarios_api.teacher.domain.port.in.TeacherQueryUseCase;
@@ -27,11 +28,11 @@ public class TeacherController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Listar docentes")
-    public ResponseEntity<List<TeacherResponse>> listAll() {
-        return ResponseEntity.ok(teacherQueryUseCase.listTeachers().stream()
-                .map(TeacherResponse::from)
-                .toList());
+    @Operation(summary = "Listar docentes (paginado)")
+    public ResponseEntity<Page<TeacherResponse>> listAll(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize) {
+        return ResponseEntity.ok(teacherQueryUseCase.listTeachersPaged(page, pageSize).map(TeacherResponse::from));
     }
 
     @GetMapping("/{id}")
@@ -43,11 +44,12 @@ public class TeacherController {
 
     @GetMapping("/search")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Buscar docentes")
-    public ResponseEntity<List<TeacherResponse>> search(@RequestParam String q) {
-        return ResponseEntity.ok(teacherQueryUseCase.searchTeachers(q).stream()
-                .map(TeacherResponse::from)
-                .toList());
+    @Operation(summary = "Buscar docentes (paginado)")
+    public ResponseEntity<Page<TeacherResponse>> search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize) {
+        return ResponseEntity.ok(teacherQueryUseCase.searchTeachersPaged(q, page, pageSize).map(TeacherResponse::from));
     }
 
     @PostMapping
@@ -109,3 +111,5 @@ public class TeacherController {
         return ResponseEntity.noContent().build();
     }
 }
+
+
