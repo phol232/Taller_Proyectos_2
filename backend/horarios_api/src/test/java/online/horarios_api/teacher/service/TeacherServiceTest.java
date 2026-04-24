@@ -43,7 +43,7 @@ class TeacherServiceTest {
         when(teacherPort.create(any())).thenAnswer(invocation -> {
             TeacherData data = invocation.getArgument(0);
             return new Teacher(teacherId, data.userId(), data.code(), data.fullName(),
-                    data.specialty(), data.isActive(), data.availability(), Instant.now(), Instant.now());
+                    null, data.specialty(), data.isActive(), data.availability(), Instant.now(), Instant.now());
         });
 
         service.createTeacher(new TeacherData(

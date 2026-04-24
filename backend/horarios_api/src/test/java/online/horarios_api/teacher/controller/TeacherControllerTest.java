@@ -77,7 +77,7 @@ class TeacherControllerTest {
     @DisplayName("POST /api/teachers: payload válido → 200")
     void createTeacher_validPayload_returns200() throws Exception {
         Teacher teacher = new Teacher(
-                UUID.randomUUID(), null, "DOC-01", "Ada Lovelace", "Matemática", true,
+                UUID.randomUUID(), null, "DOC-01", "Ada Lovelace", null, "Matemática", true,
                 List.of(new AvailabilitySlot(ScheduleDay.MONDAY, LocalTime.of(8, 0), LocalTime.of(10, 0), true)),
                 Instant.now(), Instant.now()
         );
