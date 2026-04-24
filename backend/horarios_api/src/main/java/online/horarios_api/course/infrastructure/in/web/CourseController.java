@@ -9,11 +9,11 @@ import online.horarios_api.course.domain.port.in.CourseCommandUseCase;
 import online.horarios_api.course.domain.port.in.CourseQueryUseCase;
 import online.horarios_api.course.infrastructure.in.web.dto.CourseRequest;
 import online.horarios_api.course.infrastructure.in.web.dto.CourseResponse;
+import online.horarios_api.shared.domain.model.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -27,11 +27,11 @@ public class CourseController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Listar cursos")
-    public ResponseEntity<List<CourseResponse>> listAll() {
-        return ResponseEntity.ok(courseQueryUseCase.listCourses().stream()
-                .map(CourseResponse::from)
-                .toList());
+    @Operation(summary = "Listar cursos (paginado)")
+    public ResponseEntity<Page<CourseResponse>> listAll(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize) {
+        return ResponseEntity.ok(courseQueryUseCase.listCoursesPaged(page, pageSize).map(CourseResponse::from));
     }
 
     @GetMapping("/{id}")
@@ -43,11 +43,12 @@ public class CourseController {
 
     @GetMapping("/search")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Buscar cursos por código o nombre")
-    public ResponseEntity<List<CourseResponse>> search(@RequestParam String q) {
-        return ResponseEntity.ok(courseQueryUseCase.searchCourses(q).stream()
-                .map(CourseResponse::from)
-                .toList());
+    @Operation(summary = "Buscar cursos por código o nombre (paginado)")
+    public ResponseEntity<Page<CourseResponse>> search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize) {
+        return ResponseEntity.ok(courseQueryUseCase.searchCoursesPaged(q, page, pageSize).map(CourseResponse::from));
     }
 
     @PostMapping

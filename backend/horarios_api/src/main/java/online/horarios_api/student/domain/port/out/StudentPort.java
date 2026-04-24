@@ -1,5 +1,6 @@
 package online.horarios_api.student.domain.port.out;
 
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.student.domain.model.Student;
 import online.horarios_api.student.domain.model.StudentData;
 
@@ -14,6 +15,8 @@ public interface StudentPort {
     Optional<Student> findByUserId(UUID userId);
     List<Student> findAll();
     List<Student> searchByCodeOrName(String query);
+    Page<Student> findAllPaged(int page, int pageSize);
+    Page<Student> searchPaged(String query, int page, int pageSize);
     void deactivate(UUID studentId);
     void delete(UUID studentId);
 }

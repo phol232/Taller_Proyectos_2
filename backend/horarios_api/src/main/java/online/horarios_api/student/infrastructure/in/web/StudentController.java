@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.student.domain.model.StudentData;
 import online.horarios_api.student.domain.port.in.StudentCommandUseCase;
 import online.horarios_api.student.domain.port.in.StudentQueryUseCase;
@@ -13,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -27,11 +27,11 @@ public class StudentController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Listar estudiantes")
-    public ResponseEntity<List<StudentResponse>> listAll() {
-        return ResponseEntity.ok(studentQueryUseCase.listStudents().stream()
-                .map(StudentResponse::from)
-                .toList());
+    @Operation(summary = "Listar estudiantes (paginado)")
+    public ResponseEntity<Page<StudentResponse>> listAll(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize) {
+        return ResponseEntity.ok(studentQueryUseCase.listStudentsPaged(page, pageSize).map(StudentResponse::from));
     }
 
     @GetMapping("/{id}")
@@ -43,11 +43,12 @@ public class StudentController {
 
     @GetMapping("/search")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Buscar estudiantes")
-    public ResponseEntity<List<StudentResponse>> search(@RequestParam String q) {
-        return ResponseEntity.ok(studentQueryUseCase.searchStudents(q).stream()
-                .map(StudentResponse::from)
-                .toList());
+    @Operation(summary = "Buscar estudiantes (paginado)")
+    public ResponseEntity<Page<StudentResponse>> search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize) {
+        return ResponseEntity.ok(studentQueryUseCase.searchStudentsPaged(q, page, pageSize).map(StudentResponse::from));
     }
 
     @PostMapping

@@ -6,6 +6,7 @@ import online.horarios_api.course.domain.model.CourseData;
 import online.horarios_api.course.domain.port.out.CoursePort;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.DuplicateFieldException;
+import online.horarios_api.shared.domain.model.Page;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -105,6 +106,42 @@ public class CourseJdbcAdapter implements CoursePort {
                 .stream()
                 .map(this::enrich)
                 .toList();
+    }
+
+    @Override
+    public Page<Course> findAllPaged(int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, pageSize);
+        long[] total = {0L};
+        List<Course> raw = jdbcTemplate.query(
+                "SELECT * FROM fn_list_courses_paged(?, ?)",
+                (rs, rowNum) -> {
+                    if (rowNum == 0) total[0] = rs.getLong("total_count");
+                    return baseMapper.mapRow(rs, rowNum);
+                },
+                safePage, safeSize
+        );
+        long totalCount = raw.isEmpty() ? 0L : total[0];
+        List<Course> enriched = raw.stream().map(this::enrich).toList();
+        return Page.of(enriched, safePage, safeSize, totalCount);
+    }
+
+    @Override
+    public Page<Course> searchPaged(String query, int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, pageSize);
+        long[] total = {0L};
+        List<Course> raw = jdbcTemplate.query(
+                "SELECT * FROM fn_search_courses_paged(?, ?, ?)",
+                (rs, rowNum) -> {
+                    if (rowNum == 0) total[0] = rs.getLong("total_count");
+                    return baseMapper.mapRow(rs, rowNum);
+                },
+                query, safePage, safeSize
+        );
+        long totalCount = raw.isEmpty() ? 0L : total[0];
+        List<Course> enriched = raw.stream().map(this::enrich).toList();
+        return Page.of(enriched, safePage, safeSize, totalCount);
     }
 
     @Override

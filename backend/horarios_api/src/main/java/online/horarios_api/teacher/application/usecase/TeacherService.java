@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
 import online.horarios_api.shared.domain.model.AvailabilitySlot;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.teacher.domain.model.Teacher;
 import online.horarios_api.teacher.domain.model.TeacherData;
 import online.horarios_api.teacher.domain.port.in.TeacherCommandUseCase;
@@ -70,6 +71,21 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
         return teacherPort.searchByCodeOrName(query.trim());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Teacher> listTeachersPaged(int page, int pageSize) {
+        return teacherPort.findAllPaged(page, pageSize);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Teacher> searchTeachersPaged(String query, int page, int pageSize) {
+        if (query == null || query.isBlank()) {
+            return teacherPort.findAllPaged(page, pageSize);
+        }
+        return teacherPort.searchPaged(query.trim(), page, pageSize);
+    }
+
     private Teacher ensureExists(UUID teacherId) {
         return teacherPort.findById(teacherId)
                 .orElseThrow(() -> new NotFoundException("Docente no encontrado."));
@@ -108,3 +124,5 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
         return value.trim();
     }
 }
+
+
