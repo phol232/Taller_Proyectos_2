@@ -38,10 +38,10 @@ export const adminApi = {
   deactivateUser: async (id: string) =>
     (await api.post<UserAdmin>(`/api/users/${id}/deactivate`)).data,
 
-  listCourses: async (page = 1) =>
-    (await api.get<PagedResult<CourseAdmin>>("/api/courses", { params: { page, pageSize: 12 } })).data,
-  searchCourses: async (query: string, page = 1) =>
-    (await api.get<PagedResult<CourseAdmin>>("/api/courses/search", { params: { q: query, page, pageSize: 12 } })).data,
+  listCourses: async (page = 1, pageSize = 12) =>
+    (await api.get<PagedResult<CourseAdmin>>("/api/courses", { params: { page, pageSize } })).data,
+  searchCourses: async (query: string, page = 1, pageSize = 12) =>
+    (await api.get<PagedResult<CourseAdmin>>("/api/courses/search", { params: { q: query, page, pageSize } })).data,
   createCourse: async (payload: Partial<CourseAdmin>) =>
     (await api.post<CourseAdmin>("/api/courses", payload)).data,
   updateCourse: async (id: string, payload: Partial<CourseAdmin>) =>

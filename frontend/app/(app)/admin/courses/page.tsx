@@ -158,6 +158,18 @@ export default function CoursesPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
+  // Catálogo completo para pickers de prerrequisitos (no se filtra con el buscador de la página)
+  const [catalogCourses, setCatalogCourses] = useState<CourseAdmin[]>([]);
+
+  const loadCatalog = useCallback(async () => {
+    try {
+      const data = await adminApi.listCourses(1, 1000);
+      setCatalogCourses(data.content);
+    } catch {
+      // silencioso: los pickers caerán al estado "no encontrado"
+    }
+  }, []);
+
   const loadCourses = useCallback(async (search: string, pg = page) => {
     setLoading(true);
     try {
@@ -180,7 +192,11 @@ export default function CoursesPage() {
   }
 
   useEffect(() => { void loadCourses(query, page); }, [query, page, loadCourses]);
-  useAdminEvents("courses.changed", () => void loadCourses(query, page));
+  useEffect(() => { void loadCatalog(); }, [loadCatalog]);
+  useAdminEvents("courses.changed", () => {
+    void loadCourses(query, page);
+    void loadCatalog();
+  });
 
   const roomTypes = useMemo(
     () => Array.from(new Set(courses.map((c) => c.requiredRoomType).filter((v): v is string => !!v))).sort(),
@@ -425,7 +441,7 @@ export default function CoursesPage() {
         open={prereqModalOpen}
         onOpenChange={setPrereqModalOpen}
         course={activeCoursePrerreq}
-        allCourses={courses}
+        allCourses={catalogCourses}
         onUpdated={onPrereqsUpdated}
       />
 
@@ -486,7 +502,7 @@ export default function CoursesPage() {
             <PrerequisitesPicker
               value={form.prerequisites}
               onChange={(prerequisites) => setForm((p) => ({ ...p, prerequisites }))}
-              allCourses={courses}
+              allCourses={catalogCourses}
               excludeCode={form.code}
               error={errors.prerequisites}
             />
@@ -682,6 +698,7 @@ function PrerequisitesModal({
   const [saving, setSaving]               = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [detailCode, setDetailCode]       = useState<string | null>(null);
+  const [extras, setExtras]               = useState<Record<string, CourseAdmin>>({});
 
   useEffect(() => {
     if (!open) {
@@ -691,10 +708,46 @@ function PrerequisitesModal({
     }
   }, [open]);
 
+  // Resolve missing prereq codes (outside the 1000-item catalog) via server search
+  useEffect(() => {
+    if (!open || !course) return;
+    const missing = course.prerequisites.filter(
+      (code) => !allCourses.some((c) => c.code === code) && !extras[code],
+    );
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        missing.map(async (code) => {
+          try {
+            const res = await adminApi.searchCourses(code, 1, 1);
+            const match = res.content.find((c) => c.code === code) ?? res.content[0] ?? null;
+            return match ? ([code, match] as const) : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      const next: Record<string, CourseAdmin> = {};
+      for (const entry of entries) {
+        if (entry) next[entry[0]] = entry[1];
+      }
+      if (Object.keys(next).length > 0) {
+        setExtras((prev) => ({ ...prev, ...next }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, course, allCourses, extras]);
+
   const prereqDetails = useMemo(() => {
     if (!course) return [];
-    return course.prerequisites.map((code) => allCourses.find((c) => c.code === code) ?? null);
-  }, [course, allCourses]);
+    return course.prerequisites.map(
+      (code) => allCourses.find((c) => c.code === code) ?? extras[code] ?? null,
+    );
+  }, [course, allCourses, extras]);
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -898,7 +951,7 @@ function PrerequisitesModal({
         zIndex={60}
       />
       <PrereqDetailModal
-        course={detailCode ? allCourses.find((c) => c.code === detailCode) ?? null : null}
+        course={detailCode ? allCourses.find((c) => c.code === detailCode) ?? extras[detailCode] ?? null : null}
         onClose={() => setDetailCode(null)}
       />
     </>
@@ -954,9 +1007,43 @@ function PrerequisitesPicker({
       .slice(0, 8);
   }, [query, allCourses, value, excludeCode]);
 
+  const [extras, setExtras] = useState<Record<string, CourseAdmin>>({});
+
+  useEffect(() => {
+    const missing = value.filter(
+      (code) => !allCourses.some((c) => c.code === code) && !extras[code],
+    );
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        missing.map(async (code) => {
+          try {
+            const res = await adminApi.searchCourses(code, 1, 1);
+            const match = res.content.find((c) => c.code === code) ?? res.content[0] ?? null;
+            return match ? ([code, match] as const) : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      const next: Record<string, CourseAdmin> = {};
+      for (const entry of entries) {
+        if (entry) next[entry[0]] = entry[1];
+      }
+      if (Object.keys(next).length > 0) {
+        setExtras((prev) => ({ ...prev, ...next }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [value, allCourses, extras]);
+
   const prereqDetails = useMemo(
-    () => value.map((code) => allCourses.find((c) => c.code === code) ?? null),
-    [value, allCourses],
+    () => value.map((code) => allCourses.find((c) => c.code === code) ?? extras[code] ?? null),
+    [value, allCourses, extras],
   );
 
   const dropdownPortal =
@@ -1001,7 +1088,7 @@ function PrerequisitesPicker({
         )
       : null;
 
-  const detailCourse = detailCode ? allCourses.find((c) => c.code === detailCode) ?? null : null;
+  const detailCourse = detailCode ? allCourses.find((c) => c.code === detailCode) ?? extras[detailCode] ?? null : null;
 
   return (
     <div className="space-y-3">
