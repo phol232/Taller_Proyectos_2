@@ -5,13 +5,14 @@ import online.horarios_api.user.application.usecase.UserService;
 import online.horarios_api.user.domain.port.out.UserPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
 public class UserBeanConfig {
 
     @Bean
-    public UserService userService(UserPort userPort) {
-        return new UserService(userPort);
+    public UserService userService(UserPort userPort, PasswordEncoder passwordEncoder) {
+        return new UserService(userPort, passwordEncoder);
     }
 
     @Bean

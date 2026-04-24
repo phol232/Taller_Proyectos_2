@@ -2,6 +2,7 @@ package online.horarios_api.user.application.usecase;
 
 import lombok.RequiredArgsConstructor;
 import online.horarios_api.shared.domain.exception.NotFoundException;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.user.domain.model.User;
 import online.horarios_api.user.domain.port.in.FindUserByIdUseCase;
 import online.horarios_api.user.domain.port.in.ListUsersUseCase;
@@ -22,6 +23,11 @@ public class UserQueryService implements ListUsersUseCase, FindUserByIdUseCase, 
     }
 
     @Override
+    public Page<User> listAllUsersPaged(int page, int pageSize) {
+        return userPort.findAllPaged(page, pageSize);
+    }
+
+    @Override
     public User findById(UUID id) {
         return userPort.findById(id)
                 .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
@@ -34,4 +40,13 @@ public class UserQueryService implements ListUsersUseCase, FindUserByIdUseCase, 
         }
         return userPort.findByFullNameContaining(query.trim());
     }
+
+    @Override
+    public Page<User> searchByNamePaged(String query, int page, int pageSize) {
+        if (query == null || query.isBlank()) {
+            return userPort.findAllPaged(page, pageSize);
+        }
+        return userPort.findByFullNameContainingPaged(query.trim(), page, pageSize);
+    }
 }
+
