@@ -1,7 +1,8 @@
 package online.horarios_api.shared.infrastructure.events;
 
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.MessageListener;
@@ -11,31 +12,32 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 import java.nio.charset.StandardCharsets;
 
-/**
- * Wires a Redis pub/sub subscriber that forwards fan-out events to the local
- * {@link SseEventPublisher} so every backend node delivers to its connected clients.
- */
 @Configuration
-@ConditionalOnBean(RedisConnectionFactory.class)
+@RequiredArgsConstructor
 @Slf4j
 public class RedisSseConfig {
 
-    @Bean
-    public RedisMessageListenerContainer adminEventsListenerContainer(
-            RedisConnectionFactory connectionFactory,
-            SseEventPublisher publisher) {
+    private final RedisConnectionFactory connectionFactory;
+    private final SseEventPublisher publisher;
 
+    @PostConstruct
+    void logBoot() {
+        log.info("RedisSseConfig cargada. ConnectionFactory={}", connectionFactory.getClass().getSimpleName());
+    }
+
+    @Bean
+    public RedisMessageListenerContainer adminEventsListenerContainer() {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
 
         MessageListener listener = (message, pattern) -> {
             String eventName = new String(message.getBody(), StandardCharsets.UTF_8);
-            log.debug("Recibido evento Redis '{}'", eventName);
+            log.info("SSE Redis listener recibió: '{}'", eventName);
             publisher.dispatchLocal(eventName);
         };
 
         container.addMessageListener(listener, new ChannelTopic(SseEventPublisher.CHANNEL));
-        log.info("Subscriber Redis SSE iniciado en canal '{}'", SseEventPublisher.CHANNEL);
+        log.info("Subscriber Redis SSE registrado en canal '{}'", SseEventPublisher.CHANNEL);
         return container;
     }
 }
