@@ -109,6 +109,20 @@ public class CourseJdbcAdapter implements CoursePort {
     }
 
     @Override
+    public List<Course> findByCodes(List<String> codes) {
+        if (codes == null || codes.isEmpty()) {
+            return List.of();
+        }
+        String[] codeArray = codes.toArray(new String[0]);
+        List<Course> raw = jdbcTemplate.query(
+                "SELECT * FROM fn_find_courses_by_codes(?)",
+                ps -> ps.setArray(1, ps.getConnection().createArrayOf("varchar", codeArray)),
+                baseMapper
+        );
+        return raw.stream().map(this::enrich).toList();
+    }
+
+    @Override
     public Page<Course> findAllPaged(int page, int pageSize) {
         int safePage = Math.max(1, page);
         int safeSize = Math.max(1, pageSize);
