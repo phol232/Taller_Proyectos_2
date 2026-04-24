@@ -683,6 +683,7 @@ function PrerequisitesModal({
   const [resolved, setResolved]               = useState<Record<string, CourseAdmin>>({});
   const [searchResults, setSearchResults]     = useState<CourseAdmin[]>([]);
   const [searchLoading, setSearchLoading]     = useState(false);
+  const attemptedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!open) {
@@ -690,14 +691,17 @@ function PrerequisitesModal({
       setConfirmRemove(null);
       setDetailCode(null);
       setSearchResults([]);
+      setResolved({});
+      attemptedRef.current = new Set();
     }
   }, [open]);
 
-  // Resolve prereq codes via backend lookup-by-codes
+  // Resolve prereq codes via backend lookup-by-codes (once per code, no retries)
   useEffect(() => {
     if (!open || !course) return;
-    const missing = course.prerequisites.filter((code) => !resolved[code]);
+    const missing = course.prerequisites.filter((code) => !attemptedRef.current.has(code));
     if (missing.length === 0) return;
+    missing.forEach((code) => attemptedRef.current.add(code));
     let cancelled = false;
     (async () => {
       try {
@@ -713,7 +717,7 @@ function PrerequisitesModal({
       }
     })();
     return () => { cancelled = true; };
-  }, [open, course, resolved]);
+  }, [open, course]);
 
   const prereqDetails = useMemo(() => {
     if (!course) return [];
@@ -969,8 +973,9 @@ function PrerequisitesPicker({
   const [resolved, setResolved]       = useState<Record<string, CourseAdmin>>({});
   const [results, setResults]         = useState<CourseAdmin[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dropdownRef  = useRef<HTMLDivElement>(null);
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const dropdownRef   = useRef<HTMLDivElement>(null);
+  const attemptedRef  = useRef<Set<string>>(new Set());
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -1012,10 +1017,11 @@ function PrerequisitesPicker({
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query, value, excludeCode]);
 
-  // Resolve currently-selected codes via backend lookup
+  // Resolve currently-selected codes via backend lookup (once per code, no retries)
   useEffect(() => {
-    const missing = value.filter((code) => !resolved[code]);
+    const missing = value.filter((code) => !attemptedRef.current.has(code));
     if (missing.length === 0) return;
+    missing.forEach((code) => attemptedRef.current.add(code));
     let cancelled = false;
     (async () => {
       try {
@@ -1031,7 +1037,7 @@ function PrerequisitesPicker({
       }
     })();
     return () => { cancelled = true; };
-  }, [value, resolved]);
+  }, [value]);
 
   const prereqDetails = useMemo(
     () => value.map((code) => resolved[code] ?? null),
