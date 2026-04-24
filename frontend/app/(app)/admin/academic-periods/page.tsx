@@ -174,7 +174,6 @@ export default function AcademicPeriodsPage() {
     <>
       <CrudPageLayout
         title="Períodos académicos"
-        description="Administra períodos académicos y el límite general de créditos."
         data={filtered}
         getRowId={(period) => period.id}
         isLoading={loading}

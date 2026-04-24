@@ -13,6 +13,7 @@ import {
   CalendarDays,
   CalendarCheck,
   Building2,
+  UserCircle,
   ArrowRight,
   TrendingUp,
   ShieldCheck,
@@ -23,6 +24,7 @@ export default function AdminHomePage() {
   const { t } = useTranslation();
 
   const STAT_CARDS = [
+    { label: "Usuarios", value: "—", sub: "Cuentas, roles y estado de acceso.", icon: <UserCircle className="h-5 w-5" />, href: "/admin/users" },
     { label: t.admin.stats.students,   value: "—", sub: t.admin.stats.studentsDesc,   icon: <Users className="h-5 w-5" />,          href: "/admin/students" },
     { label: t.admin.stats.teachers,   value: "—", sub: t.admin.stats.teachersDesc,   icon: <GraduationCap className="h-5 w-5" />,  href: "/admin/teachers" },
     { label: t.admin.stats.courses,    value: "—", sub: t.admin.stats.coursesDesc,    icon: <BookOpen className="h-5 w-5" />,        href: "/admin/courses" },
@@ -33,6 +35,7 @@ export default function AdminHomePage() {
   ];
 
   const QUICK_LINKS = [
+    { title: "Usuarios", description: "Revisa cuentas del sistema, roles, verificación y estado.", href: "/admin/users", icon: <UserCircle className="h-5 w-5" /> },
     { title: t.admin.links.studentsTitle,   description: t.admin.links.studentsDesc,   href: "/admin/students",   icon: <Users className="h-5 w-5" /> },
     { title: t.admin.links.teachersTitle,   description: t.admin.links.teachersDesc,   href: "/admin/teachers",   icon: <GraduationCap className="h-5 w-5" /> },
     { title: t.admin.links.coursesTitle,    description: t.admin.links.coursesDesc,    href: "/admin/courses",    icon: <BookOpen className="h-5 w-5" /> },

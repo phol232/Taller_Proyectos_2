@@ -101,6 +101,7 @@ function getNavGroups(t: TranslationDictionary): Record<Role, NavGroup[]> {
       {
         group: t.sidebar.nav.management,
         items: [
+          { label: "Usuarios", href: "/admin/users", icon: <UserCircle className="h-4 w-4" />, color: "#6B21A8", bgColor: "rgba(107,33,168,0.15)" },
           { label: t.sidebar.nav.students, href: "/admin/students", icon: <Users className="h-4 w-4" />, color: "#0284c7", bgColor: "rgba(2,132,199,0.15)" },
           { label: t.sidebar.nav.teachers, href: "/admin/teachers", icon: <GraduationCap className="h-4 w-4" />, color: "#0d9488", bgColor: "rgba(13,148,136,0.15)" },
           { label: t.sidebar.nav.courses, href: "/admin/courses", icon: <BookOpen className="h-4 w-4" />, color: "#b45309", bgColor: "rgba(180,83,9,0.15)" },

@@ -25,11 +25,11 @@ export function FormField({
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <Label htmlFor={htmlFor} className="text-[14px] font-medium text-[#171717]">
+          <Label htmlFor={htmlFor} className="text-[14px] font-medium text-foreground">
             {label}
           </Label>
           {description && (
-            <p className="text-xs leading-5 text-[#666666]">
+            <p className="text-xs leading-5 text-muted-foreground">
               {description}
             </p>
           )}
