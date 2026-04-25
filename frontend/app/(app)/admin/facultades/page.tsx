@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { createElement, useCallback, useEffect, useState } from "react";
 import {
   Building2,
   BookOpen,
@@ -497,6 +497,7 @@ export default function FacultadesPage() {
         onOpenChange={(o) => !o && setFacDeactivate(null)}
         title="Desactivar facultad"
         description={facDeactivate ? `"${facDeactivate.name}" se marcará como inactiva junto con todas sus carreras.` : ""}
+        variant="warning"
         onConfirm={() => facDeactivate && void handleFacDeactivate(facDeactivate)}
         isLoading={actionLoading}
       />
@@ -514,6 +515,7 @@ export default function FacultadesPage() {
         onOpenChange={(o) => !o && setCarDeactivate(null)}
         title="Desactivar carrera"
         description={carDeactivate ? `"${carDeactivate.name}" se marcará como inactiva.` : ""}
+        variant="warning"
         onConfirm={() => carDeactivate && void handleCarDeactivate(carDeactivate)}
         isLoading={actionLoading}
       />
@@ -548,14 +550,12 @@ function FacultadCard({
   onDelete: () => void;
 }) {
   const palette = getFacPalette(paletteIndex);
-  const Icon = getIconForFacultadName(facultad.name);
-
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md">
       {/* Header con icono grande + nombre */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl dark:opacity-80", palette.bg)}>
-          <Icon className={cn("h-7 w-7", palette.text)} />
+          {createElement(getIconForFacultadName(facultad.name), { className: cn("h-7 w-7", palette.text) })}
         </div>
         <p className="truncate text-sm font-semibold text-card-foreground">{facultad.name}</p>
       </div>

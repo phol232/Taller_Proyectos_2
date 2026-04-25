@@ -1,21 +1,89 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Award,
+  BadgeCheck,
+  BookOpen,
+  BriefcaseBusiness,
+  CalendarClock,
+  CalendarDays,
+  GraduationCap,
+  Mail,
+  Pencil,
+  Plus,
+  Power,
+  RefreshCw,
+  Search,
+  Tag,
+  Trash2,
+  User,
+  Users,
+} from "lucide-react";
 import { z } from "zod";
+import PageShell from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FormField } from "@/components/shared/FormField";
-import { CrudPageLayout } from "@/components/admin/CrudPageLayout";
 import { AvailabilityEditor } from "@/components/admin/AvailabilityEditor";
 import { FiltersPopover, type StatusFilter } from "@/components/admin/FiltersPopover";
 import { SelectField } from "@/components/admin/SelectField";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { teacherSchema } from "@/lib/validators/teacher.schema";
-import { toastError, toastSuccess } from "@/lib/utils";
+import { cn, toastError, toastSuccess } from "@/lib/utils";
 import { joinFullName, splitFullName } from "@/lib/fullName";
 import { useAdminEvents } from "@/hooks/useAdminEvents";
-import type { TeacherAdmin, AvailabilitySlot } from "@/types/admin";
+import type { AvailabilitySlot, TeacherAdmin } from "@/types/admin";
+
+// ─── Palette ──────────────────────────────────────────────────────────────────
+
+const TEACHER_PALETTE = [
+  { icon: GraduationCap,    bg: "bg-violet-100  dark:bg-violet-900/30",  text: "text-violet-600  dark:text-violet-400"  },
+  { icon: User,             bg: "bg-blue-100    dark:bg-blue-900/30",    text: "text-blue-600    dark:text-blue-400"    },
+  { icon: BookOpen,         bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-600 dark:text-emerald-400" },
+  { icon: Users,            bg: "bg-rose-100    dark:bg-rose-900/30",    text: "text-rose-600    dark:text-rose-400"    },
+  { icon: Award,            bg: "bg-amber-100   dark:bg-amber-900/30",   text: "text-amber-600   dark:text-amber-400"   },
+  { icon: BriefcaseBusiness,bg: "bg-cyan-100    dark:bg-cyan-900/30",    text: "text-cyan-600    dark:text-cyan-400"    },
+  { icon: CalendarClock,    bg: "bg-pink-100    dark:bg-pink-900/30",    text: "text-pink-600    dark:text-pink-400"    },
+];
+
+function getPalette(index: number) {
+  return TEACHER_PALETTE[index % TEACHER_PALETTE.length];
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function flattenErrors(error: z.ZodError): Record<string, string> {
+  return error.issues.reduce<Record<string, string>>((accumulator, issue) => {
+    const key = issue.path.join(".");
+    if (key && !accumulator[key]) {
+      accumulator[key] = issue.message;
+    }
+    return accumulator;
+  }, {});
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString("es-PE", {
+    timeZone: "America/Lima",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// ─── Form types ───────────────────────────────────────────────────────────────
 
 type TeacherFormState = {
   userId: string;
@@ -37,34 +105,39 @@ const EMPTY_FORM: TeacherFormState = {
   availability: [],
 };
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<TeacherAdmin[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Create / Edit dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TeacherAdmin | null>(null);
   const [form, setForm] = useState<TeacherFormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Filters
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [specialtyFilter, setSpecialtyFilter] = useState<string>("all");
 
+  // Confirmations
   const [confirmDeactivate, setConfirmDeactivate] = useState<TeacherAdmin | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<TeacherAdmin | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Availability modal
+  const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false);
+  const [activeTeacher, setActiveTeacher] = useState<TeacherAdmin | null>(null);
+  const [activeTeacherIdx, setActiveTeacherIdx] = useState(0);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
-  useEffect(() => {
-    void loadTeachers(query, page);
-  }, [query, page]);
-
-  useAdminEvents("teachers.changed", () => void loadTeachers(query, page));
-
-  async function loadTeachers(search: string, pg = page) {
+  const loadTeachers = useCallback(async (search: string, pg = page) => {
     setLoading(true);
     try {
       const data = search.trim()
@@ -78,16 +151,28 @@ export default function TeachersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [page]);
 
   function handleSearchChange(value: string) {
     setQuery(value);
     setPage(1);
   }
 
+  const anyModalOpenRef = useRef(false);
+  useEffect(() => {
+    anyModalOpenRef.current = availabilityModalOpen || dialogOpen;
+  }, [availabilityModalOpen, dialogOpen]);
+
+  useEffect(() => { void loadTeachers(query, page); }, [query, page, loadTeachers]);
+  useAdminEvents("teachers.changed", () => {
+    if (!anyModalOpenRef.current) void loadTeachers(query, page);
+  });
+
+  // ─── Derived ──────────────────────────────────────────────────────────────
+
   const specialties = useMemo(
-    () => Array.from(new Set(teachers.map((t) => t.specialty).filter(Boolean))).sort(),
-    [teachers]
+    () => Array.from(new Set(teachers.map((t) => t.specialty).filter((s): s is string => Boolean(s)))).sort(),
+    [teachers],
   );
 
   const filtered = useMemo(
@@ -98,7 +183,7 @@ export default function TeachersPage() {
         if (specialtyFilter !== "all" && t.specialty !== specialtyFilter) return false;
         return true;
       }),
-    [teachers, statusFilter, specialtyFilter]
+    [teachers, statusFilter, specialtyFilter],
   );
 
   const activeFiltersCount = (statusFilter !== "all" ? 1 : 0) + (specialtyFilter !== "all" ? 1 : 0);
@@ -107,6 +192,8 @@ export default function TeachersPage() {
     setStatusFilter("all");
     setSpecialtyFilter("all");
   }
+
+  // ─── Handlers ─────────────────────────────────────────────────────────────
 
   function openCreate() {
     setEditing(null);
@@ -131,6 +218,17 @@ export default function TeachersPage() {
     setDialogOpen(true);
   }
 
+  function openAvailabilityModal(teacher: TeacherAdmin, index: number) {
+    setActiveTeacher(teacher);
+    setActiveTeacherIdx(index);
+    setAvailabilityModalOpen(true);
+  }
+
+  function onTeacherUpdated(updated: TeacherAdmin) {
+    setTeachers((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    setActiveTeacher(updated);
+  }
+
   async function handleSubmit() {
     const localErrors: Record<string, string> = {};
     if (!form.apellidos.trim()) localErrors.apellidos = "Los apellidos son obligatorios";
@@ -143,6 +241,7 @@ export default function TeachersPage() {
       specialty: form.specialty,
       isActive: form.isActive,
     };
+
     const result = teacherSchema.safeParse(payloadInput);
     if (!result.success || Object.keys(localErrors).length > 0) {
       const zodErrors = result.success ? {} : flattenErrors(result.error);
@@ -159,16 +258,17 @@ export default function TeachersPage() {
       };
 
       if (editing) {
-        await adminApi.updateTeacher(editing.id, payload);
+        const updated = await adminApi.updateTeacher(editing.id, payload);
+        setTeachers((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
         toastSuccess("Docente actualizado");
       } else {
         await adminApi.createTeacher(payload);
         toastSuccess("Docente creado");
+        await loadTeachers(query);
       }
 
       setDialogOpen(false);
       setForm(EMPTY_FORM);
-      await loadTeachers(query);
     } catch (error) {
       toastError("No se pudo guardar el docente", getApiErrorMessage(error, "Intenta nuevamente."));
     } finally {
@@ -200,179 +300,470 @@ export default function TeachersPage() {
     } catch (error) {
       toastError(
         "No se pudo eliminar el docente",
-        getApiErrorMessage(error, "Tiene registros dependientes. Considera desactivarlo.")
+        getApiErrorMessage(error, "Tiene registros dependientes. Considera desactivarlo."),
       );
     } finally {
       setActionLoading(false);
     }
   }
 
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
-    <>
-      <CrudPageLayout
-        title="Docentes"
-        data={filtered}
-        getRowId={(teacher) => teacher.id}
-        isLoading={loading}
-        searchValue={query}
-        onSearchChange={handleSearchChange}
-        searchPlaceholder="Buscar..."
-        dialogOpen={dialogOpen}
-        onDialogOpenChange={setDialogOpen}
-        dialogTitle={editing ? "Editar docente" : "Nuevo docente"}
-        dialogDescription="Registra la identidad académica del docente, su especialidad y sus franjas disponibles."
-        onCreate={openCreate}
-        onSubmit={handleSubmit}
-        isSubmitting={submitting}
-        dialogContentClassName="sm:max-w-[63rem]"
-        totalCount={totalCount}
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        filters={
-          <FiltersPopover
-            activeCount={activeFiltersCount}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            onClear={clearFilters}
-            extraFilters={
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#171717]">Especialidad</label>
-                <SelectField
-                  value={specialtyFilter}
-                  onChange={setSpecialtyFilter}
-                  options={[
-                    { value: "all", label: "Todas" },
-                    ...specialties.map((s) => ({ value: s, label: s })),
-                  ]}
-                />
-              </div>
-            }
+    <PageShell
+      title="Docentes"
+      actions={
+        <Button onClick={openCreate} className="h-10 rounded-md bg-[#6B21A8] px-4 text-white hover:bg-[#581C87]">
+          <Plus className="h-4 w-4" />
+          Nuevo docente
+        </Button>
+      }
+    >
+      {/* ── Search + Filters bar ─────────────────────────────── */}
+      <div className="mb-6 flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Buscar por código o nombre…"
+            value={query}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
-        }
-        columns={[
-          { key: "code", label: "Código", sortable: true, sortAccessor: (t) => t.code, render: (t) => t.code },
-          { key: "name", label: "Nombre", sortable: true, sortAccessor: (t) => t.fullName, render: (t) => t.fullName },
-          { key: "email", label: "Correo", sortable: true, sortAccessor: (t) => t.email ?? "", render: (t) => t.email ?? "—" },
-          { key: "specialty", label: "Especialidad", sortable: true, sortAccessor: (t) => t.specialty, render: (t) => t.specialty },
-          { key: "slots", label: "Franjas", sortable: true, sortAccessor: (t) => t.availability.length, render: (t) => t.availability.length },
-          {
-            key: "status",
-            label: "Estado",
-            sortable: true,
-            sortAccessor: (t) => (t.isActive ? 1 : 0),
-            render: (t) => (
-              <span
-                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                  t.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {t.isActive ? "Activo" : "Inactivo"}
-              </span>
-            ),
-          },
-          {
-            key: "actions",
-            label: "Acciones",
-            render: (teacher) => (
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => openEdit(teacher)}>
-                  Editar
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setConfirmDeactivate(teacher)}>
-                  Desactivar
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(teacher)}>
-                  Eliminar
-                </Button>
-              </div>
-            ),
-          },
-        ]}
-      >
-        <div className="grid gap-6 md:grid-cols-[2fr_3fr]">
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-[#171717]">Ficha del docente</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Código" error={errors.code}>
-                <Input value={form.code} onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))} />
-              </FormField>
-              <FormField label="Activo">
-                <SelectField
-                  value={String(form.isActive)}
-                  onChange={(v) => setForm((prev) => ({ ...prev, isActive: v === "true" }))}
-                  options={[
-                    { value: "true", label: "Sí" },
-                    { value: "false", label: "No" },
-                  ]}
-                />
-              </FormField>
+        </div>
+        <FiltersPopover
+          activeCount={activeFiltersCount}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          onClear={clearFilters}
+          extraFilters={
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-foreground">Especialidad</label>
+              <SelectField
+                value={specialtyFilter}
+                onChange={setSpecialtyFilter}
+                options={[
+                  { value: "all", label: "Todas" },
+                  ...specialties.map((s) => ({ value: s, label: s })),
+                ]}
+              />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Nombres" error={errors.nombres ?? errors.fullName}>
-                <Input
-                  value={form.nombres}
-                  onChange={(event) => setForm((prev) => ({ ...prev, nombres: event.target.value }))}
-                  placeholder="Nombres"
-                />
-              </FormField>
-              <FormField label="Apellidos" error={errors.apellidos}>
-                <Input
-                  value={form.apellidos}
-                  onChange={(event) => setForm((prev) => ({ ...prev, apellidos: event.target.value }))}
-                  placeholder="Apellido paterno materno"
-                />
-              </FormField>
-            </div>
-            <FormField label="Especialidad" error={errors.specialty}>
-              <Input value={form.specialty} onChange={(event) => setForm((prev) => ({ ...prev, specialty: event.target.value }))} />
-            </FormField>
-            {editing && (
-              <FormField label="Correo institucional">
-                <Input value={editing.email ?? "—"} disabled readOnly />
-              </FormField>
-            )}
-          </div>
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-[#171717]">Disponibilidad horaria</h3>
-            <AvailabilityEditor
-              label=""
-              value={form.availability}
-              onChange={(availability) => setForm((prev) => ({ ...prev, availability }))}
+          }
+        />
+      </div>
+
+      {/* ── Card grid ────────────────────────────────────────── */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-72 animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border text-muted-foreground">
+          <GraduationCap className="h-8 w-8 opacity-40" />
+          <p className="text-sm">
+            {query.trim() ? "Sin resultados para esa búsqueda." : "No hay docentes. Crea el primero."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((teacher, idx) => (
+            <TeacherCard
+              key={teacher.id}
+              teacher={teacher}
+              paletteIndex={idx}
+              onAvailability={() => openAvailabilityModal(teacher, idx)}
+              onEdit={() => openEdit(teacher)}
+              onDeactivate={() => setConfirmDeactivate(teacher)}
+              onDelete={() => setConfirmDelete(teacher)}
             />
+          ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-[#ebebeb] pt-4 text-sm">
+          <span className="text-[#666666]">
+            Página {page} de {totalPages} &mdash; {totalCount} registros
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="rounded border border-[#ebebeb] px-3 py-1 text-xs transition-colors hover:bg-[#f5f5f5] disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="rounded border border-[#ebebeb] px-3 py-1 text-xs transition-colors hover:bg-[#f5f5f5] disabled:opacity-40"
+            >
+              Siguiente
+            </button>
           </div>
         </div>
-      </CrudPageLayout>
+      )}
 
+      {/* ── Availability Modal ───────────────────────────────── */}
+      <AvailabilityModal
+        open={availabilityModalOpen}
+        onOpenChange={setAvailabilityModalOpen}
+        teacher={activeTeacher}
+        paletteIndex={activeTeacherIdx}
+        onUpdated={onTeacherUpdated}
+      />
+
+      {/* ── Create / Edit dialog ─────────────────────────────── */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar docente" : "Nuevo docente"}</DialogTitle>
+            <DialogDescription>Configura la identidad académica del docente, su especialidad y sus franjas disponibles.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 md:grid-cols-[2fr_3fr]">
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Ficha del docente</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Código" error={errors.code}>
+                  <Input
+                    value={form.code}
+                    onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+                  />
+                </FormField>
+                <FormField label="Activo">
+                  <SelectField
+                    value={String(form.isActive)}
+                    onChange={(v) => setForm((p) => ({ ...p, isActive: v === "true" }))}
+                    options={[{ value: "true", label: "Sí" }, { value: "false", label: "No" }]}
+                  />
+                </FormField>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Nombres" error={errors.nombres ?? errors.fullName}>
+                  <Input
+                    value={form.nombres}
+                    onChange={(e) => setForm((p) => ({ ...p, nombres: e.target.value }))}
+                    placeholder="Nombres"
+                  />
+                </FormField>
+                <FormField label="Apellidos" error={errors.apellidos}>
+                  <Input
+                    value={form.apellidos}
+                    onChange={(e) => setForm((p) => ({ ...p, apellidos: e.target.value }))}
+                    placeholder="Apellido paterno materno"
+                  />
+                </FormField>
+              </div>
+              <FormField label="Especialidad" error={errors.specialty}>
+                <Input
+                  value={form.specialty}
+                  onChange={(e) => setForm((p) => ({ ...p, specialty: e.target.value }))}
+                />
+              </FormField>
+              {editing && (
+                <FormField label="Correo institucional">
+                  <Input value={editing.email ?? "—"} disabled readOnly />
+                </FormField>
+              )}
+            </div>
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Disponibilidad horaria</h3>
+              <AvailabilityEditor
+                label=""
+                value={form.availability}
+                onChange={(availability) => setForm((p) => ({ ...p, availability }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void handleSubmit()} disabled={submitting}>
+              {submitting ? "Guardando…" : editing ? "Guardar" : "Crear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirmations ────────────────────────────────────── */}
       <ConfirmDialog
         open={!!confirmDeactivate}
-        onOpenChange={(open) => !open && setConfirmDeactivate(null)}
+        onOpenChange={(o) => !o && setConfirmDeactivate(null)}
         title="Desactivar docente"
         description={`¿Desactivar a "${confirmDeactivate?.fullName}"? Podrá reactivarse luego editando el registro.`}
         confirmLabel="Desactivar"
-        onConfirm={() => confirmDeactivate && handleDeactivate(confirmDeactivate)}
+        variant="warning"
+        onConfirm={() => confirmDeactivate && void handleDeactivate(confirmDeactivate)}
         isLoading={actionLoading}
       />
       <ConfirmDialog
         open={!!confirmDelete}
-        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        onOpenChange={(o) => !o && setConfirmDelete(null)}
         title="Eliminar docente"
         description={`Esta acción es permanente. "${confirmDelete?.fullName}" será eliminado definitivamente. Si tiene registros asociados, no podrá eliminarse.`}
         confirmLabel="Eliminar"
         variant="destructive"
-        onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
+        onConfirm={() => confirmDelete && void handleDelete(confirmDelete)}
         isLoading={actionLoading}
       />
-    </>
+    </PageShell>
   );
 }
 
-function flattenErrors(error: z.ZodError): Record<string, string> {
-  return error.issues.reduce<Record<string, string>>((accumulator, issue) => {
-    const key = issue.path.join(".");
-    if (key && !accumulator[key]) {
-      accumulator[key] = issue.message;
+// ─── TeacherCard ──────────────────────────────────────────────────────────────
+
+function TeacherCard({
+  teacher,
+  paletteIndex,
+  onAvailability,
+  onEdit,
+  onDeactivate,
+  onDelete,
+}: {
+  teacher: TeacherAdmin;
+  paletteIndex: number;
+  onAvailability: () => void;
+  onEdit: () => void;
+  onDeactivate: () => void;
+  onDelete: () => void;
+}) {
+  const palette = getPalette(paletteIndex);
+  const Icon = palette.icon;
+  const availabilityCount = teacher.availability.length;
+
+  return (
+    <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 pb-3 pt-4">
+        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl dark:opacity-80", palette.bg)}>
+          <Icon className={cn("h-7 w-7", palette.text)} />
+        </div>
+        <p className="truncate text-sm font-semibold text-card-foreground">{teacher.fullName}</p>
+      </div>
+
+      {/* Data rows */}
+      <div className="space-y-1.5 px-4 pb-3">
+        <InfoRow icon={<Tag className="h-3.5 w-3.5 shrink-0 text-amber-500" />} value={teacher.code} mono />
+        <InfoRow icon={<BriefcaseBusiness className="h-3.5 w-3.5 shrink-0 text-violet-500" />} value={teacher.specialty} />
+        <InfoRow
+          icon={<CalendarClock className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
+          value={`${availabilityCount} ${availabilityCount === 1 ? "franja" : "franjas"}`}
+        />
+        {teacher.email && (
+          <InfoRow icon={<Mail className="h-3.5 w-3.5 shrink-0 text-emerald-500" />} value={teacher.email} />
+        )}
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold",
+              teacher.isActive ? "bg-green-500 text-white" : "bg-gray-400 text-white",
+            )}
+          >
+            {teacher.isActive ? "✓" : "✕"}
+          </span>
+          <span className={cn("text-xs", teacher.isActive ? "text-green-500 dark:text-green-400" : "text-muted-foreground")}>
+            {teacher.isActive ? "Activo" : "Inactivo"}
+          </span>
+        </div>
+        {teacher.createdAt && (
+          <InfoRow icon={<CalendarDays className="h-3.5 w-3.5 shrink-0 text-indigo-400" />} value={`Creado: ${formatDate(teacher.createdAt)}`} />
+        )}
+        {teacher.updatedAt && teacher.updatedAt !== teacher.createdAt && (
+          <InfoRow icon={<RefreshCw className="h-3.5 w-3.5 shrink-0 text-sky-400" />} value={`Actualizado: ${formatDate(teacher.updatedAt)}`} />
+        )}
+      </div>
+
+      {/* Divider */}
+      <div className="mx-4 border-t border-border" />
+
+      {/* Availability button */}
+      <div className="px-4 py-3">
+        <button
+          type="button"
+          onClick={onAvailability}
+          className={cn(
+            "flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
+            palette.bg,
+            palette.text,
+            "hover:opacity-80",
+          )}
+        >
+          <BadgeCheck className="h-3.5 w-3.5" />
+          Disponibilidad
+          {availabilityCount > 0 && (
+            <span
+              className={cn(
+                "ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-current ring-opacity-30",
+                palette.bg,
+                palette.text,
+              )}
+            >
+              {availabilityCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Divider */}
+      <div className="mx-4 border-t border-border" />
+
+      {/* Actions */}
+      <div className="grid grid-cols-2 gap-1.5 p-3">
+        <ActionButton
+          label="Editar"
+          icon={<Pencil className="h-3.5 w-3.5" />}
+          onClick={onEdit}
+          variant="neutral"
+        />
+        <ActionButton
+          label="Desactivar"
+          icon={<Power className="h-3.5 w-3.5" />}
+          onClick={onDeactivate}
+          disabled={!teacher.isActive}
+          variant="warning"
+        />
+        <ActionButton
+          label="Eliminar"
+          icon={<Trash2 className="h-3.5 w-3.5" />}
+          onClick={onDelete}
+          variant="danger"
+          className="col-span-2"
+        />
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({
+  icon,
+  value,
+  mono = false,
+}: {
+  icon: ReactNode;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {icon}
+      <span className={cn("truncate text-xs text-muted-foreground", mono && "font-mono")}>{value}</span>
+    </div>
+  );
+}
+
+// ─── AvailabilityModal ───────────────────────────────────────────────────────
+
+function AvailabilityModal({
+  open,
+  onOpenChange,
+  teacher,
+  paletteIndex,
+  onUpdated,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  teacher: TeacherAdmin | null;
+  paletteIndex: number;
+  onUpdated: (updated: TeacherAdmin) => void;
+}) {
+  const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
+  const [saving, setSaving] = useState(false);
+  const palette = getPalette(paletteIndex);
+
+  useEffect(() => {
+    if (open && teacher) setAvailability(teacher.availability);
+  }, [open, teacher]);
+
+  async function handleSave() {
+    if (!teacher) return;
+    setSaving(true);
+    try {
+      const updated = await adminApi.updateTeacher(teacher.id, {
+        code: teacher.code,
+        fullName: teacher.fullName,
+        specialty: teacher.specialty,
+        isActive: teacher.isActive,
+        userId: teacher.userId,
+        availability,
+      });
+      onUpdated(updated);
+      toastSuccess("Disponibilidad actualizada");
+      onOpenChange(false);
+    } catch (error) {
+      toastError("No se pudo guardar la disponibilidad", getApiErrorMessage(error, "Intenta nuevamente."));
+    } finally {
+      setSaving(false);
     }
-    return accumulator;
-  }, {});
+  }
+
+  if (!teacher) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[42rem]">
+        <DialogHeader className="border-b border-border px-6 py-5 pr-14">
+          <DialogTitle>Disponibilidad · {teacher.fullName}</DialogTitle>
+          <DialogDescription>Gestiona las franjas disponibles de este docente.</DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center border-b border-border bg-muted/30 px-6 py-3">
+          <span className={cn("text-xs", palette.text)}>
+            {availability.length} {availability.length === 1 ? "franja registrada" : "franjas registradas"}
+          </span>
+        </div>
+        <div className="max-h-[65vh] overflow-y-auto px-6 py-5">
+          <AvailabilityEditor label="" value={availability} onChange={setAvailability} />
+        </div>
+        <DialogFooter className="border-t border-border px-6 py-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={() => void handleSave()} disabled={saving}>
+            {saving ? "Guardando…" : "Guardar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── ActionButton ─────────────────────────────────────────────────────────────
+
+function ActionButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  variant,
+  className,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  variant: "neutral" | "warning" | "danger";
+  className?: string;
+}) {
+  const variantClass = {
+    neutral: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+    warning: "text-amber-600 hover:bg-amber-500/10 hover:text-amber-500 disabled:cursor-not-allowed disabled:opacity-40",
+    danger: "text-red-600 hover:bg-red-500/10 hover:text-red-500",
+  }[variant];
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      disabled={disabled}
+      className={cn(
+        "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
+        variantClass,
+        className,
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   Search,
@@ -152,7 +152,7 @@ export default function CoursesPage() {
   // Prerequisites modal
   const [prereqModalOpen, setPrereqModalOpen]               = useState(false);
   const [activeCoursePrerreq, setActiveCoursePrerreq]       = useState<CourseAdmin | null>(null);
-  const [activeCoursePrerreqIdx, setActiveCoursePrerreqIdx] = useState(0);
+  const [, setActiveCoursePrerreqIdx] = useState(0);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -516,6 +516,7 @@ export default function CoursesPage() {
         title="Desactivar curso"
         description={`¿Desactivar "${confirmDeactivate?.name}"? Podrá reactivarse luego editando el registro.`}
         confirmLabel="Desactivar"
+        variant="warning"
         onConfirm={() => confirmDeactivate && void handleDeactivate(confirmDeactivate)}
         isLoading={actionLoading}
       />
@@ -551,7 +552,6 @@ function CourseCard({
   onDelete: () => void;
 }) {
   const palette = getPalette(paletteIndex);
-  const Icon = getIconForCourseName(course.name);
   const prereqCount = course.prerequisites.length;
 
   return (
@@ -559,7 +559,7 @@ function CourseCard({
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl dark:opacity-80", palette.bg)}>
-          <Icon className={cn("h-7 w-7", palette.text)} />
+          {createElement(getIconForCourseName(course.name), { className: cn("h-7 w-7", palette.text) })}
         </div>
         <p className="truncate text-sm font-semibold text-card-foreground">{course.name}</p>
       </div>
@@ -698,10 +698,18 @@ function PrerequisitesModal({
       setConfirmRemove(null);
       setDetailCode(null);
       setSearchResults([]);
+    }
+  }, [open]);
+
+  // Reset resolved cache when a different course opens
+  const prevCourseIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (open && course && course.id !== prevCourseIdRef.current) {
+      prevCourseIdRef.current = course.id;
       setResolved({});
       attemptedRef.current = new Set();
     }
-  }, [open]);
+  }, [open, course]);
 
   // Resolve prereq codes via backend lookup-by-codes (once per code, no retries)
   useEffect(() => {
@@ -811,7 +819,7 @@ function PrerequisitesModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[52rem]">
+        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[38rem]">
           <DialogHeader className="border-b border-border px-6 py-5 pr-14">
             <DialogTitle>Prerrequisitos · {course.name}</DialogTitle>
             <DialogDescription>Gestiona los prerrequisitos de este curso.</DialogDescription>
@@ -885,7 +893,7 @@ function PrerequisitesModal({
                 </div>
               )
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 {course.prerequisites.map((code, i) => {
                   const c = prereqDetails[i];
                   return (
@@ -1200,7 +1208,10 @@ function PrerequisitesPicker({
 
 function PrereqDetailModal({ course, onClose }: { course: CourseAdmin | null; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
   useEffect(() => {
     if (!course) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -1260,7 +1271,10 @@ function ConfirmRemovePrereqModal({
   onConfirm: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
   useEffect(() => {
     if (!code) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onCancel(); }

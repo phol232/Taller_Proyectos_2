@@ -522,6 +522,7 @@ export default function CourseOfferingsPage() {
         title="Desactivar oferta"
         description={`¿Desactivar esta oferta? Se marcará como CANCELLED y no estará disponible.`}
         confirmLabel="Desactivar"
+        variant="warning"
         onConfirm={() => confirmCancel && handleCancel(confirmCancel)}
         isLoading={actionLoading}
       />

@@ -20,7 +20,7 @@ interface ConfirmDialogProps {
   title: string;
   description: string;
   onConfirm: () => void;
-  variant?: "default" | "destructive";
+  variant?: "default" | "destructive" | "warning";
   isLoading?: boolean;
   confirmLabel?: string;
   /** z-index del popup. El overlay usa zIndex - 5. Default 50. */
@@ -39,28 +39,34 @@ export default function ConfirmDialog({
   zIndex,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
-  const isDestructive = variant === "destructive";
+
+  const actionClass = {
+    destructive: "bg-red-500 hover:bg-red-600 active:bg-red-700 text-white",
+    warning: "bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white",
+    default: "bg-[#6B21A8] hover:bg-[#581c87] active:bg-[#4a1572] text-white dark:bg-[#7e22ce] dark:hover:bg-[#9333ea]",
+  }[variant];
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent
-        className="max-w-sm rounded-xl border-0 bg-white p-6 shadow-xl dark:bg-[#1a1a1a]"
+        className="max-w-[380px] rounded-2xl border-0 bg-white p-7 shadow-2xl dark:bg-[#1c1c1e]"
         onOverlayClick={() => !isLoading && onOpenChange(false)}
         style={zIndex ? { zIndex } : undefined}
         overlayStyle={zIndex ? { zIndex: zIndex - 5 } : undefined}
       >
-        <AlertDialogHeader className="mb-2">
-          <AlertDialogTitle className="text-[17px] font-semibold text-gray-900 dark:text-white">
+        <AlertDialogHeader className="mb-1 gap-2">
+          <AlertDialogTitle className="text-[18px] font-bold leading-snug text-gray-900 dark:text-white">
             {title}
           </AlertDialogTitle>
-          <AlertDialogDescription className="text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+          <AlertDialogDescription className="text-[14px] leading-relaxed text-gray-500 dark:text-gray-400">
             {description}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter className="mt-4 grid grid-cols-2 gap-2 border-0 bg-transparent p-0">
+
+        <AlertDialogFooter className="mt-5 flex flex-row justify-end gap-2.5 border-0 bg-transparent p-0">
           <AlertDialogCancel
             disabled={isLoading}
-            className="h-10 rounded-lg border border-gray-200 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-transparent dark:text-gray-200 dark:hover:bg-white/[0.06]"
+            className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-[14px] font-semibold text-gray-800 shadow-none transition-colors hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:bg-transparent dark:text-gray-200 dark:hover:bg-white/[0.06]"
           >
             {t.common.cancel}
           </AlertDialogCancel>
@@ -68,14 +74,16 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             disabled={isLoading}
             className={cn(
-              "h-10 rounded-lg px-5 text-sm font-semibold text-white",
-              isDestructive
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-[#6B21A8] hover:bg-[#581c87] dark:bg-[#7e22ce] dark:hover:bg-[#9333ea]"
+              "h-11 min-w-[100px] rounded-xl px-5 text-[14px] font-semibold shadow-none transition-colors disabled:opacity-60",
+              actionClass
             )}
           >
-            {isLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-            {isLoading ? t.common.processing : (confirmLabel ?? t.common.confirm)}
+            {isLoading ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : null}
+            {isLoading
+              ? t.common.processing
+              : (confirmLabel ?? t.common.confirm)}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -23,18 +23,31 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
   const [confirmRemove, setConfirmRemove] = React.useState<{ code: string; name: string } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
-  // Position of the input, used to anchor the fixed dropdown
   const [inputRect, setInputRect] = React.useState<DOMRect | null>(null);
   const [mounted, setMounted] = React.useState(false);
-
-  const [allCourses, setAllCourses] = React.useState<CourseAdmin[]>([]);
+  const [resolved, setResolved] = React.useState<Record<string, CourseAdmin>>({});
+  const attemptedRef = React.useRef<Set<string>>(new Set());
 
   // Only render portal after mount (SSR safety)
   React.useEffect(() => { setMounted(true); }, []);
 
+  // Resolve existing codes via backend lookup (once per code, no retries)
   React.useEffect(() => {
-    adminApi.listCourses().then((data) => setAllCourses(data.content)).catch(() => {});
-  }, []);
+    const missing = value.filter((code) => !attemptedRef.current.has(code));
+    if (missing.length === 0) return;
+    missing.forEach((code) => attemptedRef.current.add(code));
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await adminApi.findCoursesByCodes(missing);
+        if (cancelled) return;
+        const next: Record<string, CourseAdmin> = {};
+        for (const c of list) next[c.code] = c;
+        if (Object.keys(next).length > 0) setResolved((prev) => ({ ...prev, ...next }));
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [value]);
 
   // Close dropdown on outside click (both input area and portal dropdown)
   React.useEffect(() => {
@@ -71,8 +84,12 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
     return () => clearTimeout(timeout);
   }, [query, value]);
 
-  function addCourse(code: string) {
-    if (!value.includes(code)) onChange([...value, code]);
+  function addCourse(course: CourseAdmin) {
+    if (!value.includes(course.code)) {
+      attemptedRef.current.add(course.code);
+      setResolved((prev) => ({ ...prev, [course.code]: course }));
+      onChange([...value, course.code]);
+    }
     setQuery("");
     setResults([]);
     setDropdownOpen(false);
@@ -89,8 +106,8 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
   }
 
   const approvedDetails = React.useMemo(
-    () => value.map((code) => allCourses.find((c) => c.code === code) ?? { code, id: code, name: "", credits: 0, weeklyHours: 0, requiredRoomType: null, isActive: true, prerequisites: [], createdAt: null, updatedAt: null }),
-    [value, allCourses]
+    () => value.map((code) => resolved[code] ?? { code, id: code, name: "", credits: 0, weeklyHours: 0, requiredRoomType: null, isActive: true, prerequisites: [], createdAt: null, updatedAt: null } as CourseAdmin),
+    [value, resolved]
   );
 
   const showDropdown = dropdownOpen && (searching || results.length > 0);
@@ -108,7 +125,7 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
               width: inputRect.width,
               zIndex: 9999,
             }}
-            className="rounded-xl border border-input bg-white shadow-2xl overflow-hidden"
+            className="rounded-xl border border-input bg-popover shadow-2xl overflow-hidden"
           >
             {searching && (
               <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
@@ -125,7 +142,7 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
                   <CourseResultCard
                     key={course.id}
                     course={course}
-                    onAdd={() => addCourse(course.code)}
+                    onAdd={() => addCourse(course)}
                     onViewDetail={() => { setDetailCourse(course); setDropdownOpen(false); }}
                   />
                 ))}
@@ -173,7 +190,7 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
                 key={course.code}
                 course={course}
                 onRemove={() => requestRemoveCourse(course.code, course.name || course.code)}
-                onViewDetail={() => setDetailCourse(course.id !== course.code ? (course as CourseAdmin) : null)}
+                onViewDetail={() => setDetailCourse(resolved[course.code] ?? null)}
               />
             ))}
           </div>
@@ -212,16 +229,16 @@ function CourseResultCard({
   onViewDetail: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-input bg-white p-3 text-sm transition-shadow hover:shadow-sm">
+    <div className="flex flex-col gap-1.5 rounded-lg border border-input bg-card p-3 text-sm transition-shadow hover:shadow-sm">
       <div className="flex items-start justify-between gap-1">
         <div className="min-w-0">
-          <p className="font-semibold leading-tight text-[#171717] truncate">{course.code}</p>
+          <p className="font-semibold leading-tight text-card-foreground truncate">{course.code}</p>
           <p className="text-xs text-muted-foreground truncate">{course.name}</p>
         </div>
         <button
           type="button"
           onClick={onViewDetail}
-          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-[#F3E8FF] hover:text-[#6B21A8] transition-colors"
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-violet-100 hover:text-violet-700 dark:hover:bg-violet-900/30 dark:hover:text-violet-400 transition-colors"
           title="Ver detalles"
         >
           <BookOpen className="h-3.5 w-3.5" />
@@ -251,10 +268,10 @@ function ApprovedCourseCard({
 }) {
   const hasDetails = course.name !== "";
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-[#E9D5FF] bg-[#FAF5FF] p-3 text-sm">
+    <div className="flex flex-col gap-1.5 rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm dark:border-violet-800/50 dark:bg-violet-950/30">
       <div className="flex items-start justify-between gap-1">
         <div className="min-w-0">
-          <p className="font-semibold leading-tight text-[#6B21A8] truncate">{course.code}</p>
+          <p className="font-semibold leading-tight text-violet-600 dark:text-violet-400 truncate">{course.code}</p>
           {hasDetails && <p className="text-xs text-muted-foreground truncate">{course.name}</p>}
         </div>
         <div className="flex shrink-0 gap-0.5">
@@ -262,7 +279,7 @@ function ApprovedCourseCard({
             <button
               type="button"
               onClick={onViewDetail}
-              className="rounded-md p-1 text-muted-foreground hover:bg-[#E9D5FF] hover:text-[#6B21A8] transition-colors"
+              className="rounded-md p-1 text-muted-foreground hover:bg-violet-100 hover:text-violet-700 dark:hover:bg-violet-900/30 dark:hover:text-violet-400 transition-colors"
               title="Ver detalles"
             >
               <BookOpen className="h-3.5 w-3.5" />
@@ -271,7 +288,7 @@ function ApprovedCourseCard({
           <button
             type="button"
             onClick={onRemove}
-            className="rounded-md p-1 text-muted-foreground hover:bg-red-100 hover:text-red-600 transition-colors"
+            className="rounded-md p-1 text-muted-foreground hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
             title="Quitar"
           >
             <X className="h-3.5 w-3.5" />
@@ -315,18 +332,18 @@ function CourseDetailModal({
       />
       {/* Panel */}
       <div
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-xl bg-white p-5 shadow-[0_0_0_1px_rgba(0,0,0,0.08),0_12px_32px_-12px_rgba(0,0,0,0.12)]"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-xl bg-background border border-border p-5 shadow-xl"
         style={{ zIndex: 120 }}
         role="dialog"
         aria-modal
         aria-label="Detalles del curso"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-[#171717]">Detalles del curso</h2>
+          <h2 className="text-base font-semibold text-foreground">Detalles del curso</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-[#808080] hover:bg-[#f5f5f5] hover:text-[#171717] transition"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition"
             aria-label="Cerrar"
           >
             <X className="h-4 w-4" />
@@ -353,7 +370,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-right text-[#171717]">{value}</span>
+      <span className="font-medium text-right text-foreground">{value}</span>
     </div>
   );
 }
@@ -390,20 +407,20 @@ function ConfirmRemoveModal({
         aria-hidden
       />
       <div
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-xl bg-background border border-border p-6 shadow-xl"
         style={{ zIndex: 130 }}
         role="alertdialog"
         aria-modal
       >
-        <h2 className="text-[17px] font-semibold text-gray-900 mb-2">Quitar curso aprobado</h2>
-        <p className="text-sm leading-relaxed text-gray-500 mb-6">
+        <h2 className="text-[17px] font-semibold text-foreground mb-2">Quitar curso aprobado</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground mb-6">
           ¿Quitar {label} de los cursos aprobados? El estudiante figurará como si no hubiera aprobado este curso.
         </p>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="h-10 rounded-lg border border-gray-200 bg-white px-5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="h-10 rounded-lg border border-border bg-background px-5 text-sm font-medium text-foreground hover:bg-accent"
           >
             Cancelar
           </button>
