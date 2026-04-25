@@ -217,7 +217,7 @@ export default function AdminUsersPage() {
     <>
     <PageShell
       title="Usuarios"
-      description="Consulta administrativa de cuentas, roles, estado y trazabilidad básica."
+
       actions={
         <Button type="button" onClick={openCreateDialog}>
           <Plus className="h-4 w-4" />
@@ -415,6 +415,7 @@ export default function AdminUsersPage() {
       title="Desactivar usuario"
       description={`¿Desactivar la cuenta de "${confirmDeactivate?.fullName}"? La cuenta y su verificación quedarán deshabilitadas. Podrá reactivarse luego.`}
       confirmLabel="Desactivar"
+      variant="warning"
       onConfirm={() => {
         if (confirmDeactivate) {
           void handleToggleUserStatus(confirmDeactivate);

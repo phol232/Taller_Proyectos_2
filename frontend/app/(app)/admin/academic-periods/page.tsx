@@ -298,6 +298,7 @@ export default function AcademicPeriodsPage() {
         title="Desactivar período académico"
         description={`¿Desactivar "${confirmDeactivate?.name}"? Podrá reactivarse luego.`}
         confirmLabel="Desactivar"
+        variant="warning"
         onConfirm={() => confirmDeactivate && handleDeactivate(confirmDeactivate)}
         isLoading={actionLoading}
       />
