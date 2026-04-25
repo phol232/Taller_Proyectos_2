@@ -38,6 +38,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final AppProperties                 appProperties;
     private final AuthCookiePort                cookiePort;
     private final StudentProvisioningUseCase    studentProvisioningUseCase;
+    private final FrontendRedirectResolver      frontendRedirectResolver;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest  request,
@@ -46,11 +47,12 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         OAuth2AuthenticationToken oauth2Token = (OAuth2AuthenticationToken) authentication;
         String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
+        String frontendBaseUrl = frontendRedirectResolver.resolveBaseUrl(request);
 
         OidcUser oidcUser = extractOidcUser(oauth2Token);
         if (oidcUser == null) {
             log.error("Principal no es OidcUser para el proveedor '{}'", registrationId);
-            response.sendRedirect(appProperties.frontend().url() + "/login?error=oauth2_failed");
+            response.sendRedirect(frontendBaseUrl + "/login?error=oauth2_failed");
             return;
         }
 
@@ -83,14 +85,14 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             }
 
             log.debug("OAuth2 handler: redirigiendo userId={} provider={}", authResult.user().id(), registrationId);
-            response.sendRedirect(appProperties.frontend().url() + "/callback");
+            response.sendRedirect(frontendBaseUrl + "/callback");
 
         } catch (DomainException e) {
             log.warn("Login OAuth2 rechazado: {}", e.getMessage());
-            response.sendRedirect(appProperties.frontend().url() + "/login?error=" + e.getMessage());
+            response.sendRedirect(frontendBaseUrl + "/login?error=" + e.getMessage());
         } catch (Exception e) {
             log.error("Error en OAuth2 success handler: {}", e.getMessage(), e);
-            response.sendRedirect(appProperties.frontend().url() + "/login?error=oauth2_failed");
+            response.sendRedirect(frontendBaseUrl + "/login?error=oauth2_failed");
         }
     }
 

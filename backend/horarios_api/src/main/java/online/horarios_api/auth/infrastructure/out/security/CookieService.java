@@ -52,7 +52,7 @@ public class CookieService implements AuthCookiePort {
                 .secure(appProperties.security().cookie().secure())
                 .path("/")
                 .maxAge(Duration.ofSeconds(maxAgeSeconds))
-                .sameSite("Strict")
+                .sameSite(resolveSameSite())
                 .build();
     }
 
@@ -62,7 +62,11 @@ public class CookieService implements AuthCookiePort {
                 .secure(appProperties.security().cookie().secure())
                 .path("/")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite(resolveSameSite())
                 .build();
+    }
+
+    private String resolveSameSite() {
+        return appProperties.security().cookie().secure() ? "None" : "Lax";
     }
 }

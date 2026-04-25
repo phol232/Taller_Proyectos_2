@@ -5,6 +5,7 @@ import online.horarios_api.auth.domain.model.RequestMetadata;
 import online.horarios_api.auth.domain.model.TokenPair;
 import online.horarios_api.auth.domain.port.in.OAuth2AuthUseCase;
 import online.horarios_api.auth.domain.port.out.AuthCookiePort;
+import online.horarios_api.auth.infrastructure.in.web.FrontendRedirectResolver;
 import online.horarios_api.auth.infrastructure.in.web.OAuth2LoginSuccessHandler;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.model.OAuth2UserInfo;
@@ -41,9 +42,9 @@ class OAuth2LoginSuccessHandlerTest {
     @Mock private OAuth2AuthUseCase oAuth2AuthUseCase;
     @Mock private OAuth2UserResolutionUseCase oAuth2UserResolutionUseCase;
     @Mock private AppProperties appProperties;
-    @Mock private AppProperties.FrontendProperties frontendProperties;
     @Mock private AuthCookiePort cookiePort;
     @Mock private StudentProvisioningUseCase studentProvisioningUseCase;
+        @Mock private FrontendRedirectResolver frontendRedirectResolver;
 
     private OAuth2LoginSuccessHandler handler;
     private MockHttpServletRequest request;
@@ -53,15 +54,15 @@ class OAuth2LoginSuccessHandlerTest {
 
     @BeforeEach
     void setUp() {
-        when(appProperties.frontend()).thenReturn(frontendProperties);
-        when(frontendProperties.url()).thenReturn(FRONTEND_URL);
+        when(frontendRedirectResolver.resolveBaseUrl(any())).thenReturn(FRONTEND_URL);
 
         handler = new OAuth2LoginSuccessHandler(
                 oAuth2AuthUseCase,
                 oAuth2UserResolutionUseCase,
                 appProperties,
                 cookiePort,
-                studentProvisioningUseCase
+                studentProvisioningUseCase,
+                frontendRedirectResolver
         );
 
         request = new MockHttpServletRequest();
@@ -75,6 +76,8 @@ class OAuth2LoginSuccessHandlerTest {
     @Test
     @DisplayName("login OAuth2 exitoso → setea cookies y redirige a /callback")
     void onAuthenticationSuccess_happyPath_setsCookiesAndRedirects() throws Exception {
+                when(frontendRedirectResolver.resolveBaseUrl(request)).thenReturn("https://incredible-kleicha-a23c30.netlify.app");
+
         OAuth2AuthenticationToken token = buildOAuth2Token("google");
         UserInfo userInfo = new UserInfo(UUID.randomUUID(), "user@continental.edu.pe",
                 "Test User", "STUDENT", null);
@@ -93,7 +96,7 @@ class OAuth2LoginSuccessHandlerTest {
         verify(cookiePort).buildAccessTokenCookie("access-jwt");
         verify(cookiePort).buildRefreshTokenCookie("refresh-opaque");
         assertThat(response.getHeaders("Set-Cookie")).contains("access_token=access-jwt; HttpOnly", "refresh_token=refresh-opaque; HttpOnly");
-        assertThat(response.getRedirectedUrl()).isEqualTo(FRONTEND_URL + "/callback");
+                assertThat(response.getRedirectedUrl()).isEqualTo("https://incredible-kleicha-a23c30.netlify.app/callback");
     }
 
     // ── dominio no permitido (BadRequestException) ───────────────────
