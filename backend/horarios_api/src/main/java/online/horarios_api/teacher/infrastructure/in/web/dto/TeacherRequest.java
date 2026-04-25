@@ -22,5 +22,7 @@ public record TeacherRequest(
         Boolean isActive,
 
         @Valid
-        List<AvailabilitySlotRequest> availability
+        List<AvailabilitySlotRequest> availability,
+
+        List<String> courseCodes
 ) {}

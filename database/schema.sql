@@ -207,14 +207,30 @@ CREATE TABLE courses (
     id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     code                VARCHAR(50)  NOT NULL,
     name                VARCHAR(255) NOT NULL,
+    cycle               INTEGER      NOT NULL DEFAULT 1 CHECK (cycle BETWEEN 1 AND 10),
     credits             INTEGER      NOT NULL CHECK (credits BETWEEN 1 AND 6),
+    required_credits    INTEGER      NOT NULL DEFAULT 0 CHECK (required_credits >= 0),
     weekly_hours        INTEGER      NOT NULL CHECK (weekly_hours >= 1),
-    required_room_type  VARCHAR(100),
+    required_room_type  VARCHAR(100) NOT NULL CHECK (BTRIM(required_room_type) <> ''),
     is_active           BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_courses_code UNIQUE (code)
+);
+
+CREATE TABLE teacher_courses (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    teacher_id  UUID        NOT NULL,
+    course_id   UUID        NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_teacher_courses_teacher
+        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+    CONSTRAINT fk_teacher_courses_course
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT uq_teacher_courses UNIQUE (teacher_id, course_id)
 );
 
 CREATE TABLE students (
@@ -647,6 +663,9 @@ CREATE INDEX idx_classrooms_active ON classrooms(is_active) WHERE is_active = TR
 
 CREATE INDEX idx_courses_active ON courses(is_active) WHERE is_active = TRUE;
 
+CREATE INDEX idx_teacher_courses_teacher_id ON teacher_courses(teacher_id);
+CREATE INDEX idx_teacher_courses_course_id ON teacher_courses(course_id);
+
 CREATE INDEX idx_students_user_id ON students(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_students_active ON students(is_active) WHERE is_active = TRUE;
 
@@ -698,4 +717,3 @@ CREATE INDEX idx_schedule_feedback_events_period_id ON schedule_feedback_events(
 CREATE INDEX idx_ml_model_registry_status ON ml_model_registry(status);
 CREATE INDEX idx_ml_prediction_logs_model_id ON ml_prediction_logs(model_id);
 CREATE INDEX idx_ml_prediction_logs_run_id ON ml_prediction_logs(solver_run_id) WHERE solver_run_id IS NOT NULL;
-

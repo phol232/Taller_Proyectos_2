@@ -107,7 +107,9 @@ function flattenErrors(error: z.ZodError): Record<string, string> {
 type CourseFormState = {
   code: string;
   name: string;
+  cycle: number;
   credits: number;
+  requiredCredits: number;
   weeklyHours: number;
   requiredRoomType: string;
   isActive: boolean;
@@ -117,12 +119,19 @@ type CourseFormState = {
 const EMPTY_FORM: CourseFormState = {
   code: "",
   name: "",
+  cycle: 1,
   credits: 3,
+  requiredCredits: 0,
   weeklyHours: 4,
   requiredRoomType: "",
   isActive: true,
   prerequisites: [],
 };
+
+const CYCLE_OPTIONS = Array.from({ length: 10 }, (_, index) => {
+  const value = String(index + 1);
+  return { value, label: value };
+});
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -236,7 +245,9 @@ export default function CoursesPage() {
     setForm({
       code: course.code,
       name: course.name,
+      cycle: course.cycle ?? 1,
       credits: course.credits,
+      requiredCredits: course.requiredCredits ?? 0,
       weeklyHours: course.weeklyHours,
       requiredRoomType: course.requiredRoomType ?? "",
       isActive: course.isActive,
@@ -252,7 +263,7 @@ export default function CoursesPage() {
 
     setSubmitting(true);
     try {
-      const payload = { ...result.data, requiredRoomType: result.data.requiredRoomType?.trim() || null };
+      const payload = { ...result.data, requiredRoomType: result.data.requiredRoomType.trim() };
       if (editing) {
         const updated = await adminApi.updateCourse(editing.id, payload);
         setCourses((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
@@ -469,18 +480,38 @@ export default function CoursesPage() {
                 />
               </FormField>
               <div className="grid grid-cols-2 gap-4">
+                <FormField label="Ciclo" error={errors.cycle}>
+                  <SelectField
+                    value={String(form.cycle)}
+                    onChange={(value) => setForm((p) => ({ ...p, cycle: Number(value) }))}
+                    options={CYCLE_OPTIONS}
+                  />
+                </FormField>
                 <FormField label="Créditos" error={errors.credits}>
                   <Input
                     type="number"
+                    min={1}
+                    max={6}
                     value={form.credits}
                     onChange={(e) => setForm((p) => ({ ...p, credits: Number(e.target.value) }))}
                   />
                 </FormField>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <FormField label="Horas semanales" error={errors.weeklyHours}>
                   <Input
                     type="number"
+                    min={1}
                     value={form.weeklyHours}
                     onChange={(e) => setForm((p) => ({ ...p, weeklyHours: Number(e.target.value) }))}
+                  />
+                </FormField>
+                <FormField label="Créditos requeridos" error={errors.requiredCredits}>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.requiredCredits}
+                    onChange={(e) => setForm((p) => ({ ...p, requiredCredits: Number(e.target.value) }))}
                   />
                 </FormField>
               </div>
@@ -553,6 +584,8 @@ function CourseCard({
 }) {
   const palette = getPalette(paletteIndex);
   const prereqCount = course.prerequisites.length;
+  const requiredCredits = course.requiredCredits ?? 0;
+  const requirementCount = prereqCount + (requiredCredits > 0 ? 1 : 0);
 
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md">
@@ -571,9 +604,19 @@ function CourseCard({
           <span className="font-mono text-xs text-muted-foreground">{course.code}</span>
         </div>
         <div className="flex items-center gap-2">
+          <Layers className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+          <span className="text-xs text-muted-foreground">Ciclo {course.cycle ?? 1}</span>
+        </div>
+        <div className="flex items-center gap-2">
           <Star className="h-3.5 w-3.5 shrink-0 text-violet-500" />
           <span className="text-xs text-muted-foreground">{course.credits} créditos</span>
         </div>
+        {requiredCredits > 0 && (
+          <div className="flex items-center gap-2">
+            <Target className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+            <span className="text-xs text-muted-foreground">{requiredCredits} créditos requeridos</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Clock className="h-3.5 w-3.5 shrink-0 text-blue-500" />
           <span className="text-xs text-muted-foreground">{course.weeklyHours} h/sem</span>
@@ -626,7 +669,7 @@ function CourseCard({
         >
           <BookOpen className="h-3.5 w-3.5" />
           Ver prerrequisitos
-          {prereqCount > 0 && (
+          {requirementCount > 0 && (
             <span
               className={cn(
                 "ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-current ring-opacity-30",
@@ -634,7 +677,7 @@ function CourseCard({
                 palette.text,
               )}
             >
-              {prereqCount}
+              {requirementCount}
             </span>
           )}
         </button>
@@ -687,6 +730,7 @@ function PrerequisitesModal({
   const [saving, setSaving]                   = useState(false);
   const [confirmRemove, setConfirmRemove]     = useState<string | null>(null);
   const [detailCode, setDetailCode]           = useState<string | null>(null);
+  const [requiredCreditsDraft, setRequiredCreditsDraft] = useState(0);
   const [resolved, setResolved]               = useState<Record<string, CourseAdmin>>({});
   const [searchResults, setSearchResults]     = useState<CourseAdmin[]>([]);
   const [searchLoading, setSearchLoading]     = useState(false);
@@ -698,8 +742,10 @@ function PrerequisitesModal({
       setConfirmRemove(null);
       setDetailCode(null);
       setSearchResults([]);
+    } else if (course) {
+      setRequiredCreditsDraft(course.requiredCredits ?? 0);
     }
-  }, [open]);
+  }, [open, course]);
 
   // Reset resolved cache when a different course opens
   const prevCourseIdRef = useRef<string | null>(null);
@@ -775,9 +821,11 @@ function PrerequisitesModal({
       const updated = await adminApi.updateCourse(course.id, {
         code: course.code,
         name: course.name,
+        cycle: course.cycle ?? 1,
         credits: course.credits,
+        requiredCredits: course.requiredCredits ?? 0,
         weeklyHours: course.weeklyHours,
-        requiredRoomType: course.requiredRoomType,
+        requiredRoomType: course.requiredRoomType ?? "",
         isActive: course.isActive,
         prerequisites: [...course.prerequisites, newCode],
       });
@@ -791,6 +839,34 @@ function PrerequisitesModal({
     }
   }
 
+  async function handleSaveRequiredCredits() {
+    if (!course) return;
+    if (!Number.isInteger(requiredCreditsDraft) || requiredCreditsDraft < 0) {
+      toastError("Créditos requeridos inválidos", "Ingresa un número entero mayor o igual a 0.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await adminApi.updateCourse(course.id, {
+        code: course.code,
+        name: course.name,
+        cycle: course.cycle ?? 1,
+        credits: course.credits,
+        requiredCredits: requiredCreditsDraft,
+        weeklyHours: course.weeklyHours,
+        requiredRoomType: course.requiredRoomType ?? "",
+        isActive: course.isActive,
+        prerequisites: course.prerequisites,
+      });
+      onUpdated(updated);
+      toastSuccess("Créditos requeridos actualizados");
+    } catch (error) {
+      toastError("No se pudieron actualizar los créditos requeridos", getApiErrorMessage(error, "Intenta nuevamente."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleRemove(code: string) {
     if (!course) return;
     setSaving(true);
@@ -798,9 +874,11 @@ function PrerequisitesModal({
       const updated = await adminApi.updateCourse(course.id, {
         code: course.code,
         name: course.name,
+        cycle: course.cycle ?? 1,
         credits: course.credits,
+        requiredCredits: course.requiredCredits ?? 0,
         weeklyHours: course.weeklyHours,
-        requiredRoomType: course.requiredRoomType,
+        requiredRoomType: course.requiredRoomType ?? "",
         isActive: course.isActive,
         prerequisites: course.prerequisites.filter((p) => p !== code),
       });
@@ -829,11 +907,38 @@ function PrerequisitesModal({
           <div className="flex items-center border-b border-border bg-muted/30 px-6 py-3">
             <span className="text-xs text-muted-foreground">
               {course.prerequisites.length}{" "}
-              {course.prerequisites.length === 1 ? "prerrequisito" : "prerrequisitos"}
+              {course.prerequisites.length === 1 ? "curso requerido" : "cursos requeridos"}
+              {(course.requiredCredits ?? 0) > 0 ? ` · ${course.requiredCredits ?? 0} créditos requeridos` : ""}
             </span>
           </div>
 
           <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-5">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800/50 dark:bg-emerald-950/30">
+              <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                Créditos requeridos
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  value={requiredCreditsDraft}
+                  onChange={(e) => setRequiredCreditsDraft(Number(e.target.value))}
+                  className="h-9 bg-background"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={saving || requiredCreditsDraft === (course.requiredCredits ?? 0)}
+                  onClick={() => void handleSaveRequiredCredits()}
+                >
+                  Guardar
+                </Button>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Usa 0 si el curso no exige créditos aprobados mínimos.
+              </p>
+            </div>
+
             {/* Search to add */}
             <div className="space-y-1">
               <div className="relative">
@@ -874,7 +979,7 @@ function PrerequisitesModal({
                             </div>
                           </div>
                           <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                            {c.credits} cr · {c.weeklyHours}h/sem
+                            Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
                           </span>
                         </button>
                       ))}
@@ -932,7 +1037,7 @@ function PrerequisitesModal({
                       </div>
                       {c ? (
                         <p className="text-xs text-muted-foreground">
-                          {c.credits} cr · {c.weeklyHours}h/sem
+                          Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
                           {c.requiredRoomType ? ` · ${c.requiredRoomType}` : ""}
                         </p>
                       ) : (
@@ -992,7 +1097,10 @@ function PrerequisitesPicker({
   const dropdownRef   = useRef<HTMLDivElement>(null);
   const attemptedRef  = useRef<Set<string>>(new Set());
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
@@ -1174,7 +1282,7 @@ function PrerequisitesPicker({
                   </div>
                   {course && (
                     <p className="text-xs text-muted-foreground">
-                      {course.credits} cr · {course.weeklyHours}h/sem
+                      Ciclo {course.cycle ?? 1} · {course.credits} cr · {course.weeklyHours}h/sem
                     </p>
                   )}
                 </div>
@@ -1248,7 +1356,9 @@ function PrereqDetailModal({ course, onClose }: { course: CourseAdmin | null; on
         <div className="space-y-3 text-sm">
           <PrereqRow label="Código"          value={course.code} />
           <PrereqRow label="Nombre"          value={course.name} />
+          <PrereqRow label="Ciclo"           value={String(course.cycle ?? 1)} />
           <PrereqRow label="Créditos"        value={String(course.credits)} />
+          <PrereqRow label="Créditos requeridos" value={String(course.requiredCredits ?? 0)} />
           <PrereqRow label="Horas semanales" value={String(course.weeklyHours)} />
           <PrereqRow label="Tipo de aula"    value={course.requiredRoomType ?? "—"} />
           <PrereqRow label="Estado"          value={course.isActive ? "Activo" : "Inactivo"} />

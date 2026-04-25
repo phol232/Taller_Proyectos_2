@@ -990,7 +990,7 @@ function ApprovedCoursesModal({
                             </div>
                           </div>
                           <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                            {c.credits} cr · {c.weeklyHours}h/sem
+                            Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
                           </span>
                         </button>
                       ))}
@@ -1048,7 +1048,7 @@ function ApprovedCoursesModal({
                       </div>
                       {c ? (
                         <p className="text-xs text-muted-foreground">
-                          {c.credits} cr · {c.weeklyHours}h/sem
+                          Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
                           {c.requiredRoomType ? ` · ${c.requiredRoomType}` : ""}
                         </p>
                       ) : (
@@ -1126,6 +1126,7 @@ function ApprovedDetailModal({ course, onClose }: { course: CourseAdmin | null; 
         <div className="space-y-3 text-sm">
           <DetailRow label="Código"          value={course.code} />
           <DetailRow label="Nombre"          value={course.name} />
+          <DetailRow label="Ciclo"           value={String(course.cycle ?? 1)} />
           <DetailRow label="Créditos"        value={String(course.credits)} />
           <DetailRow label="Horas semanales" value={String(course.weeklyHours)} />
           <DetailRow label="Tipo de aula"    value={course.requiredRoomType ?? "—"} />

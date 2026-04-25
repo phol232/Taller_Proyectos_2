@@ -69,7 +69,9 @@ public class CourseController {
         CourseData command = new CourseData(
                 request.code(),
                 request.name(),
+                request.cycle(),
                 request.credits(),
+                request.requiredCredits(),
                 request.weeklyHours(),
                 request.requiredRoomType(),
                 request.isActive(),
@@ -86,7 +88,9 @@ public class CourseController {
         CourseData command = new CourseData(
                 request.code(),
                 request.name(),
+                request.cycle(),
                 request.credits(),
+                request.requiredCredits(),
                 request.weeklyHours(),
                 request.requiredRoomType(),
                 request.isActive(),

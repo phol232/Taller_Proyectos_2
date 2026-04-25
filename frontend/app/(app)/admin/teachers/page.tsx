@@ -19,6 +19,7 @@ import {
   Trash2,
   User,
   Users,
+  X,
 } from "lucide-react";
 import { z } from "zod";
 import PageShell from "@/components/layout/PageShell";
@@ -42,7 +43,7 @@ import { teacherSchema } from "@/lib/validators/teacher.schema";
 import { cn, toastError, toastSuccess } from "@/lib/utils";
 import { joinFullName, splitFullName } from "@/lib/fullName";
 import { useAdminEvents } from "@/hooks/useAdminEvents";
-import type { AvailabilitySlot, TeacherAdmin } from "@/types/admin";
+import type { AvailabilitySlot, CourseAdmin, TeacherAdmin } from "@/types/admin";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ type TeacherFormState = {
   specialty: string;
   isActive: boolean;
   availability: AvailabilitySlot[];
+  courseCodes: string[];
 };
 
 const EMPTY_FORM: TeacherFormState = {
@@ -103,6 +105,7 @@ const EMPTY_FORM: TeacherFormState = {
   specialty: "",
   isActive: true,
   availability: [],
+  courseCodes: [],
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -130,6 +133,7 @@ export default function TeachersPage() {
 
   // Availability modal
   const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false);
+  const [coursesModalOpen, setCoursesModalOpen] = useState(false);
   const [activeTeacher, setActiveTeacher] = useState<TeacherAdmin | null>(null);
   const [activeTeacherIdx, setActiveTeacherIdx] = useState(0);
 
@@ -160,8 +164,8 @@ export default function TeachersPage() {
 
   const anyModalOpenRef = useRef(false);
   useEffect(() => {
-    anyModalOpenRef.current = availabilityModalOpen || dialogOpen;
-  }, [availabilityModalOpen, dialogOpen]);
+    anyModalOpenRef.current = availabilityModalOpen || coursesModalOpen || dialogOpen;
+  }, [availabilityModalOpen, coursesModalOpen, dialogOpen]);
 
   useEffect(() => { void loadTeachers(query, page); }, [query, page, loadTeachers]);
   useAdminEvents("teachers.changed", () => {
@@ -213,6 +217,7 @@ export default function TeachersPage() {
       specialty: teacher.specialty,
       isActive: teacher.isActive,
       availability: teacher.availability,
+      courseCodes: teacher.courseCodes ?? [],
     });
     setErrors({});
     setDialogOpen(true);
@@ -222,6 +227,12 @@ export default function TeachersPage() {
     setActiveTeacher(teacher);
     setActiveTeacherIdx(index);
     setAvailabilityModalOpen(true);
+  }
+
+  function openCoursesModal(teacher: TeacherAdmin, index: number) {
+    setActiveTeacher(teacher);
+    setActiveTeacherIdx(index);
+    setCoursesModalOpen(true);
   }
 
   function onTeacherUpdated(updated: TeacherAdmin) {
@@ -240,6 +251,7 @@ export default function TeachersPage() {
       fullName: joinFullName(form.nombres, form.apellidos),
       specialty: form.specialty,
       isActive: form.isActive,
+      courseCodes: form.courseCodes,
     };
 
     const result = teacherSchema.safeParse(payloadInput);
@@ -373,6 +385,7 @@ export default function TeachersPage() {
               teacher={teacher}
               paletteIndex={idx}
               onAvailability={() => openAvailabilityModal(teacher, idx)}
+              onCourses={() => openCoursesModal(teacher, idx)}
               onEdit={() => openEdit(teacher)}
               onDeactivate={() => setConfirmDeactivate(teacher)}
               onDelete={() => setConfirmDelete(teacher)}
@@ -409,6 +422,14 @@ export default function TeachersPage() {
       <AvailabilityModal
         open={availabilityModalOpen}
         onOpenChange={setAvailabilityModalOpen}
+        teacher={activeTeacher}
+        paletteIndex={activeTeacherIdx}
+        onUpdated={onTeacherUpdated}
+      />
+
+      <TeacherCoursesModal
+        open={coursesModalOpen}
+        onOpenChange={setCoursesModalOpen}
         teacher={activeTeacher}
         paletteIndex={activeTeacherIdx}
         onUpdated={onTeacherUpdated}
@@ -518,6 +539,7 @@ function TeacherCard({
   teacher,
   paletteIndex,
   onAvailability,
+  onCourses,
   onEdit,
   onDeactivate,
   onDelete,
@@ -525,6 +547,7 @@ function TeacherCard({
   teacher: TeacherAdmin;
   paletteIndex: number;
   onAvailability: () => void;
+  onCourses: () => void;
   onEdit: () => void;
   onDeactivate: () => void;
   onDelete: () => void;
@@ -532,6 +555,7 @@ function TeacherCard({
   const palette = getPalette(paletteIndex);
   const Icon = palette.icon;
   const availabilityCount = teacher.availability.length;
+  const courseCount = (teacher.courseCodes ?? []).length;
 
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md">
@@ -550,6 +574,10 @@ function TeacherCard({
         <InfoRow
           icon={<CalendarClock className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
           value={`${availabilityCount} ${availabilityCount === 1 ? "franja" : "franjas"}`}
+        />
+        <InfoRow
+          icon={<BookOpen className="h-3.5 w-3.5 shrink-0 text-cyan-500" />}
+          value={`${courseCount} ${courseCount === 1 ? "curso asignado" : "cursos asignados"}`}
         />
         {teacher.email && (
           <InfoRow icon={<Mail className="h-3.5 w-3.5 shrink-0 text-emerald-500" />} value={teacher.email} />
@@ -578,8 +606,7 @@ function TeacherCard({
       {/* Divider */}
       <div className="mx-4 border-t border-border" />
 
-      {/* Availability button */}
-      <div className="px-4 py-3">
+      <div className="grid grid-cols-2 gap-2 px-4 py-3">
         <button
           type="button"
           onClick={onAvailability}
@@ -599,8 +626,32 @@ function TeacherCard({
                 palette.bg,
                 palette.text,
               )}
+          >
+            {availabilityCount}
+          </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onCourses}
+          className={cn(
+            "flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
+            palette.bg,
+            palette.text,
+            "hover:opacity-80",
+          )}
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          Cursos asignados
+          {courseCount > 0 && (
+            <span
+              className={cn(
+                "ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-current ring-opacity-30",
+                palette.bg,
+                palette.text,
+              )}
             >
-              {availabilityCount}
+              {courseCount}
             </span>
           )}
         </button>
@@ -653,6 +704,241 @@ function InfoRow({
   );
 }
 
+// ─── TeacherCoursesModal ─────────────────────────────────────────────────────
+
+function TeacherCoursesModal({
+  open,
+  onOpenChange,
+  teacher,
+  paletteIndex,
+  onUpdated,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  teacher: TeacherAdmin | null;
+  paletteIndex: number;
+  onUpdated: (updated: TeacherAdmin) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [resolved, setResolved] = useState<Record<string, CourseAdmin>>({});
+  const [searchResults, setSearchResults] = useState<CourseAdmin[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const attemptedRef = useRef<Set<string>>(new Set());
+  const palette = getPalette(paletteIndex);
+
+  const assignedCodes = useMemo(() => teacher?.courseCodes ?? [], [teacher]);
+
+  useEffect(() => {
+    if (!open) {
+      setSearchQuery("");
+      setSearchResults([]);
+    }
+  }, [open]);
+
+  const prevTeacherIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (open && teacher && teacher.id !== prevTeacherIdRef.current) {
+      prevTeacherIdRef.current = teacher.id;
+      setResolved({});
+      attemptedRef.current = new Set();
+    }
+  }, [open, teacher]);
+
+  useEffect(() => {
+    if (!open || !teacher) return;
+    const missing = assignedCodes.filter((code) => !attemptedRef.current.has(code));
+    if (missing.length === 0) return;
+    missing.forEach((code) => attemptedRef.current.add(code));
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await adminApi.findCoursesByCodes(missing);
+        if (cancelled) return;
+        const next: Record<string, CourseAdmin> = {};
+        for (const course of list) next[course.code] = course;
+        if (Object.keys(next).length > 0) setResolved((prev) => ({ ...prev, ...next }));
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [assignedCodes, open, teacher]);
+
+  useEffect(() => {
+    if (!open || !teacher) return;
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const data = await adminApi.searchCourses(q, 1, 8);
+        if (cancelled) return;
+        setSearchResults(data.content.filter((course) => !assignedCodes.includes(course.code)));
+      } catch {
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setSearchLoading(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [assignedCodes, open, searchQuery, teacher]);
+
+  async function saveCodes(nextCodes: string[], successMessage: string, errorTitle: string) {
+    if (!teacher) return;
+    setSaving(true);
+    try {
+      const updated = await adminApi.updateTeacher(teacher.id, {
+        code: teacher.code,
+        fullName: teacher.fullName,
+        specialty: teacher.specialty,
+        isActive: teacher.isActive,
+        userId: teacher.userId,
+        availability: teacher.availability,
+        courseCodes: nextCodes,
+      });
+      onUpdated(updated);
+      toastSuccess(successMessage);
+    } catch (error) {
+      toastError(errorTitle, getApiErrorMessage(error, "Intenta nuevamente."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleAdd(course: CourseAdmin) {
+    if (assignedCodes.includes(course.code)) return;
+    setResolved((prev) => ({ ...prev, [course.code]: course }));
+    setSearchQuery("");
+    setSearchResults([]);
+    void saveCodes([...assignedCodes, course.code], "Curso asignado", "No se pudo asignar el curso");
+  }
+
+  function handleRemove(code: string) {
+    void saveCodes(
+      assignedCodes.filter((item) => item !== code),
+      "Curso quitado",
+      "No se pudo quitar el curso",
+    );
+  }
+
+  const assignedCourses = assignedCodes.map((code) => resolved[code] ?? null);
+
+  if (!teacher) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[38rem]">
+        <DialogHeader className="border-b border-border px-6 py-5 pr-14">
+          <DialogTitle>Cursos asignados · {teacher.fullName}</DialogTitle>
+          <DialogDescription>Gestiona los cursos que este docente puede dictar.</DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center border-b border-border bg-muted/30 px-6 py-3">
+          <span className={cn("text-xs", palette.text)}>
+            {assignedCodes.length} {assignedCodes.length === 1 ? "curso asignado" : "cursos asignados"}
+          </span>
+        </div>
+
+        <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-5">
+          <div className="space-y-1">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar curso por código o nombre…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
+
+            {searchQuery.trim().length > 0 && (
+              <div className="overflow-hidden rounded-xl border border-input bg-popover shadow-sm">
+                {searchLoading ? (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">Buscando…</p>
+                ) : searchResults.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">
+                    Sin resultados para &ldquo;{searchQuery}&rdquo;
+                  </p>
+                ) : (
+                  <div className="max-h-52 divide-y divide-border overflow-y-auto">
+                    {searchResults.map((course) => (
+                      <button
+                        key={course.id}
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleAdd(course)}
+                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition hover:bg-violet-100 disabled:opacity-50 dark:hover:bg-violet-900/30"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-medium text-foreground">{course.code}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{course.name}</span>
+                        </div>
+                        <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                          Ciclo {course.cycle ?? 1} · {course.credits} cr
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {assignedCodes.length === 0 ? (
+            !searchQuery.trim() && (
+              <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-muted-foreground">
+                <BookOpen className="h-6 w-6 opacity-40" />
+                <p className="text-sm">Este docente no tiene cursos asignados.</p>
+              </div>
+            )
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {assignedCodes.map((code, index) => {
+                const course = assignedCourses[index];
+                return (
+                  <div
+                    key={code}
+                    className="flex flex-col gap-1.5 rounded-xl border border-violet-200 bg-violet-50 p-3 dark:border-violet-800/50 dark:bg-violet-950/30"
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold leading-tight text-violet-700 dark:text-violet-400">{code}</p>
+                        {course && <p className="mt-0.5 truncate text-xs text-muted-foreground">{course.name}</p>}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleRemove(code)}
+                        className="rounded-md p-1 text-muted-foreground transition hover:bg-red-100 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                        title="Quitar curso"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {course ? (
+                      <p className="text-xs text-muted-foreground">
+                        Ciclo {course.cycle ?? 1} · {course.credits} cr · {course.weeklyHours}h/sem
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-500">Código no encontrado en catálogo</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── AvailabilityModal ───────────────────────────────────────────────────────
 
 function AvailabilityModal({
@@ -687,6 +973,7 @@ function AvailabilityModal({
         isActive: teacher.isActive,
         userId: teacher.userId,
         availability,
+        courseCodes: teacher.courseCodes ?? [],
       });
       onUpdated(updated);
       toastSuccess("Disponibilidad actualizada");

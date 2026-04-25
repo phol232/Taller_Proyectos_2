@@ -6,6 +6,7 @@ import online.horarios_api.course.domain.port.in.CourseCommandUseCase;
 import online.horarios_api.course.domain.port.in.CourseQueryUseCase;
 import online.horarios_api.course.infrastructure.in.web.CourseController;
 import online.horarios_api.course.infrastructure.in.web.dto.CourseRequest;
+import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.shared.infrastructure.web.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,20 +62,20 @@ class CourseControllerTest {
     @Test
     @DisplayName("GET /api/courses: retorna lista")
     void listCourses_returnsOk() throws Exception {
-        when(courseQueryUseCase.listCourses()).thenReturn(List.of(
-                new Course(UUID.randomUUID(), "INF-101", "Curso", 4, 4,
-                        null, true, List.of("MAT-001"), Instant.now(), Instant.now())
-        ));
+        when(courseQueryUseCase.listCoursesPaged(1, 12)).thenReturn(Page.of(List.of(
+                new Course(UUID.randomUUID(), "INF-101", "Curso", 1, 4, 0,
+                        4, "Presencial", true, List.of("MAT-001"), Instant.now(), Instant.now())
+        ), 1, 12, 1));
 
         mockMvc.perform(get("/api/courses"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("INF-101"));
+                .andExpect(jsonPath("$.content[0].code").value("INF-101"));
     }
 
     @Test
     @DisplayName("POST /api/courses: payload inválido → 400")
     void createCourse_invalidPayload_returns400() throws Exception {
-        CourseRequest request = new CourseRequest("", "", 0, 0, null, true, List.of());
+        CourseRequest request = new CourseRequest("", "", 0, 0, 0, 0, null, true, List.of());
 
         mockMvc.perform(post("/api/courses")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -87,16 +88,17 @@ class CourseControllerTest {
     @Test
     @DisplayName("POST /api/courses: payload válido → 200")
     void createCourse_validPayload_returns200() throws Exception {
-        Course course = new Course(UUID.randomUUID(), "INF-101", "Curso", 4, 4,
-                null, true, List.of(), Instant.now(), Instant.now());
+        Course course = new Course(UUID.randomUUID(), "INF-101", "Curso", 1, 4, 0,
+                4, "Presencial", true, List.of(), Instant.now(), Instant.now());
         when(courseCommandUseCase.createCourse(any())).thenReturn(course);
 
         mockMvc.perform(post("/api/courses")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new CourseRequest("INF-101", "Curso", 4, 4, null, true, List.of())
+                                new CourseRequest("INF-101", "Curso", 1, 4, 0, 4, "Presencial", true, List.of())
                         )))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("INF-101"));
+                .andExpect(jsonPath("$.code").value("INF-101"))
+                .andExpect(jsonPath("$.cycle").value(1));
     }
 }

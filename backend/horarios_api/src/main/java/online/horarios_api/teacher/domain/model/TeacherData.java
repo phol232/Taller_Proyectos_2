@@ -11,5 +11,6 @@ public record TeacherData(
         String fullName,
         String specialty,
         Boolean isActive,
-        List<AvailabilitySlot> availability
+        List<AvailabilitySlot> availability,
+        List<String> courseCodes
 ) {}

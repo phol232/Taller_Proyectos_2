@@ -194,6 +194,7 @@ BEGIN
             USING ERRCODE = '23503';
     END IF;
 
+    DELETE FROM teacher_courses WHERE teacher_id = p_teacher_id;
     DELETE FROM section_teacher_candidates WHERE teacher_id = p_teacher_id;
     DELETE FROM teacher_availability WHERE teacher_id = p_teacher_id;
     DELETE FROM teachers WHERE id = p_teacher_id;
@@ -266,6 +267,204 @@ AS $$
 BEGIN
     DELETE FROM teacher_availability
     WHERE  teacher_id = p_teacher_id;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_add_teacher_courses
+-- Agrega en una operación varios cursos que puede dictar un docente.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_add_teacher_courses(
+    p_teacher_id  UUID,
+    p_course_ids  UUID[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    IF p_course_ids IS NULL OR array_length(p_course_ids, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO teacher_courses(teacher_id, course_id)
+    SELECT p_teacher_id, c.id
+    FROM   courses c
+    WHERE  c.id = ANY(p_course_ids)
+    ON CONFLICT (teacher_id, course_id) DO NOTHING;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_add_teacher_courses_by_codes
+-- Agrega en una operación varios cursos por código.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_add_teacher_courses_by_codes(
+    p_teacher_id    UUID,
+    p_course_codes  VARCHAR[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    IF p_course_codes IS NULL OR array_length(p_course_codes, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO teacher_courses(teacher_id, course_id)
+    SELECT p_teacher_id, c.id
+    FROM   courses c
+    WHERE  c.code = ANY(
+        ARRAY(
+            SELECT DISTINCT UPPER(TRIM(code_value))
+            FROM   unnest(p_course_codes) AS code_value
+            WHERE  NULLIF(TRIM(code_value), '') IS NOT NULL
+        )
+    )
+    ON CONFLICT (teacher_id, course_id) DO NOTHING;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_remove_teacher_courses
+-- Quita en una operación varios cursos de un docente.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_remove_teacher_courses(
+    p_teacher_id  UUID,
+    p_course_ids  UUID[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    IF p_course_ids IS NULL OR array_length(p_course_ids, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    DELETE FROM teacher_courses
+    WHERE  teacher_id = p_teacher_id
+       AND course_id = ANY(p_course_ids);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_remove_teacher_courses_by_codes
+-- Quita en una operación varios cursos por código.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_remove_teacher_courses_by_codes(
+    p_teacher_id    UUID,
+    p_course_codes  VARCHAR[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    IF p_course_codes IS NULL OR array_length(p_course_codes, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    DELETE FROM teacher_courses tc
+    USING courses c
+    WHERE tc.teacher_id = p_teacher_id
+      AND tc.course_id = c.id
+      AND c.code = ANY(
+          ARRAY(
+              SELECT DISTINCT UPPER(TRIM(code_value))
+              FROM   unnest(p_course_codes) AS code_value
+              WHERE  NULLIF(TRIM(code_value), '') IS NOT NULL
+          )
+      );
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_set_teacher_courses
+-- Reemplaza en una operación los cursos que puede dictar un docente.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_set_teacher_courses(
+    p_teacher_id  UUID,
+    p_course_ids  UUID[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    DELETE FROM teacher_courses
+    WHERE  teacher_id = p_teacher_id;
+
+    PERFORM fn_add_teacher_courses(p_teacher_id, p_course_ids);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_set_teacher_courses_by_codes
+-- Reemplaza en una operación los cursos que puede dictar un docente usando códigos.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_set_teacher_courses_by_codes(
+    p_teacher_id    UUID,
+    p_course_codes  VARCHAR[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    DELETE FROM teacher_courses
+    WHERE  teacher_id = p_teacher_id;
+
+    PERFORM fn_add_teacher_courses_by_codes(p_teacher_id, p_course_codes);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_list_teacher_course_codes
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_teacher_course_codes(
+    p_teacher_id UUID
+)
+RETURNS TABLE(course_code VARCHAR(50))
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT c.code
+    FROM   teacher_courses tc
+    JOIN   courses c ON c.id = tc.course_id
+    WHERE  tc.teacher_id = p_teacher_id
+    ORDER  BY c.code ASC;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_list_course_teacher_ids
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_course_teacher_ids(
+    p_course_id UUID
+)
+RETURNS TABLE(teacher_id UUID)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT t.id
+    FROM   teacher_courses tc
+    JOIN   teachers t ON t.id = tc.teacher_id
+    WHERE  tc.course_id = p_course_id
+    ORDER  BY t.full_name ASC;
 END;
 $$;
 

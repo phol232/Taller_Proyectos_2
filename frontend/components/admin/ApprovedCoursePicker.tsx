@@ -106,7 +106,7 @@ export function ApprovedCoursePicker({ value, onChange, error }: ApprovedCourseP
   }
 
   const approvedDetails = React.useMemo(
-    () => value.map((code) => resolved[code] ?? { code, id: code, name: "", credits: 0, weeklyHours: 0, requiredRoomType: null, isActive: true, prerequisites: [], createdAt: null, updatedAt: null } as CourseAdmin),
+    () => value.map((code) => resolved[code] ?? { code, id: code, name: "", cycle: 1, credits: 0, requiredCredits: 0, weeklyHours: 0, requiredRoomType: null, isActive: true, prerequisites: [], createdAt: null, updatedAt: null } as CourseAdmin),
     [value, resolved]
   );
 
@@ -262,7 +262,7 @@ function ApprovedCourseCard({
   onRemove,
   onViewDetail,
 }: {
-  course: Pick<CourseAdmin, "code" | "name" | "credits" | "weeklyHours" | "id">;
+  course: Pick<CourseAdmin, "code" | "name" | "cycle" | "credits" | "weeklyHours" | "id">;
   onRemove: () => void;
   onViewDetail: () => void;
 }) {
@@ -296,7 +296,7 @@ function ApprovedCourseCard({
         </div>
       </div>
       {hasDetails && (
-        <p className="text-xs text-muted-foreground">{course.credits} cr · {course.weeklyHours}h/sem</p>
+        <p className="text-xs text-muted-foreground">Ciclo {course.cycle} · {course.credits} cr · {course.weeklyHours}h/sem</p>
       )}
     </div>
   );
@@ -352,6 +352,7 @@ function CourseDetailModal({
         <div className="space-y-3 text-sm">
           <Row label="Código" value={course.code} />
           <Row label="Nombre" value={course.name} />
+          <Row label="Ciclo" value={String(course.cycle)} />
           <Row label="Créditos" value={String(course.credits)} />
           <Row label="Horas semanales" value={String(course.weeklyHours)} />
           <Row label="Tipo de aula requerida" value={course.requiredRoomType ?? "—"} />
