@@ -41,14 +41,16 @@ class CourseServiceTest {
         UUID courseId = UUID.randomUUID();
         when(coursePort.create(any())).thenAnswer(invocation -> {
             CourseData data = invocation.getArgument(0);
-            return new Course(courseId, data.code(), data.name(), data.credits(), data.weeklyHours(),
-                    data.requiredRoomType(), data.isActive(), data.prerequisites(), Instant.now(), Instant.now());
+            return new Course(courseId, data.code(), data.name(), data.cycle(), data.credits(), data.requiredCredits(),
+                    data.weeklyHours(), data.requiredRoomType(), data.isActive(), data.prerequisites(), Instant.now(), Instant.now());
         });
 
         service.createCourse(new CourseData(
                 " inf-101 ",
                 " Introducción a Programación ",
+                3,
                 4,
+                12,
                 6,
                 " lab ",
                 null,
@@ -60,6 +62,8 @@ class CourseServiceTest {
 
         assertThat(captor.getValue().code()).isEqualTo("INF-101");
         assertThat(captor.getValue().name()).isEqualTo("Introducción a Programación");
+        assertThat(captor.getValue().cycle()).isEqualTo(3);
+        assertThat(captor.getValue().requiredCredits()).isEqualTo(12);
         assertThat(captor.getValue().requiredRoomType()).isEqualTo("lab");
         assertThat(captor.getValue().prerequisites()).containsExactly("MAT-001", "FIS-100");
         assertThat(captor.getValue().isActive()).isTrue();
@@ -71,9 +75,11 @@ class CourseServiceTest {
         assertThatThrownBy(() -> service.createCourse(new CourseData(
                 "INF-101",
                 "Curso",
+                1,
                 4,
+                0,
                 4,
-                null,
+                "lab",
                 true,
                 List.of("INF-101")
         ))).isInstanceOf(BadRequestException.class);

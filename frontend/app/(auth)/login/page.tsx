@@ -61,7 +61,8 @@ function LoginContent() {
 
   /* ── Login form ───────────────────────────────────── */
   function handleGoogleLogin() {
-    window.location.href = `${BACKEND_URL}/oauth2/authorization/google`;
+    const redirectUri = encodeURIComponent(window.location.origin);
+    window.location.href = `${BACKEND_URL}/oauth2/authorization/google?redirect_uri=${redirectUri}`;
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

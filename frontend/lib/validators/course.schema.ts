@@ -9,16 +9,31 @@ export const courseSchema = z.object({
     .string()
     .min(2, "El nombre es obligatorio")
     .max(255, "Máximo 255 caracteres"),
+  cycle: z
+    .number({ error: "El ciclo debe ser un número" })
+    .int()
+    .min(1, "Mínimo ciclo 1")
+    .max(10, "Máximo ciclo 10")
+    .default(1),
   credits: z
     .number({ error: "Los créditos deben ser un número" })
     .int()
     .min(1, "Mínimo 1 crédito")
     .max(6, "Máximo 6 créditos"),
+  requiredCredits: z
+    .number({ error: "Los créditos requeridos deben ser un número" })
+    .int()
+    .min(0, "No puede ser negativo")
+    .default(0),
   weeklyHours: z
     .number({ error: "Las horas deben ser un número" })
     .int()
     .min(1, "Mínimo 1 hora semanal"),
-  requiredRoomType: z.string().max(100, "Máximo 100 caracteres").optional().nullable(),
+  requiredRoomType: z
+    .string()
+    .trim()
+    .min(1, "El tipo de aula requerido es obligatorio")
+    .max(100, "Máximo 100 caracteres"),
   isActive: z.boolean().default(true),
   prerequisites: z.array(z.string()).default([]),
 });

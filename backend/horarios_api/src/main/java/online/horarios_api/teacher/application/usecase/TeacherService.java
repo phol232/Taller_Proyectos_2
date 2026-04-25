@@ -13,6 +13,7 @@ import online.horarios_api.teacher.domain.port.out.TeacherPort;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -93,13 +94,15 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
 
     private TeacherData normalize(TeacherData command) {
         List<AvailabilitySlot> availability = normalizeAvailability(command.availability());
+        List<String> courseCodes = normalizeCourseCodes(command.courseCodes());
         return new TeacherData(
                 command.userId(),
                 requireText(command.code(), "El código del docente es obligatorio.").toUpperCase(Locale.ROOT),
                 requireText(command.fullName(), "El nombre del docente es obligatorio."),
                 requireText(command.specialty(), "La especialidad del docente es obligatoria."),
                 command.isActive() == null ? Boolean.TRUE : command.isActive(),
-                availability
+                availability,
+                courseCodes
         );
     }
 
@@ -117,6 +120,19 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
         return List.copyOf(deduped.values());
     }
 
+    private List<String> normalizeCourseCodes(List<String> courseCodes) {
+        if (courseCodes == null || courseCodes.isEmpty()) {
+            return List.of();
+        }
+        return courseCodes.stream()
+                .filter(code -> code != null && !code.isBlank())
+                .map(code -> code.trim().toUpperCase(Locale.ROOT))
+                .collect(java.util.stream.Collectors.collectingAndThen(
+                        java.util.stream.Collectors.toCollection(LinkedHashSet::new),
+                        List::copyOf
+                ));
+    }
+
     private String requireText(String value, String message) {
         if (value == null || value.trim().isEmpty()) {
             throw new BadRequestException(message);
@@ -124,5 +140,4 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
         return value.trim();
     }
 }
-
 

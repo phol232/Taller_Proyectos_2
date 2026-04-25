@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
 import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
@@ -45,7 +46,8 @@ public class SecurityConfig {
             JwtAuthenticationConverter jwtAuthenticationConverter,
             AuthenticationSuccessHandler oAuth2SuccessHandler,
             AuthenticationFailureHandler oAuth2FailureHandler,
-            CorsConfigurationSource corsConfigurationSource
+                CorsConfigurationSource corsConfigurationSource,
+                online.horarios_api.auth.infrastructure.in.web.OAuth2FrontendRedirectCaptureFilter oAuth2FrontendRedirectCaptureFilter
     ) throws Exception {
 
         return http
@@ -68,6 +70,8 @@ public class SecurityConfig {
                 .successHandler(oAuth2SuccessHandler)
                 .failureHandler(oAuth2FailureHandler)
             )
+
+            .addFilterBefore(oAuth2FrontendRedirectCaptureFilter, OAuth2AuthorizationRequestRedirectFilter.class)
 
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt

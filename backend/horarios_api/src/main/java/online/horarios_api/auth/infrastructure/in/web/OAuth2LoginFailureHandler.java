@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import online.horarios_api.shared.infrastructure.config.AppProperties;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
@@ -19,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 
-    private final AppProperties appProperties;
+    private final FrontendRedirectResolver frontendRedirectResolver;
 
     @Override
     public void onAuthenticationFailure(@NonNull HttpServletRequest request,
@@ -29,6 +28,6 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
         log.warn("Fallo en autenticación OAuth2: {}", exception.getMessage());
 
         String errorParam = URLEncoder.encode("oauth2_error", StandardCharsets.UTF_8);
-        response.sendRedirect(appProperties.frontend().url() + "/login?error=" + errorParam);
+        response.sendRedirect(frontendRedirectResolver.resolveBaseUrl(request) + "/login?error=" + errorParam);
     }
 }

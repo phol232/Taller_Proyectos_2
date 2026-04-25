@@ -110,10 +110,18 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
         String code = requireText(command.code(), "El código del curso es obligatorio.")
                 .toUpperCase(Locale.ROOT);
         String name = requireText(command.name(), "El nombre del curso es obligatorio.");
-        String roomType = normalizeNullable(command.requiredRoomType());
+        String roomType = requireText(command.requiredRoomType(), "El tipo de aula requerido es obligatorio.");
 
         if (command.credits() < 1 || command.credits() > 6) {
             throw new BadRequestException("Los créditos deben estar entre 1 y 6.");
+        }
+        int cycle = command.cycle() == null ? 1 : command.cycle();
+        if (cycle < 1 || cycle > 10) {
+            throw new BadRequestException("El ciclo debe estar entre 1 y 10.");
+        }
+        int requiredCredits = command.requiredCredits() == null ? 0 : command.requiredCredits();
+        if (requiredCredits < 0) {
+            throw new BadRequestException("Los créditos requeridos no pueden ser negativos.");
         }
         if (command.weeklyHours() < 1) {
             throw new BadRequestException("Las horas semanales deben ser mayores o iguales a 1.");
@@ -137,7 +145,9 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
         return new CourseData(
                 code,
                 name,
+                cycle,
                 command.credits(),
+                requiredCredits,
                 command.weeklyHours(),
                 roomType,
                 command.isActive() == null ? Boolean.TRUE : command.isActive(),

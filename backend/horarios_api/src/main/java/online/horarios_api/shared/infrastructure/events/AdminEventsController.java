@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,10 +25,8 @@ public class AdminEventsController {
     @Operation(summary = "Stream SSE con eventos de cambio en recursos admin")
     public SseEmitter stream(HttpServletResponse response) {
         // Required by the SSE spec; without it browsers and proxies may buffer the stream.
-        response.setHeader("Cache-Control", "no-cache");
-        // Disables response buffering in nginx / other reverse proxies.
-        response.setHeader("X-Accel-Buffering", "no");
-        response.setHeader("Connection", "keep-alive");
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
+        response.setHeader(HttpHeaders.CONNECTION, "keep-alive");
         return publisher.subscribe();
     }
 }

@@ -19,26 +19,10 @@ COPY . .
 
 RUN pnpm build
 
-# ── Stage 3: Runner (imagen final mínima) ────────────────────
-FROM node:20-alpine AS runner
-WORKDIR /app
+# ── Stage 3: Runner estático ──────────────────────────────────
+FROM nginx:1.27-alpine AS runner
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Usuario no-root para seguridad
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-
-# Archivos generados por next build --output standalone
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
-COPY --from=builder --chown=appuser:appgroup /app/.next/static ./.next/static
-
-USER appuser
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/out /usr/share/nginx/html
 
 EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# server.js es generado automáticamente por Next.js standalone mode
-CMD ["node", "server.js"]

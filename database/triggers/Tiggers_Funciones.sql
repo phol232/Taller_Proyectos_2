@@ -63,6 +63,11 @@ CREATE TRIGGER trg_courses_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION fn_set_updated_at();
 
+CREATE TRIGGER trg_teacher_courses_updated_at
+    BEFORE UPDATE ON teacher_courses
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_set_updated_at();
+
 CREATE TRIGGER trg_students_updated_at
     BEFORE UPDATE ON students
     FOR EACH ROW

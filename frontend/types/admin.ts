@@ -19,7 +19,9 @@ export interface CourseAdmin {
   id: string;
   code: string;
   name: string;
+  cycle: number;
   credits: number;
+  requiredCredits: number;
   weeklyHours: number;
   requiredRoomType: string | null;
   isActive: boolean;
@@ -37,6 +39,7 @@ export interface TeacherAdmin {
   specialty: string;
   isActive: boolean;
   availability: AvailabilitySlot[];
+  courseCodes: string[];
   createdAt: string | null;
   updatedAt: string | null;
 }

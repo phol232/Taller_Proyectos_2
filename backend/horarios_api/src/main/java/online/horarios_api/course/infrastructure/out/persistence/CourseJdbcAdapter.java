@@ -29,7 +29,9 @@ public class CourseJdbcAdapter implements CoursePort {
             rs.getObject("id", UUID.class),
             rs.getString("code"),
             rs.getString("name"),
+            rs.getInt("cycle"),
             rs.getInt("credits"),
+            rs.getInt("required_credits"),
             rs.getInt("weekly_hours"),
             rs.getString("required_room_type"),
             rs.getBoolean("is_active"),
@@ -42,11 +44,13 @@ public class CourseJdbcAdapter implements CoursePort {
     public Course create(CourseData command) {
         try {
             Course created = jdbcTemplate.queryForObject(
-                    "SELECT * FROM fn_create_course(?, ?, ?, ?, ?, ?)",
+                    "SELECT * FROM fn_create_course(?, ?, ?, ?, ?, ?, ?, ?)",
                     baseMapper,
                     command.code(),
                     command.name(),
+                    command.cycle(),
                     command.credits(),
+                    command.requiredCredits(),
                     command.weeklyHours(),
                     command.requiredRoomType(),
                     command.isActive()
@@ -62,12 +66,14 @@ public class CourseJdbcAdapter implements CoursePort {
     public Course update(UUID courseId, CourseData command) {
         try {
             Course updated = jdbcTemplate.queryForObject(
-                    "SELECT * FROM fn_update_course(?, ?, ?, ?, ?, ?, ?)",
+                    "SELECT * FROM fn_update_course(?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     baseMapper,
                     courseId,
                     command.code(),
                     command.name(),
+                    command.cycle(),
                     command.credits(),
+                    command.requiredCredits(),
                     command.weeklyHours(),
                     command.requiredRoomType(),
                     command.isActive()
@@ -182,7 +188,9 @@ public class CourseJdbcAdapter implements CoursePort {
                 baseCourse.id(),
                 baseCourse.code(),
                 baseCourse.name(),
+                baseCourse.cycle(),
                 baseCourse.credits(),
+                baseCourse.requiredCredits(),
                 baseCourse.weeklyHours(),
                 baseCourse.requiredRoomType(),
                 baseCourse.isActive(),

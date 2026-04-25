@@ -36,7 +36,7 @@ class CookieServiceTest {
     }
 
     @Test
-    @DisplayName("buildAccessTokenCookie: genera cookie HttpOnly, Secure, SameSite=Strict")
+    @DisplayName("buildAccessTokenCookie: secure=true genera cookie cross-site con SameSite=None")
     void buildAccessTokenCookie_setsCorrectAttributes() {
         when(tokenConfigPort.getAccessTokenExpirationSeconds()).thenReturn(900L);
 
@@ -46,7 +46,7 @@ class CookieServiceTest {
                 .contains("access_token=test-access-jwt")
                 .contains("HttpOnly")
                 .contains("Secure")
-                .contains("SameSite=Strict")
+            .contains("SameSite=None")
                 .contains("Max-Age=900")
                 .contains("Path=/");
     }
@@ -85,7 +85,7 @@ class CookieServiceTest {
     // ── secure=false ─────────────────────────────────────────────────
 
     @Test
-    @DisplayName("buildAccessTokenCookie: secure=false omite atributo Secure")
+    @DisplayName("buildAccessTokenCookie: secure=false usa SameSite=Lax y omite Secure")
     void buildAccessTokenCookie_notSecure_omitsSecureFlag() {
         when(cookieProperties.secure()).thenReturn(false);
         cookieService = new CookieService(appProperties, tokenConfigPort);
@@ -95,6 +95,7 @@ class CookieServiceTest {
 
         assertThat(cookie)
                 .contains("access_token=dev-token")
-                .doesNotContain("Secure");
+            .contains("SameSite=Lax")
+            .doesNotContain("Secure");
     }
 }
