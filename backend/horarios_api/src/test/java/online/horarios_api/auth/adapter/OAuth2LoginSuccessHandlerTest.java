@@ -10,7 +10,6 @@ import online.horarios_api.auth.infrastructure.in.web.OAuth2LoginSuccessHandler;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.model.OAuth2UserInfo;
 import online.horarios_api.shared.domain.model.UserInfo;
-import online.horarios_api.shared.infrastructure.config.AppProperties;
 import online.horarios_api.student.domain.port.in.StudentProvisioningUseCase;
 import online.horarios_api.user.domain.port.in.OAuth2UserResolutionUseCase;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +40,6 @@ class OAuth2LoginSuccessHandlerTest {
 
     @Mock private OAuth2AuthUseCase oAuth2AuthUseCase;
     @Mock private OAuth2UserResolutionUseCase oAuth2UserResolutionUseCase;
-    @Mock private AppProperties appProperties;
     @Mock private AuthCookiePort cookiePort;
     @Mock private StudentProvisioningUseCase studentProvisioningUseCase;
         @Mock private FrontendRedirectResolver frontendRedirectResolver;
@@ -59,7 +57,6 @@ class OAuth2LoginSuccessHandlerTest {
         handler = new OAuth2LoginSuccessHandler(
                 oAuth2AuthUseCase,
                 oAuth2UserResolutionUseCase,
-                appProperties,
                 cookiePort,
                 studentProvisioningUseCase,
                 frontendRedirectResolver
@@ -96,7 +93,7 @@ class OAuth2LoginSuccessHandlerTest {
         verify(cookiePort).buildAccessTokenCookie("access-jwt");
         verify(cookiePort).buildRefreshTokenCookie("refresh-opaque");
         assertThat(response.getHeaders("Set-Cookie")).contains("access_token=access-jwt; HttpOnly", "refresh_token=refresh-opaque; HttpOnly");
-                assertThat(response.getRedirectedUrl()).isEqualTo("https://incredible-kleicha-a23c30.netlify.app/callback");
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://incredible-kleicha-a23c30.netlify.app/callback");
     }
 
     // ── dominio no permitido (BadRequestException) ───────────────────
