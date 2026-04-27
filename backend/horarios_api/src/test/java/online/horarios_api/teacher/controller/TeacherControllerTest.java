@@ -66,7 +66,7 @@ class TeacherControllerTest {
         mockMvc.perform(post("/api/teachers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new TeacherRequest(null, "", "", "", true, List.of(), List.of())
+                                new TeacherRequest(null, "", "", "", true, List.of(), List.of(), List.of())
                         )))
                 .andExpect(status().isBadRequest());
 
@@ -80,6 +80,7 @@ class TeacherControllerTest {
                 UUID.randomUUID(), null, "DOC-01", "Ada Lovelace", null, "Matemática", true,
                 List.of(new AvailabilitySlot(ScheduleDay.MONDAY, LocalTime.of(8, 0), LocalTime.of(10, 0), true)),
                 List.of("INF-101"),
+                List.of(),
                 Instant.now(), Instant.now()
         );
         when(teacherCommandUseCase.createTeacher(any())).thenReturn(teacher);
@@ -99,7 +100,8 @@ class TeacherControllerTest {
                                                 "10:00",
                                                 true
                                         )),
-                                        List.of("INF-101")
+                                        List.of("INF-101"),
+                                        List.of()
                                 )
                         )))
                 .andExpect(status().isOk())

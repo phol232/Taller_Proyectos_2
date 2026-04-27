@@ -73,7 +73,7 @@ class OAuth2LoginSuccessHandlerTest {
     @Test
     @DisplayName("login OAuth2 exitoso → setea cookies y redirige a /callback")
     void onAuthenticationSuccess_happyPath_setsCookiesAndRedirects() throws Exception {
-                when(frontendRedirectResolver.resolveBaseUrl(request)).thenReturn("https://incredible-kleicha-a23c30.netlify.app");
+                when(frontendRedirectResolver.resolveBaseUrl(request)).thenReturn("https://horarisu.wankoraep.com");
 
         OAuth2AuthenticationToken token = buildOAuth2Token("google");
         UserInfo userInfo = new UserInfo(UUID.randomUUID(), "user@continental.edu.pe",
@@ -93,7 +93,7 @@ class OAuth2LoginSuccessHandlerTest {
         verify(cookiePort).buildAccessTokenCookie("access-jwt");
         verify(cookiePort).buildRefreshTokenCookie("refresh-opaque");
         assertThat(response.getHeaders("Set-Cookie")).contains("access_token=access-jwt; HttpOnly", "refresh_token=refresh-opaque; HttpOnly");
-        assertThat(response.getRedirectedUrl()).isEqualTo("https://incredible-kleicha-a23c30.netlify.app/callback");
+                assertThat(response.getRedirectedUrl()).isEqualTo("https://horarisu.wankoraep.com/callback");
     }
 
     // ── dominio no permitido (BadRequestException) ───────────────────

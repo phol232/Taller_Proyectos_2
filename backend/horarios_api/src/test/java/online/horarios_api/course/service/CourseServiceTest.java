@@ -2,6 +2,7 @@ package online.horarios_api.course.service;
 
 import online.horarios_api.course.application.usecase.CourseService;
 import online.horarios_api.course.domain.model.Course;
+import online.horarios_api.course.domain.model.CourseComponentData;
 import online.horarios_api.course.domain.model.CourseData;
 import online.horarios_api.course.domain.port.out.CoursePort;
 import online.horarios_api.shared.domain.exception.BadRequestException;
@@ -42,7 +43,7 @@ class CourseServiceTest {
         when(coursePort.create(any())).thenAnswer(invocation -> {
             CourseData data = invocation.getArgument(0);
             return new Course(courseId, data.code(), data.name(), data.cycle(), data.credits(), data.requiredCredits(),
-                    data.weeklyHours(), data.requiredRoomType(), data.isActive(), data.prerequisites(), Instant.now(), Instant.now());
+                    data.weeklyHours(), data.requiredRoomType(), data.isActive(), List.of(), data.prerequisites(), Instant.now(), Instant.now());
         });
 
         service.createCourse(new CourseData(
@@ -54,6 +55,8 @@ class CourseServiceTest {
                 6,
                 " lab ",
                 null,
+                List.of(new CourseComponentData("THEORY", 3, "Aula", 1, true),
+                        new CourseComponentData("PRACTICE", 3, "Lab", 2, true)),
                 List.of("mat-001", "MAT-001", " fis-100 ")
         ));
 
@@ -65,6 +68,8 @@ class CourseServiceTest {
         assertThat(captor.getValue().cycle()).isEqualTo(3);
         assertThat(captor.getValue().requiredCredits()).isEqualTo(12);
         assertThat(captor.getValue().requiredRoomType()).isEqualTo("lab");
+        assertThat(captor.getValue().components()).extracting(CourseComponentData::componentType)
+                .containsExactly("THEORY", "PRACTICE");
         assertThat(captor.getValue().prerequisites()).containsExactly("MAT-001", "FIS-100");
         assertThat(captor.getValue().isActive()).isTrue();
     }
@@ -81,6 +86,7 @@ class CourseServiceTest {
                 4,
                 "lab",
                 true,
+                null,
                 List.of("INF-101")
         ))).isInstanceOf(BadRequestException.class);
     }
