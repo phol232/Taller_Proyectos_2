@@ -29,9 +29,7 @@ BEGIN
     END IF;
 
     v_academic_code := UPPER(
-        LEFT(REGEXP_REPLACE(SPLIT_PART(v_user.email, '@', 1), '[^a-zA-Z0-9_-]', '', 'g'), 41)
-        || '-' ||
-        LEFT(v_user.id::TEXT, 8)
+        LEFT(REGEXP_REPLACE(SPLIT_PART(v_user.email, '@', 1), '[^a-zA-Z0-9_-]', '', 'g'), 50)
     );
 
     IF v_user.role = 'STUDENT'::user_role

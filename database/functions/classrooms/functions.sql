@@ -151,16 +151,242 @@ DECLARE
     v_assignments_count INTEGER;
 BEGIN
     SELECT COUNT(*) INTO v_assignments_count
-    FROM   section_assignments
+    FROM   course_assignment_slots
     WHERE  classroom_id = p_classroom_id;
 
     IF v_assignments_count > 0 THEN
-        RAISE EXCEPTION 'El aula tiene % asignación(es) en horarios y no puede eliminarse. Desactívela en su lugar.', v_assignments_count
+        RAISE EXCEPTION 'El aula tiene % franja(s) asignada(s) en horarios y no puede eliminarse. Desactívela en su lugar.', v_assignments_count
             USING ERRCODE = '23503';
     END IF;
 
+    DELETE FROM classroom_courses WHERE classroom_id = p_classroom_id;
     DELETE FROM classroom_availability WHERE classroom_id = p_classroom_id;
     DELETE FROM classrooms WHERE id = p_classroom_id;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_add_classroom_courses
+-- Agrega en una operación varios cursos que se pueden dictar en un aula.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_add_classroom_courses(
+    p_classroom_id UUID,
+    p_course_ids   UUID[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    IF p_course_ids IS NULL OR array_length(p_course_ids, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO classroom_courses(classroom_id, course_id)
+    SELECT p_classroom_id, c.id
+    FROM   courses c
+    WHERE  c.id = ANY(p_course_ids)
+    ON CONFLICT (classroom_id, course_id) DO NOTHING;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_add_classroom_courses_by_codes
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_add_classroom_courses_by_codes(
+    p_classroom_id UUID,
+    p_course_codes VARCHAR[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    IF p_course_codes IS NULL OR array_length(p_course_codes, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO classroom_courses(classroom_id, course_id)
+    SELECT p_classroom_id, c.id
+    FROM   courses c
+    WHERE  c.code = ANY(
+        ARRAY(
+            SELECT DISTINCT UPPER(TRIM(code_value))
+            FROM   unnest(p_course_codes) AS code_value
+            WHERE  NULLIF(TRIM(code_value), '') IS NOT NULL
+        )
+    )
+    ON CONFLICT (classroom_id, course_id) DO NOTHING;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_remove_classroom_courses
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_remove_classroom_courses(
+    p_classroom_id UUID,
+    p_course_ids   UUID[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    IF p_course_ids IS NULL OR array_length(p_course_ids, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    DELETE FROM classroom_courses
+    WHERE  classroom_id = p_classroom_id
+       AND course_id = ANY(p_course_ids);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_remove_classroom_courses_by_codes
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_remove_classroom_courses_by_codes(
+    p_classroom_id UUID,
+    p_course_codes VARCHAR[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    IF p_course_codes IS NULL OR array_length(p_course_codes, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    DELETE FROM classroom_courses cc
+    USING courses c
+    WHERE cc.classroom_id = p_classroom_id
+      AND cc.course_id = c.id
+      AND c.code = ANY(
+          ARRAY(
+              SELECT DISTINCT UPPER(TRIM(code_value))
+              FROM   unnest(p_course_codes) AS code_value
+              WHERE  NULLIF(TRIM(code_value), '') IS NOT NULL
+          )
+      );
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_set_classroom_courses
+-- Reemplaza en una operación los cursos que admite un aula.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_set_classroom_courses(
+    p_classroom_id UUID,
+    p_course_ids   UUID[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    DELETE FROM classroom_courses
+    WHERE  classroom_id = p_classroom_id;
+
+    PERFORM fn_add_classroom_courses(p_classroom_id, p_course_ids);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_set_classroom_courses_by_codes
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_set_classroom_courses_by_codes(
+    p_classroom_id UUID,
+    p_course_codes VARCHAR[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    DELETE FROM classroom_courses
+    WHERE  classroom_id = p_classroom_id;
+
+    PERFORM fn_add_classroom_courses_by_codes(p_classroom_id, p_course_codes);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_list_classroom_course_codes
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_classroom_course_codes(
+    p_classroom_id UUID
+)
+RETURNS TABLE(course_code VARCHAR(50))
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT c.code
+    FROM   classroom_courses cc
+    JOIN   courses c ON c.id = cc.course_id
+    WHERE  cc.classroom_id = p_classroom_id
+    ORDER  BY c.code ASC;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_list_classroom_courses
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_classroom_courses(
+    p_classroom_id UUID
+)
+RETURNS TABLE(
+    course_id    UUID,
+    course_code  VARCHAR(50),
+    course_name  VARCHAR(255),
+    cycle        INTEGER,
+    credits      INTEGER,
+    weekly_hours INTEGER,
+    required_room_type VARCHAR(100),
+    is_active    BOOLEAN
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT c.id, c.code, c.name, c.cycle, c.credits,
+           c.weekly_hours, c.required_room_type, c.is_active
+    FROM   classroom_courses cc
+    JOIN   courses c ON c.id = cc.course_id
+    WHERE  cc.classroom_id = p_classroom_id
+    ORDER  BY c.code ASC;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_list_course_classroom_ids
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_course_classroom_ids(
+    p_course_id UUID
+)
+RETURNS TABLE(classroom_id UUID)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT cl.id
+    FROM   classroom_courses cc
+    JOIN   classrooms cl ON cl.id = cc.classroom_id
+    WHERE  cc.course_id = p_course_id
+    ORDER  BY cl.code ASC;
 END;
 $$;
 
@@ -302,5 +528,66 @@ BEGIN
     ORDER  BY cl.code ASC
     LIMIT  GREATEST(p_page_size, 1)
     OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_list_classroom_course_component_ids
+-- Retorna los IDs de los course_components asignados a un aula.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_classroom_course_component_ids(
+    p_classroom_id UUID
+)
+RETURNS TABLE(course_component_id UUID)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT ccc.course_component_id
+    FROM   classroom_course_components ccc
+    WHERE  ccc.classroom_id = p_classroom_id
+    ORDER  BY ccc.course_component_id;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_set_classroom_course_components
+-- Reemplaza en una operación los componentes asignados a un aula.
+-- Los course_id correspondientes se sincronizan en classroom_courses
+-- automáticamente para mantener consistencia.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_set_classroom_course_components(
+    p_classroom_id  UUID,
+    p_component_ids UUID[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    -- Borrar asignaciones anteriores de componentes
+    DELETE FROM classroom_course_components
+    WHERE  classroom_id = p_classroom_id;
+
+    IF p_component_ids IS NULL OR array_length(p_component_ids, 1) IS NULL THEN
+        RETURN;
+    END IF;
+
+    -- Insertar nuevas asignaciones de componentes
+    INSERT INTO classroom_course_components(classroom_id, course_component_id)
+    SELECT p_classroom_id, comp.id
+    FROM   course_components comp
+    WHERE  comp.id = ANY(p_component_ids)
+    ON CONFLICT (classroom_id, course_component_id) DO NOTHING;
+
+    -- Sincronizar classroom_courses: agregar los cursos padre de los componentes
+    INSERT INTO classroom_courses(classroom_id, course_id)
+    SELECT DISTINCT p_classroom_id, comp.course_id
+    FROM   course_components comp
+    WHERE  comp.id = ANY(p_component_ids)
+    ON CONFLICT (classroom_id, course_id) DO NOTHING;
 END;
 $$;

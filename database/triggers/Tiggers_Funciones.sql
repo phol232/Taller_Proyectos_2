@@ -93,18 +93,8 @@ CREATE TRIGGER trg_student_completed_courses_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION fn_set_updated_at();
 
-CREATE TRIGGER trg_course_offerings_updated_at
-    BEFORE UPDATE ON course_offerings
-    FOR EACH ROW
-    EXECUTE FUNCTION fn_set_updated_at();
-
-CREATE TRIGGER trg_course_sections_updated_at
-    BEFORE UPDATE ON course_sections
-    FOR EACH ROW
-    EXECUTE FUNCTION fn_set_updated_at();
-
-CREATE TRIGGER trg_section_teacher_candidates_updated_at
-    BEFORE UPDATE ON section_teacher_candidates
+CREATE TRIGGER trg_classroom_courses_updated_at
+    BEFORE UPDATE ON classroom_courses
     FOR EACH ROW
     EXECUTE FUNCTION fn_set_updated_at();
 
@@ -113,13 +103,13 @@ CREATE TRIGGER trg_teaching_schedules_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION fn_set_updated_at();
 
-CREATE TRIGGER trg_section_assignments_updated_at
-    BEFORE UPDATE ON section_assignments
+CREATE TRIGGER trg_course_schedule_assignments_updated_at
+    BEFORE UPDATE ON course_schedule_assignments
     FOR EACH ROW
     EXECUTE FUNCTION fn_set_updated_at();
 
-CREATE TRIGGER trg_section_assignment_slots_updated_at
-    BEFORE UPDATE ON section_assignment_slots
+CREATE TRIGGER trg_course_assignment_slots_updated_at
+    BEFORE UPDATE ON course_assignment_slots
     FOR EACH ROW
     EXECUTE FUNCTION fn_set_updated_at();
 

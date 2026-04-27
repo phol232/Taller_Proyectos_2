@@ -118,7 +118,7 @@ DECLARE
     v_assignments_count INTEGER;
 BEGIN
     SELECT COUNT(*) INTO v_assignments_count
-    FROM   section_assignments
+    FROM   course_schedule_assignments
     WHERE  teacher_id = p_teacher_id;
 
     IF v_assignments_count > 0 THEN
@@ -126,7 +126,7 @@ BEGIN
             USING ERRCODE = '23503';
     END IF;
 
-    DELETE FROM section_teacher_candidates WHERE teacher_id = p_teacher_id;
+    DELETE FROM course_teacher_candidates WHERE teacher_id = p_teacher_id;
     DELETE FROM teacher_availability WHERE teacher_id = p_teacher_id;
     DELETE FROM teachers WHERE id = p_teacher_id;
 END;
@@ -144,14 +144,15 @@ DECLARE
     v_assignments_count INTEGER;
 BEGIN
     SELECT COUNT(*) INTO v_assignments_count
-    FROM   section_assignments
+    FROM   course_assignment_slots
     WHERE  classroom_id = p_classroom_id;
 
     IF v_assignments_count > 0 THEN
-        RAISE EXCEPTION 'El aula tiene % asignación(es) en horarios y no puede eliminarse. Desactívela en su lugar.', v_assignments_count
+        RAISE EXCEPTION 'El aula tiene % franja(s) asignada(s) en horarios y no puede eliminarse. Desactívela en su lugar.', v_assignments_count
             USING ERRCODE = '23503';
     END IF;
 
+    DELETE FROM course_offering_classroom_candidates WHERE classroom_id = p_classroom_id;
     DELETE FROM classroom_availability WHERE classroom_id = p_classroom_id;
     DELETE FROM classrooms WHERE id = p_classroom_id;
 END;
@@ -192,21 +193,28 @@ SECURITY INVOKER
 AS $$
 DECLARE
     v_assignments_count INTEGER;
+    v_student_items_count INTEGER;
 BEGIN
     SELECT COUNT(*) INTO v_assignments_count
-    FROM   section_assignments sa
-    JOIN   course_sections cs ON cs.id = sa.section_id
-    WHERE  cs.course_offering_id = p_offering_id;
+    FROM   course_schedule_assignments
+    WHERE  course_offering_id = p_offering_id;
 
     IF v_assignments_count > 0 THEN
         RAISE EXCEPTION 'La oferta tiene % asignación(es) en horarios y no puede eliminarse. Cancélela en su lugar.', v_assignments_count
             USING ERRCODE = '23503';
     END IF;
 
-    DELETE FROM section_teacher_candidates
-    WHERE  section_id IN (SELECT id FROM course_sections WHERE course_offering_id = p_offering_id);
+    SELECT COUNT(*) INTO v_student_items_count
+    FROM   student_schedule_items
+    WHERE  course_offering_id = p_offering_id;
 
-    DELETE FROM course_sections WHERE course_offering_id = p_offering_id;
+    IF v_student_items_count > 0 THEN
+        RAISE EXCEPTION 'La oferta tiene % horario(s) de estudiante y no puede eliminarse. Cancélela en su lugar.', v_student_items_count
+            USING ERRCODE = '23503';
+    END IF;
+
+    DELETE FROM course_offering_classroom_candidates WHERE course_offering_id = p_offering_id;
+    DELETE FROM course_teacher_candidates WHERE course_offering_id = p_offering_id;
     DELETE FROM course_offerings WHERE id = p_offering_id;
 END;
 $$;
