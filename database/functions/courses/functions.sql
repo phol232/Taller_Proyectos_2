@@ -301,8 +301,8 @@ BEGIN
     RETURN QUERY
     SELECT *
     FROM   courses
-    WHERE  code ILIKE '%' || p_query || '%'
-       OR  name ILIKE '%' || p_query || '%'
+    WHERE  unaccent(LOWER(code)) LIKE '%' || unaccent(LOWER(p_query)) || '%'
+       OR  unaccent(LOWER(name)) LIKE '%' || unaccent(LOWER(p_query)) || '%'
     ORDER  BY code ASC;
 END;
 $$;
@@ -538,8 +538,8 @@ BEGIN
            c.required_room_type, c.is_active, c.created_at, c.updated_at,
            COUNT(*) OVER()::BIGINT AS total_count
     FROM   courses c
-    WHERE  c.code ILIKE '%' || p_query || '%'
-       OR  c.name ILIKE '%' || p_query || '%'
+    WHERE  unaccent(LOWER(c.code)) LIKE '%' || unaccent(LOWER(p_query)) || '%'
+       OR  unaccent(LOWER(c.name)) LIKE '%' || unaccent(LOWER(p_query)) || '%'
     ORDER  BY c.code ASC
     LIMIT  GREATEST(p_page_size, 1)
     OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);

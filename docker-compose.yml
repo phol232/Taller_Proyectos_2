@@ -76,9 +76,12 @@ services:
       dockerfile: Dockerfile
     container_name: planner-solver
     restart: unless-stopped
+    env_file:
+      - ./solver/.env
     environment:
-      SOLVER_DB_DSN: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/horarios_db
-      SOLVER_LOG_LEVEL: INFO
+      # Sobreescribe el DSN del .env para que dentro del contenedor
+      # use el hostname 'db' en lugar de 'localhost'.
+      SOLVER_DB_DSN: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/horarios_db_prueba
       TZ: America/Lima
     ports:
       - "8090:8090"

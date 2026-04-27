@@ -5,5 +5,7 @@ public enum ScheduleDay {
     TUESDAY,
     WEDNESDAY,
     THURSDAY,
-    FRIDAY
+    FRIDAY,
+    SATURDAY,
+    SUNDAY
 }

@@ -4,13 +4,15 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/shared/FormField";
 import type { AvailabilitySlot, ScheduleDay } from "@/types/admin";
 
-const DAYS: ScheduleDay[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
+const DAYS: ScheduleDay[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 const DAY_LABELS: Record<ScheduleDay, string> = {
   MONDAY: "Lunes",
   TUESDAY: "Martes",
   WEDNESDAY: "Miércoles",
   THURSDAY: "Jueves",
   FRIDAY: "Viernes",
+  SATURDAY: "Sábado",
+  SUNDAY: "Domingo",
 };
 
 const FIELD_CLASSNAME =
@@ -36,7 +38,7 @@ export function AvailabilityEditor({
   function addSlot() {
     onChange([
       ...value,
-      { day: "MONDAY", startTime: "08:00", endTime: "10:00", available: true },
+      { day: "MONDAY", startTime: "07:00", endTime: "22:00", available: true },
     ]);
   }
 
