@@ -69,7 +69,8 @@ public class TeacherController {
                         throw new online.horarios_api.shared.domain.exception.BadRequestException("Formato de hora inválido.");
                     }
                 }).toList(),
-                request.courseCodes() == null ? List.of() : request.courseCodes()
+                request.courseCodes() == null ? List.of() : request.courseCodes(),
+                request.courseComponentIds() == null ? List.of() : request.courseComponentIds()
         );
         return ResponseEntity.ok(TeacherResponse.from(teacherCommandUseCase.createTeacher(command)));
     }
@@ -92,7 +93,8 @@ public class TeacherController {
                         throw new online.horarios_api.shared.domain.exception.BadRequestException("Formato de hora inválido.");
                     }
                 }).toList(),
-                request.courseCodes() == null ? List.of() : request.courseCodes()
+                request.courseCodes() == null ? List.of() : request.courseCodes(),
+                request.courseComponentIds() == null ? List.of() : request.courseComponentIds()
         );
         return ResponseEntity.ok(TeacherResponse.from(teacherCommandUseCase.updateTeacher(id, command)));
     }
@@ -113,4 +115,3 @@ public class TeacherController {
         return ResponseEntity.noContent().build();
     }
 }
-

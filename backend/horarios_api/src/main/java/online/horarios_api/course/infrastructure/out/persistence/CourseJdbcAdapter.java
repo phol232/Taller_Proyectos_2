@@ -1,7 +1,11 @@
 package online.horarios_api.course.infrastructure.out.persistence;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import online.horarios_api.course.domain.model.Course;
+import online.horarios_api.course.domain.model.CourseComponent;
+import online.horarios_api.course.domain.model.CourseComponentData;
 import online.horarios_api.course.domain.model.CourseData;
 import online.horarios_api.course.domain.port.out.CoursePort;
 import online.horarios_api.shared.domain.exception.BadRequestException;
@@ -9,6 +13,7 @@ import online.horarios_api.shared.domain.exception.DuplicateFieldException;
 import online.horarios_api.shared.domain.model.Page;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCallback;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +29,7 @@ import java.util.UUID;
 public class CourseJdbcAdapter implements CoursePort {
 
     private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final RowMapper<Course> baseMapper = (rs, rowNum) -> new Course(
             rs.getObject("id", UUID.class),
@@ -35,6 +41,7 @@ public class CourseJdbcAdapter implements CoursePort {
             rs.getInt("weekly_hours"),
             rs.getString("required_room_type"),
             rs.getBoolean("is_active"),
+            List.of(),
             List.of(),
             toInstant(rs, "created_at"),
             toInstant(rs, "updated_at")
@@ -55,6 +62,7 @@ public class CourseJdbcAdapter implements CoursePort {
                     command.requiredRoomType(),
                     command.isActive()
             );
+            syncComponents(created.id(), command.components());
             syncPrerequisites(created.id(), command.prerequisites());
             return findById(created.id()).orElseThrow();
         } catch (DataAccessException ex) {
@@ -78,6 +86,7 @@ public class CourseJdbcAdapter implements CoursePort {
                     command.requiredRoomType(),
                     command.isActive()
             );
+            syncComponents(courseId, command.components());
             syncPrerequisites(courseId, command.prerequisites());
             return findById(updated.id()).orElseThrow();
         } catch (DataAccessException ex) {
@@ -194,9 +203,25 @@ public class CourseJdbcAdapter implements CoursePort {
                 baseCourse.weeklyHours(),
                 baseCourse.requiredRoomType(),
                 baseCourse.isActive(),
+                loadComponents(baseCourse.id()),
                 loadPrerequisites(baseCourse.id()),
                 baseCourse.createdAt(),
                 baseCourse.updatedAt()
+        );
+    }
+
+    private List<CourseComponent> loadComponents(UUID courseId) {
+        return jdbcTemplate.query(
+                "SELECT * FROM fn_list_course_components(?)",
+                (rs, rowNum) -> new CourseComponent(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("component_type"),
+                        rs.getInt("weekly_hours"),
+                        rs.getString("required_room_type"),
+                        rs.getInt("sort_order"),
+                        rs.getBoolean("is_active")
+                ),
+                courseId
         );
     }
 
@@ -223,13 +248,31 @@ public class CourseJdbcAdapter implements CoursePort {
         }
     }
 
+    private void syncComponents(UUID courseId, List<CourseComponentData> components) {
+        String payload;
+        try {
+            payload = objectMapper.writeValueAsString(components == null ? List.of() : components);
+        } catch (JsonProcessingException ex) {
+            throw new BadRequestException("No se pudieron serializar los componentes del curso.");
+        }
+
+        jdbcTemplate.execute(
+                "SELECT fn_replace_course_components(?, ?::jsonb)",
+                (PreparedStatementCallback<Boolean>) ps -> {
+                    ps.setObject(1, courseId);
+                    ps.setString(2, payload);
+                    return ps.execute();
+                }
+        );
+    }
+
     private RuntimeException mapException(DataAccessException ex, String code) {
         String detail = ex.getMostSpecificCause().getMessage();
         String message = detail != null ? detail.toLowerCase() : "";
         if (message.contains("uq_courses_code")) {
             return new DuplicateFieldException("code", "El código de curso '" + code + "' ya está registrado.");
         }
-        if (message.contains("prerrequisito")) {
+        if (message.contains("prerrequisito") || message.contains("componente") || message.contains("horas")) {
             return new BadRequestException(ex.getMostSpecificCause().getMessage());
         }
         return ex;

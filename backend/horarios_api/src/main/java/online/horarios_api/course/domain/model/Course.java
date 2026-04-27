@@ -14,6 +14,7 @@ public record Course(
         int weeklyHours,
         String requiredRoomType,
         boolean isActive,
+        List<CourseComponent> components,
         List<String> prerequisites,
         Instant createdAt,
         Instant updatedAt

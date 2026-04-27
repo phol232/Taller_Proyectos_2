@@ -68,7 +68,9 @@ public class ClassroomController {
                     } catch (RuntimeException ex) {
                         throw new online.horarios_api.shared.domain.exception.BadRequestException("Formato de hora inválido.");
                     }
-                }).toList()
+                }).toList(),
+                request.courseCodes() == null ? List.of() : request.courseCodes(),
+                request.courseComponentIds() == null ? List.of() : request.courseComponentIds()
         );
         return ResponseEntity.ok(ClassroomResponse.from(classroomCommandUseCase.createClassroom(command)));
     }
@@ -90,7 +92,9 @@ public class ClassroomController {
                     } catch (RuntimeException ex) {
                         throw new online.horarios_api.shared.domain.exception.BadRequestException("Formato de hora inválido.");
                     }
-                }).toList()
+                }).toList(),
+                request.courseCodes() == null ? List.of() : request.courseCodes(),
+                request.courseComponentIds() == null ? List.of() : request.courseComponentIds()
         );
         return ResponseEntity.ok(ClassroomResponse.from(classroomCommandUseCase.updateClassroom(id, command)));
     }

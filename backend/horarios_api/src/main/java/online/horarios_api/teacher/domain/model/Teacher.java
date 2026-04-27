@@ -16,6 +16,7 @@ public record Teacher(
         boolean isActive,
         List<AvailabilitySlot> availability,
         List<String> courseCodes,
+        List<UUID> courseComponentIds,
         Instant createdAt,
         Instant updatedAt
 ) {}

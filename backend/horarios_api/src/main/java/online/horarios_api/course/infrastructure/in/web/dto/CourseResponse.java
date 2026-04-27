@@ -16,6 +16,7 @@ public record CourseResponse(
         int weeklyHours,
         String requiredRoomType,
         boolean isActive,
+        List<CourseComponentResponse> components,
         List<String> prerequisites,
         Instant createdAt,
         Instant updatedAt
@@ -32,6 +33,7 @@ public record CourseResponse(
                 course.weeklyHours(),
                 course.requiredRoomType(),
                 course.isActive(),
+                course.components().stream().map(CourseComponentResponse::from).toList(),
                 course.prerequisites(),
                 course.createdAt(),
                 course.updatedAt()

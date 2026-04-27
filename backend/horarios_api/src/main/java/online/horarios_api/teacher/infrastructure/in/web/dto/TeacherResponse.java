@@ -17,6 +17,7 @@ public record TeacherResponse(
         boolean isActive,
         List<AvailabilitySlotResponse> availability,
         List<String> courseCodes,
+        List<UUID> courseComponentIds,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -32,6 +33,7 @@ public record TeacherResponse(
                 teacher.isActive(),
                 teacher.availability().stream().map(AvailabilitySlotResponse::from).toList(),
                 teacher.courseCodes(),
+                teacher.courseComponentIds(),
                 teacher.createdAt(),
                 teacher.updatedAt()
         );

@@ -3,6 +3,7 @@ package online.horarios_api.course.infrastructure.in.web.dto;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -30,5 +31,7 @@ public record CourseRequest(
         @NotBlank(message = "El tipo de aula requerido es obligatorio")
         String requiredRoomType,
         Boolean isActive,
+        @Valid
+        List<CourseComponentRequest> components,
         List<String> prerequisites
 ) {}

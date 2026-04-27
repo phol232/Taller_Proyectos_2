@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.horarios_api.course.domain.model.CourseComponentData;
 import online.horarios_api.course.domain.model.CourseData;
 import online.horarios_api.course.domain.port.in.CourseCommandUseCase;
 import online.horarios_api.course.domain.port.in.CourseQueryUseCase;
@@ -75,6 +76,7 @@ public class CourseController {
                 request.weeklyHours(),
                 request.requiredRoomType(),
                 request.isActive(),
+                toComponentData(request),
                 request.prerequisites()
         );
         return ResponseEntity.ok(CourseResponse.from(courseCommandUseCase.createCourse(command)));
@@ -94,6 +96,7 @@ public class CourseController {
                 request.weeklyHours(),
                 request.requiredRoomType(),
                 request.isActive(),
+                toComponentData(request),
                 request.prerequisites()
         );
         return ResponseEntity.ok(CourseResponse.from(courseCommandUseCase.updateCourse(id, command)));
@@ -113,5 +116,20 @@ public class CourseController {
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         courseCommandUseCase.deleteCourse(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private java.util.List<CourseComponentData> toComponentData(CourseRequest request) {
+        if (request.components() == null) {
+            return null;
+        }
+        return request.components().stream()
+                .map(component -> new CourseComponentData(
+                        component.componentType(),
+                        component.weeklyHours() == null ? 0 : component.weeklyHours(),
+                        component.requiredRoomType(),
+                        component.sortOrder(),
+                        component.isActive()
+                ))
+                .toList();
     }
 }

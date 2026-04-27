@@ -11,5 +11,6 @@ public record CourseData(
         int weeklyHours,
         String requiredRoomType,
         Boolean isActive,
+        List<CourseComponentData> components,
         List<String> prerequisites
 ) {}

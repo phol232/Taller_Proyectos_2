@@ -15,6 +15,8 @@ public record ClassroomResponse(
         String type,
         boolean isActive,
         List<AvailabilitySlotResponse> availability,
+        List<String> courseCodes,
+        List<UUID> courseComponentIds,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -28,6 +30,8 @@ public record ClassroomResponse(
                 classroom.type(),
                 classroom.isActive(),
                 classroom.availability().stream().map(AvailabilitySlotResponse::from).toList(),
+                classroom.courseCodes(),
+                classroom.courseComponentIds(),
                 classroom.createdAt(),
                 classroom.updatedAt()
         );

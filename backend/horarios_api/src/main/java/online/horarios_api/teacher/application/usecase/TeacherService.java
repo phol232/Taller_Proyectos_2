@@ -95,6 +95,7 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
     private TeacherData normalize(TeacherData command) {
         List<AvailabilitySlot> availability = normalizeAvailability(command.availability());
         List<String> courseCodes = normalizeCourseCodes(command.courseCodes());
+        List<UUID> courseComponentIds = normalizeCourseComponentIds(command.courseComponentIds());
         return new TeacherData(
                 command.userId(),
                 requireText(command.code(), "El código del docente es obligatorio.").toUpperCase(Locale.ROOT),
@@ -102,7 +103,8 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
                 requireText(command.specialty(), "La especialidad del docente es obligatoria."),
                 command.isActive() == null ? Boolean.TRUE : command.isActive(),
                 availability,
-                courseCodes
+                courseCodes,
+                courseComponentIds
         );
     }
 
@@ -133,6 +135,18 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
                 ));
     }
 
+    private List<UUID> normalizeCourseComponentIds(List<UUID> componentIds) {
+        if (componentIds == null || componentIds.isEmpty()) {
+            return List.of();
+        }
+        return componentIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.collectingAndThen(
+                        java.util.stream.Collectors.toCollection(LinkedHashSet::new),
+                        List::copyOf
+                ));
+    }
+
     private String requireText(String value, String message) {
         if (value == null || value.trim().isEmpty()) {
             throw new BadRequestException(message);
@@ -140,4 +154,3 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
         return value.trim();
     }
 }
-
