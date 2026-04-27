@@ -11,7 +11,6 @@ import {
   BookOpen,
   DoorOpen,
   CalendarDays,
-  CalendarCheck,
   Building2,
   UserCircle,
   ArrowRight,
@@ -31,7 +30,6 @@ export default function AdminHomePage() {
     { label: t.admin.stats.classrooms, value: "—", sub: t.admin.stats.classroomsDesc, icon: <DoorOpen className="h-5 w-5" />,        href: "/admin/classrooms" },
     { label: "Facultades", value: "—", sub: "Facultades y carreras del catálogo.", icon: <Building2 className="h-5 w-5" />, href: "/admin/facultades" },
     { label: "Períodos", value: "—", sub: "Ciclos configurados para la planificación.", icon: <CalendarDays className="h-5 w-5" />, href: "/admin/academic-periods" },
-    { label: "Ofertas", value: "—", sub: "Cursos abiertos por período y sección.", icon: <CalendarCheck className="h-5 w-5" />, href: "/admin/course-offerings" },
   ];
 
   const QUICK_LINKS = [
@@ -42,7 +40,6 @@ export default function AdminHomePage() {
     { title: t.admin.links.classroomsTitle, description: t.admin.links.classroomsDesc, href: "/admin/classrooms", icon: <DoorOpen className="h-5 w-5" /> },
     { title: "Facultades y carreras", description: "Gestiona el catálogo de facultades y sus carreras asociadas.", href: "/admin/facultades", icon: <Building2 className="h-5 w-5" /> },
     { title: "Períodos académicos", description: "Define ciclos, rango de fechas y tope general de créditos.", href: "/admin/academic-periods", icon: <CalendarDays className="h-5 w-5" /> },
-    { title: "Ofertas de cursos", description: "Abre cursos por período, crea secciones y asigna docentes candidatos.", href: "/admin/course-offerings", icon: <CalendarCheck className="h-5 w-5" /> },
   ];
 
   const SYSTEM_CARDS: { label: string; value: string; icon: React.ReactNode; accent?: boolean }[] = [

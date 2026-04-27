@@ -6,8 +6,6 @@ import type {
   ClassroomAdmin,
   CreateUserInput,
   CourseAdmin,
-  CourseOfferingAdmin,
-  CourseOfferingUpsertInput,
   FacultadAdmin,
   PagedResult,
   StudentAdmin,
@@ -96,17 +94,6 @@ export const adminApi = {
     (await api.put<AcademicPeriodAdmin>(`/api/academic-periods/${id}`, payload)).data,
   deactivateAcademicPeriod: async (id: string) => api.post(`/api/academic-periods/${id}/deactivate`),
   deleteAcademicPeriod: async (id: string) => api.delete(`/api/academic-periods/${id}`),
-
-  listCourseOfferings: async () =>
-    (await api.get<CourseOfferingAdmin[]>("/api/course-offerings")).data,
-  searchCourseOfferings: async (query: string) =>
-    (await api.get<CourseOfferingAdmin[]>("/api/course-offerings/search", { params: { q: query } })).data,
-  createCourseOffering: async (payload: CourseOfferingUpsertInput) =>
-    (await api.post<CourseOfferingAdmin>("/api/course-offerings", payload)).data,
-  updateCourseOffering: async (id: string, payload: CourseOfferingUpsertInput) =>
-    (await api.put<CourseOfferingAdmin>(`/api/course-offerings/${id}`, payload)).data,
-  cancelCourseOffering: async (id: string) => api.post(`/api/course-offerings/${id}/cancel`),
-  deleteCourseOffering: async (id: string) => api.delete(`/api/course-offerings/${id}`),
 
   listCatalogFacultades: async () =>
     (await api.get<FacultadAdmin[]>("/api/catalog/facultades")).data,

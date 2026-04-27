@@ -103,12 +103,11 @@ function getNavGroups(t: TranslationDictionary): Record<Role, NavGroup[]> {
         items: [
           { label: "Usuarios", href: "/admin/users", icon: <UserCircle className="h-4 w-4" />, color: "#6B21A8", bgColor: "rgba(107,33,168,0.15)" },
           { label: t.sidebar.nav.students, href: "/admin/students", icon: <Users className="h-4 w-4" />, color: "#0284c7", bgColor: "rgba(2,132,199,0.15)" },
-          { label: t.sidebar.nav.teachers, href: "/admin/teachers", icon: <GraduationCap className="h-4 w-4" />, color: "#0d9488", bgColor: "rgba(13,148,136,0.15)" },
           { label: t.sidebar.nav.courses, href: "/admin/courses", icon: <BookOpen className="h-4 w-4" />, color: "#b45309", bgColor: "rgba(180,83,9,0.15)" },
+          { label: t.sidebar.nav.teachers, href: "/admin/teachers", icon: <GraduationCap className="h-4 w-4" />, color: "#0d9488", bgColor: "rgba(13,148,136,0.15)" },
           { label: t.sidebar.nav.classrooms, href: "/admin/classrooms", icon: <DoorOpen className="h-4 w-4" />, color: "#be185d", bgColor: "rgba(190,24,93,0.15)" },
           { label: "Facultades", href: "/admin/facultades", icon: <Building2 className="h-4 w-4" />, color: "#6B21A8", bgColor: "rgba(107,33,168,0.15)" },
           { label: "Períodos", href: "/admin/academic-periods", icon: <CalendarDays className="h-4 w-4" />, color: "#7c3aed", bgColor: "rgba(124,58,237,0.15)" },
-          { label: "Ofertas", href: "/admin/course-offerings", icon: <CalendarCheck className="h-4 w-4" />, color: "#15803d", bgColor: "rgba(21,128,61,0.15)" },
         ],
       },
     ],

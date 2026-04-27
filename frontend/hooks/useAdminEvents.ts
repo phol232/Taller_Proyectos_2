@@ -8,7 +8,6 @@ type AdminEventName =
   | "classrooms.changed"
   | "students.changed"
   | "academic-periods.changed"
-  | "course-offerings.changed"
   | "facultades.changed"
   | "carreras.changed";
 

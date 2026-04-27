@@ -9,7 +9,6 @@ export interface Assignment {
   courseId: string;
   courseName: string;
   courseCode: string;
-  section: string;
   teacherId: string;
   teacherName: string;
   classroomId: string;

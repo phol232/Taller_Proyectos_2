@@ -15,6 +15,17 @@ export interface AvailabilitySlot {
   available: boolean;
 }
 
+export type CourseComponentType = "GENERAL" | "THEORY" | "PRACTICE";
+
+export interface CourseComponentAdmin {
+  id: string | null;
+  componentType: CourseComponentType;
+  weeklyHours: number;
+  requiredRoomType: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
 export interface CourseAdmin {
   id: string;
   code: string;
@@ -25,6 +36,7 @@ export interface CourseAdmin {
   weeklyHours: number;
   requiredRoomType: string | null;
   isActive: boolean;
+  components?: CourseComponentAdmin[];
   prerequisites: string[];
   createdAt: string | null;
   updatedAt: string | null;
@@ -40,6 +52,7 @@ export interface TeacherAdmin {
   isActive: boolean;
   availability: AvailabilitySlot[];
   courseCodes: string[];
+  courseComponentIds: string[];
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -52,6 +65,8 @@ export interface ClassroomAdmin {
   type: string;
   isActive: boolean;
   availability: AvailabilitySlot[];
+  courseCodes: string[];
+  courseComponentIds: string[];
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -123,47 +138,6 @@ export interface AcademicPeriodAdmin {
   status: "PLANNING" | "ACTIVE" | "CLOSED";
   maxStudentCredits: number;
   isActive: boolean;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface SectionTeacherCandidate {
-  teacherId: string;
-  priorityWeight: number;
-}
-
-export interface CourseSectionUpsertInput {
-  sectionCode: string;
-  vacancyLimit: number;
-  status: "DRAFT" | "ACTIVE" | "CANCELLED";
-  teacherCandidates: SectionTeacherCandidate[];
-}
-
-export interface CourseSectionAdmin {
-  id: string;
-  sectionCode: string;
-  vacancyLimit: number;
-  status: "DRAFT" | "ACTIVE" | "CANCELLED";
-  teacherCandidates: SectionTeacherCandidate[];
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface CourseOfferingUpsertInput {
-  academicPeriodId: string;
-  courseId: string;
-  expectedEnrollment: number;
-  status: "DRAFT" | "ACTIVE" | "CANCELLED";
-  sections: CourseSectionUpsertInput[];
-}
-
-export interface CourseOfferingAdmin {
-  id: string;
-  academicPeriodId: string;
-  courseId: string;
-  expectedEnrollment: number;
-  status: "DRAFT" | "ACTIVE" | "CANCELLED";
-  sections: CourseSectionAdmin[];
   createdAt: string | null;
   updatedAt: string | null;
 }

@@ -43,7 +43,7 @@ import { teacherSchema } from "@/lib/validators/teacher.schema";
 import { cn, toastError, toastSuccess } from "@/lib/utils";
 import { joinFullName, splitFullName } from "@/lib/fullName";
 import { useAdminEvents } from "@/hooks/useAdminEvents";
-import type { AvailabilitySlot, CourseAdmin, TeacherAdmin } from "@/types/admin";
+import type { AvailabilitySlot, CourseAdmin, CourseComponentAdmin, TeacherAdmin } from "@/types/admin";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +60,12 @@ const TEACHER_PALETTE = [
 function getPalette(index: number) {
   return TEACHER_PALETTE[index % TEACHER_PALETTE.length];
 }
+
+const COMPONENT_LABELS = {
+  GENERAL: "General",
+  THEORY: "Teoría",
+  PRACTICE: "Práctica",
+} as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -95,6 +101,7 @@ type TeacherFormState = {
   isActive: boolean;
   availability: AvailabilitySlot[];
   courseCodes: string[];
+  courseComponentIds: string[];
 };
 
 const EMPTY_FORM: TeacherFormState = {
@@ -106,6 +113,7 @@ const EMPTY_FORM: TeacherFormState = {
   isActive: true,
   availability: [],
   courseCodes: [],
+  courseComponentIds: [],
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -218,6 +226,7 @@ export default function TeachersPage() {
       isActive: teacher.isActive,
       availability: teacher.availability,
       courseCodes: teacher.courseCodes ?? [],
+      courseComponentIds: teacher.courseComponentIds ?? [],
     });
     setErrors({});
     setDialogOpen(true);
@@ -252,6 +261,7 @@ export default function TeachersPage() {
       specialty: form.specialty,
       isActive: form.isActive,
       courseCodes: form.courseCodes,
+      courseComponentIds: form.courseComponentIds,
     };
 
     const result = teacherSchema.safeParse(payloadInput);
@@ -642,7 +652,7 @@ function TeacherCard({
           )}
         >
           <BookOpen className="h-3.5 w-3.5" />
-          Cursos asignados
+          Cursos
           {courseCount > 0 && (
             <span
               className={cn(
@@ -724,15 +734,38 @@ function TeacherCoursesModal({
   const [resolved, setResolved] = useState<Record<string, CourseAdmin>>({});
   const [searchResults, setSearchResults] = useState<CourseAdmin[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [confirmRemoveCourse, setConfirmRemoveCourse] = useState<CourseAdmin | null>(null);
+  // Estado pendiente: curso seleccionado del dropdown, esperando confirmación de componentes
+  const [pendingCourse, setPendingCourse] = useState<CourseAdmin | null>(null);
+  const [pendingComponentIds, setPendingComponentIds] = useState<string[]>([]);
+  // Si estamos editando un curso ya asignado (vs agregar uno nuevo)
+  const [pendingIsEdit, setPendingIsEdit] = useState(false);
   const attemptedRef = useRef<Set<string>>(new Set());
   const palette = getPalette(paletteIndex);
 
-  const assignedCodes = useMemo(() => teacher?.courseCodes ?? [], [teacher]);
+  const assignedComponentIds = useMemo(() => teacher?.courseComponentIds ?? [], [teacher]);
+
+  // Derivamos los códigos de curso a partir de los componentes asignados y el catálogo local
+  const resolvedCourseCodes = useMemo(() => {
+    const codes = new Set<string>();
+    for (const cid of assignedComponentIds) {
+      for (const course of Object.values(resolved)) {
+        if (course.components?.some((c) => c.id === cid)) {
+          codes.add(course.code);
+          break;
+        }
+      }
+    }
+    return codes;
+  }, [assignedComponentIds, resolved]);
 
   useEffect(() => {
     if (!open) {
       setSearchQuery("");
       setSearchResults([]);
+      setPendingCourse(null);
+      setPendingComponentIds([]);
+      setPendingIsEdit(false);
     }
   }, [open]);
 
@@ -745,9 +778,11 @@ function TeacherCoursesModal({
     }
   }, [open, teacher]);
 
+  // Resuelve los cursos por sus códigos (teacher.courseCodes → findCoursesByCodes)
   useEffect(() => {
     if (!open || !teacher) return;
-    const missing = assignedCodes.filter((code) => !attemptedRef.current.has(code));
+    const codes = teacher.courseCodes ?? [];
+    const missing = codes.filter((code) => !attemptedRef.current.has(code));
     if (missing.length === 0) return;
     missing.forEach((code) => attemptedRef.current.add(code));
     let cancelled = false;
@@ -763,7 +798,7 @@ function TeacherCoursesModal({
       }
     })();
     return () => { cancelled = true; };
-  }, [assignedCodes, open, teacher]);
+  }, [open, teacher]);
 
   useEffect(() => {
     if (!open || !teacher) return;
@@ -779,7 +814,7 @@ function TeacherCoursesModal({
       try {
         const data = await adminApi.searchCourses(q, 1, 8);
         if (cancelled) return;
-        setSearchResults(data.content.filter((course) => !assignedCodes.includes(course.code)));
+        setSearchResults(data.content);
       } catch {
         if (!cancelled) setSearchResults([]);
       } finally {
@@ -787,9 +822,9 @@ function TeacherCoursesModal({
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [assignedCodes, open, searchQuery, teacher]);
+  }, [open, searchQuery, teacher]);
 
-  async function saveCodes(nextCodes: string[], successMessage: string, errorTitle: string) {
+  async function saveComponentIds(nextIds: string[], successMessage: string, errorTitle: string) {
     if (!teacher) return;
     setSaving(true);
     try {
@@ -800,7 +835,8 @@ function TeacherCoursesModal({
         isActive: teacher.isActive,
         userId: teacher.userId,
         availability: teacher.availability,
-        courseCodes: nextCodes,
+        courseCodes: [],
+        courseComponentIds: nextIds,
       });
       onUpdated(updated);
       toastSuccess(successMessage);
@@ -811,46 +847,153 @@ function TeacherCoursesModal({
     }
   }
 
-  function handleAdd(course: CourseAdmin) {
-    if (assignedCodes.includes(course.code)) return;
+  // Paso 1a: el usuario elige un curso del dropdown → abrir selector de componentes (agregar)
+  function handleSelectCourseFromSearch(course: CourseAdmin) {
+    const allIds = (course.components ?? []).filter((c) => c.id).map((c) => c.id!);
     setResolved((prev) => ({ ...prev, [course.code]: course }));
     setSearchQuery("");
     setSearchResults([]);
-    void saveCodes([...assignedCodes, course.code], "Curso asignado", "No se pudo asignar el curso");
+    setPendingCourse(course);
+    setPendingComponentIds(allIds);
+    setPendingIsEdit(false);
   }
 
-  function handleRemove(code: string) {
-    void saveCodes(
-      assignedCodes.filter((item) => item !== code),
+  // Paso 1b: el usuario hace click en el lápiz de una tarjeta → editar componentes
+  function handleEditCourse(course: CourseAdmin, currentSelectedIds: string[]) {
+    setPendingCourse(course);
+    setPendingComponentIds(currentSelectedIds);
+    setPendingIsEdit(true);
+    setSearchQuery("");
+    setSearchResults([]);
+  }
+
+  // Paso 2: confirmar adición o edición
+  async function handleConfirmPendingCourse() {
+    if (!pendingCourse || pendingComponentIds.length === 0) return;
+    if (pendingIsEdit) {
+      // Reemplaza solo los componentes de este curso
+      const courseComponentSet = new Set((pendingCourse.components ?? []).map((c) => c.id));
+      const otherIds = assignedComponentIds.filter((id) => !courseComponentSet.has(id));
+      await saveComponentIds(
+        [...otherIds, ...pendingComponentIds],
+        "Tipos de clase actualizados",
+        "No se pudo actualizar",
+      );
+    } else {
+      const newIds = pendingComponentIds.filter((id) => !assignedComponentIds.includes(id));
+      await saveComponentIds(
+        [...assignedComponentIds, ...newIds],
+        "Curso asignado",
+        "No se pudo asignar el curso",
+      );
+    }
+    setPendingCourse(null);
+    setPendingComponentIds([]);
+    setPendingIsEdit(false);
+  }
+
+  function handleCancelPendingCourse() {
+    setPendingCourse(null);
+    setPendingComponentIds([]);
+    setPendingIsEdit(false);
+  }
+
+  function handleTogglePendingComponent(componentId: string) {
+    setPendingComponentIds((prev) =>
+      prev.includes(componentId) ? prev.filter((id) => id !== componentId) : [...prev, componentId],
+    );
+  }
+
+  // Quita un curso completo: elimina todos sus componentes del docente
+  function handleRemoveCourse(course: CourseAdmin) {
+    const courseComponentSet = new Set((course.components ?? []).map((c) => c.id));
+    void saveComponentIds(
+      assignedComponentIds.filter((id) => !courseComponentSet.has(id)),
       "Curso quitado",
       "No se pudo quitar el curso",
     );
   }
 
-  const assignedCourses = assignedCodes.map((code) => resolved[code] ?? null);
+  // Activa o desactiva un componente individual dentro de un curso ya asignado
+  function handleToggleComponent(component: CourseComponentAdmin) {
+    if (!component.id) return;
+    const isSelected = assignedComponentIds.includes(component.id);
+    if (isSelected) {
+      void saveComponentIds(
+        assignedComponentIds.filter((id) => id !== component.id),
+        "Tipo de clase quitado",
+        "No se pudo quitar el tipo de clase",
+      );
+    } else {
+      void saveComponentIds(
+        [...assignedComponentIds, component.id],
+        "Tipo de clase asignado",
+        "No se pudo asignar el tipo de clase",
+      );
+    }
+  }
+
+  // Agrupa los IDs asignados por curso, usando el catálogo resuelto
+  const courseGroups = useMemo(() => {
+    const groups: Array<{ course: CourseAdmin; selectedIds: string[] }> = [];
+    const seen = new Set<string>();
+    for (const cid of assignedComponentIds) {
+      for (const course of Object.values(resolved)) {
+        if (course.components?.some((c) => c.id === cid)) {
+          if (!seen.has(course.id)) {
+            seen.add(course.id);
+            const selectedIds = assignedComponentIds.filter((id) =>
+              course.components?.some((c) => c.id === id),
+            );
+            groups.push({ course, selectedIds });
+          }
+          break;
+        }
+      }
+    }
+    return groups;
+  }, [assignedComponentIds, resolved]);
+
+  // IDs aún no resueltos (el curso no está en caché)
+  const unresolvedIds = useMemo(
+    () => assignedComponentIds.filter((cid) => !Object.values(resolved).some((c) => c.components?.some((comp) => comp.id === cid))),
+    [assignedComponentIds, resolved],
+  );
 
   if (!teacher) return null;
 
+  const totalCourses = courseGroups.length + (unresolvedIds.length > 0 ? 1 : 0);
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[38rem]">
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[42rem]">
         <DialogHeader className="border-b border-border px-6 py-5 pr-14">
           <DialogTitle>Cursos asignados · {teacher.fullName}</DialogTitle>
-          <DialogDescription>Gestiona los cursos que este docente puede dictar.</DialogDescription>
+          <DialogDescription>
+            Asigna cursos al docente y selecciona qué tipos de clase dicta en cada uno.
+          </DialogDescription>
         </DialogHeader>
-        <div className="flex items-center border-b border-border bg-muted/30 px-6 py-3">
-          <span className={cn("text-xs", palette.text)}>
-            {assignedCodes.length} {assignedCodes.length === 1 ? "curso asignado" : "cursos asignados"}
+
+        {/* Barra de estadísticas */}
+        <div className="flex items-center gap-4 border-b border-border bg-muted/30 px-6 py-2.5">
+          <span className={cn("text-xs font-medium", palette.text)}>
+            {totalCourses} {totalCourses === 1 ? "curso" : "cursos"}
+          </span>
+          <span className="text-xs text-muted-foreground">·</span>
+          <span className="text-xs text-muted-foreground">
+            {assignedComponentIds.length} {assignedComponentIds.length === 1 ? "tipo de clase" : "tipos de clase"} seleccionados
           </span>
         </div>
 
         <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-5">
+          {/* Buscador de cursos */}
           <div className="space-y-1">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9"
-                placeholder="Buscar curso por código o nombre…"
+                placeholder="Buscar curso para asignar…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoComplete="off"
@@ -867,75 +1010,240 @@ function TeacherCoursesModal({
                   </p>
                 ) : (
                   <div className="max-h-52 divide-y divide-border overflow-y-auto">
-                    {searchResults.map((course) => (
-                      <button
-                        key={course.id}
-                        type="button"
-                        disabled={saving}
-                        onClick={() => handleAdd(course)}
-                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition hover:bg-violet-100 disabled:opacity-50 dark:hover:bg-violet-900/30"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-medium text-foreground">{course.code}</span>
-                          <span className="ml-2 text-xs text-muted-foreground">{course.name}</span>
-                        </div>
-                        <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                          Ciclo {course.cycle ?? 1} · {course.credits} cr
-                        </span>
-                      </button>
-                    ))}
+                    {searchResults.map((course) => {
+                      const alreadyAssigned = resolvedCourseCodes.has(course.code) || pendingCourse?.code === course.code;
+                      return (
+                        <button
+                          key={course.id}
+                          type="button"
+                          disabled={saving || alreadyAssigned || (course.components ?? []).length === 0}
+                          onClick={() => handleSelectCourseFromSearch(course)}
+                          className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-violet-900/30"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-medium text-foreground">{course.code}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">{course.name}</span>
+                          </div>
+                          <span className="ml-3 shrink-0 text-xs text-muted-foreground">
+                            {alreadyAssigned ? (
+                              <span className="text-violet-500">Ya asignado</span>
+                            ) : (
+                              `${(course.components ?? []).length} tipo${(course.components ?? []).length !== 1 ? "s" : ""} de clase`
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {assignedCodes.length === 0 ? (
+          {/* Sección pendiente: selección de componentes antes de confirmar */}
+          {pendingCourse && (
+            <div className="overflow-hidden rounded-xl border-2 border-violet-300 bg-violet-50 dark:border-violet-700 dark:bg-violet-950/30">
+              <div className="flex items-center justify-between gap-3 border-b border-violet-200 px-4 py-2.5 dark:border-violet-800">
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-violet-500 dark:text-violet-400">{pendingIsEdit ? "Editar tipos de clase" : "Nuevo curso"}</span>
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {pendingCourse.code}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">{pendingCourse.name}</span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelPendingCourse}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition hover:bg-violet-200 hover:text-violet-700 dark:hover:bg-violet-800 dark:hover:text-violet-300"
+                  title="Cancelar"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="px-4 pb-4 pt-3">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Selecciona los tipos de clase que dicta este docente:
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(pendingCourse.components ?? []).map((component) => {
+                    const isSelected = component.id ? pendingComponentIds.includes(component.id) : false;
+                    return (
+                      <button
+                        key={component.id ?? component.componentType}
+                        type="button"
+                        disabled={!component.id}
+                        onClick={() => component.id && handleTogglePendingComponent(component.id)}
+                        className={cn(
+                          "flex flex-col items-start gap-0.5 rounded-xl border-2 px-4 py-3 text-left transition",
+                          isSelected
+                            ? "border-violet-400 bg-violet-100 dark:border-violet-600 dark:bg-violet-900/50"
+                            : "border-border bg-card hover:border-violet-200 hover:bg-violet-50 dark:hover:border-violet-800 dark:hover:bg-violet-950/20",
+                          "disabled:cursor-not-allowed disabled:opacity-50",
+                        )}
+                      >
+                        <div className="flex w-full items-center justify-between">
+                          <span className={cn("text-sm font-semibold", isSelected ? "text-violet-700 dark:text-violet-300" : "text-foreground")}>
+                            {COMPONENT_LABELS[component.componentType]}
+                          </span>
+                          <span className={cn(
+                            "flex h-4 w-4 items-center justify-center rounded-full border-2 text-[9px] font-bold transition",
+                            isSelected
+                              ? "border-violet-500 bg-violet-500 text-white dark:border-violet-400 dark:bg-violet-400"
+                              : "border-border bg-background",
+                          )}>
+                            {isSelected && "✓"}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{component.weeklyHours}h/sem · {component.requiredRoomType}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCancelPendingCourse}
+                    className="rounded-lg border border-border px-4 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving || pendingComponentIds.length === 0}
+                    onClick={() => void handleConfirmPendingCourse()}
+                    className="rounded-lg bg-violet-600 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {saving ? "Guardando…" : pendingIsEdit ? "Guardar" : `Agregar${pendingComponentIds.length > 0 ? ` (${pendingComponentIds.length})` : ""}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de cursos asignados agrupados */}
+          {totalCourses === 0 ? (
             !searchQuery.trim() && (
               <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-muted-foreground">
                 <BookOpen className="h-6 w-6 opacity-40" />
                 <p className="text-sm">Este docente no tiene cursos asignados.</p>
+                <p className="text-xs opacity-70">Busca un curso arriba para comenzar.</p>
               </div>
             )
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {assignedCodes.map((code, index) => {
-                const course = assignedCourses[index];
-                return (
-                  <div
-                    key={code}
-                    className="flex flex-col gap-1.5 rounded-xl border border-violet-200 bg-violet-50 p-3 dark:border-violet-800/50 dark:bg-violet-950/30"
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold leading-tight text-violet-700 dark:text-violet-400">{code}</p>
-                        {course && <p className="mt-0.5 truncate text-xs text-muted-foreground">{course.name}</p>}
-                      </div>
+            <div className="space-y-3">
+              {/* Cursos resueltos en grilla 2 columnas */}
+              <div className="grid grid-cols-2 gap-3">
+              {courseGroups.map(({ course, selectedIds }) => (
+                <div
+                  key={course.id}
+                  className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+                >
+                  {/* Encabezado del curso */}
+                  <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-sm text-violet-700 dark:text-violet-400">{course.code}</p>
+                      <p className="truncate text-xs text-muted-foreground leading-tight">{course.name}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-0.5">
                       <button
                         type="button"
                         disabled={saving}
-                        onClick={() => handleRemove(code)}
+                        onClick={() => handleEditCourse(course, selectedIds)}
+                        className="rounded-md p-1 text-muted-foreground transition hover:bg-violet-100 hover:text-violet-600 disabled:opacity-50 dark:hover:bg-violet-900/30 dark:hover:text-violet-400"
+                        title="Editar tipos de clase"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => setConfirmRemoveCourse(course)}
                         className="rounded-md p-1 text-muted-foreground transition hover:bg-red-100 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                         title="Quitar curso"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    {course ? (
-                      <p className="text-xs text-muted-foreground">
-                        Ciclo {course.cycle ?? 1} · {course.credits} cr · {course.weeklyHours}h/sem
-                      </p>
+                  </div>
+
+                  {/* Chips de componentes (solo lectura, editar con el lápiz) */}
+                  <div className="flex flex-wrap gap-1.5 px-3 py-2.5">
+                    {(course.components ?? []).length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Sin componentes.</p>
                     ) : (
-                      <p className="text-xs text-amber-500">Código no encontrado en catálogo</p>
+                      (course.components ?? []).map((component) => {
+                        const isSelected = component.id ? selectedIds.includes(component.id) : false;
+                        if (!isSelected) return null;
+                        return (
+                          <span
+                            key={component.id ?? component.componentType}
+                            className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700 dark:border-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-violet-500 dark:bg-violet-400" />
+                            {COMPONENT_LABELS[component.componentType]}
+                            <span className="opacity-60">{component.weeklyHours}h</span>
+                          </span>
+                        );
+                      })
                     )}
                   </div>
-                );
-              })}
+                </div>
+              ))}
+              </div>
+
+              {/* IDs de componentes huérfanos (curso no resuelto en caché) */}
+              {unresolvedIds.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/20">
+                  <div className="flex items-center gap-2 border-b border-amber-200 px-4 py-2.5 dark:border-amber-800/50">
+                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                      {unresolvedIds.length} componente{unresolvedIds.length !== 1 ? "s" : ""} sin resolver
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 px-4 py-3">
+                    {unresolvedIds.map((cid) => (
+                      <button
+                        key={cid}
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          void saveComponentIds(
+                            assignedComponentIds.filter((id) => id !== cid),
+                            "Componente quitado",
+                            "No se pudo quitar",
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-mono text-amber-700 transition hover:border-red-300 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        title="Quitar componente no encontrado"
+                      >
+                        {cid.slice(0, 8)}…
+                        <X className="h-3 w-3 opacity-60" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      open={!!confirmRemoveCourse}
+      onOpenChange={(o) => !o && setConfirmRemoveCourse(null)}
+      title="Quitar curso"
+      description={`¿Quitar "${confirmRemoveCourse?.code} – ${confirmRemoveCourse?.name}" del docente? Se eliminarán todos sus componentes asignados.`}
+      confirmLabel="Quitar"
+      variant="destructive"
+      onConfirm={() => {
+        if (confirmRemoveCourse) handleRemoveCourse(confirmRemoveCourse);
+        setConfirmRemoveCourse(null);
+      }}
+      isLoading={saving}
+    />
+    </>
   );
 }
 
@@ -973,7 +1281,8 @@ function AvailabilityModal({
         isActive: teacher.isActive,
         userId: teacher.userId,
         availability,
-        courseCodes: teacher.courseCodes ?? [],
+        courseCodes: [],
+        courseComponentIds: teacher.courseComponentIds ?? [],
       });
       onUpdated(updated);
       toastSuccess("Disponibilidad actualizada");

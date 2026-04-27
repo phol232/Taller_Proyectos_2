@@ -16,6 +16,7 @@ export const teacherSchema = z.object({
     .max(255, "Máximo 255 caracteres"),
   isActive: z.boolean().default(true),
   courseCodes: z.array(z.string()).default([]),
+  courseComponentIds: z.array(z.string().uuid()).default([]),
 });
 
 export type TeacherFormValues = z.infer<typeof teacherSchema>;
