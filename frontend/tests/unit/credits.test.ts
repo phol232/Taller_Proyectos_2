@@ -7,7 +7,6 @@ const makeAssignment = (courseId: string): Assignment => ({
   courseId,
   courseName: `Curso ${courseId}`,
   courseCode: courseId,
-  section: "A",
   teacherId: "T1",
   teacherName: "Docente 1",
   classroomId: "R1",

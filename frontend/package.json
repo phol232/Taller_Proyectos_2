@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:netlify": "next build",
     "build:cf": "next build",
     "build:pages": "next build",
     "deploy": "next build",

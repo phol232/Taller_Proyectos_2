@@ -69,6 +69,23 @@ services:
     depends_on:
       - backend
 
+  # ── Solver CSP Microservice (FastAPI) ───────────────────────
+  solver:
+    build:
+      context: ./solver
+      dockerfile: Dockerfile
+    container_name: planner-solver
+    restart: unless-stopped
+    environment:
+      SOLVER_DB_DSN: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/horarios_db
+      SOLVER_LOG_LEVEL: INFO
+      TZ: America/Lima
+    ports:
+      - "8090:8090"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
