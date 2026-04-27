@@ -1,1 +1,0 @@
-(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,67632,e=>{"use strict";var s=e.i(65932),t=e.i(77770);e.s(["default",0,function(){let{t:e}=(0,t.useTranslation)();return(0,s.jsx)("div",{className:"p-8",children:(0,s.jsx)("p",{className:"text-sm text-gray-400",children:e.subpages.schedulesView.phase})})}])}]);
