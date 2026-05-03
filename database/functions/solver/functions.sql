@@ -13,6 +13,8 @@
 -- -----------------------------------------------------------
 -- fn_solver_get_period
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_get_period(UUID);
+
 CREATE OR REPLACE FUNCTION fn_solver_get_period(p_period_id UUID)
 RETURNS TABLE (
     id                  UUID,
@@ -33,6 +35,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_active_courses
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_active_courses();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_active_courses()
 RETURNS TABLE (
     id                 UUID,
@@ -41,7 +45,7 @@ RETURNS TABLE (
     cycle              INTEGER,
     credits            INTEGER,
     required_credits   INTEGER,
-    weekly_hours       INTEGER,
+    weekly_hours       NUMERIC(3,1),
     required_room_type VARCHAR
 )
 LANGUAGE plpgsql
@@ -68,7 +72,7 @@ RETURNS TABLE (
     id                 UUID,
     course_id          UUID,
     component_type     VARCHAR,
-    weekly_hours       INTEGER,
+    weekly_hours       NUMERIC(3,1),
     required_room_type VARCHAR,
     sort_order         INTEGER
 )
@@ -95,6 +99,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_active_teachers
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_active_teachers();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_active_teachers()
 RETURNS TABLE (
     id        UUID,
@@ -142,6 +148,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_active_time_slots
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_active_time_slots();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_active_time_slots()
 RETURNS TABLE (
     id          UUID,
@@ -170,6 +178,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_teacher_courses
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_teacher_courses();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_teacher_courses()
 RETURNS TABLE (
     teacher_id UUID,
@@ -208,6 +218,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_classroom_courses
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_classroom_courses();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_classroom_courses()
 RETURNS TABLE (
     classroom_id UUID,
@@ -225,6 +237,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_teacher_availability
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_teacher_availability();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_teacher_availability()
 RETURNS TABLE (
     teacher_id   UUID,
@@ -245,6 +259,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_classroom_availability
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_classroom_availability();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_classroom_availability()
 RETURNS TABLE (
     classroom_id UUID,
@@ -265,6 +281,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_course_prerequisites
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_course_prerequisites();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_course_prerequisites()
 RETURNS TABLE (
     course_id              UUID,
@@ -283,6 +301,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_course_corequisites
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_course_corequisites();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_course_corequisites()
 RETURNS TABLE (
     course_id      UUID,
@@ -301,6 +321,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_building_travel_times
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_building_travel_times();
+
 CREATE OR REPLACE FUNCTION fn_solver_list_building_travel_times()
 RETURNS TABLE (
     building_a VARCHAR,
@@ -320,6 +342,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_get_confirmed_teaching_schedule
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_get_confirmed_teaching_schedule(UUID);
+
 CREATE OR REPLACE FUNCTION fn_solver_get_confirmed_teaching_schedule(p_period_id UUID)
 RETURNS UUID
 LANGUAGE plpgsql
@@ -377,6 +401,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_list_completed_courses
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_completed_courses(UUID[]);
+
 CREATE OR REPLACE FUNCTION fn_solver_list_completed_courses(p_student_ids UUID[])
 RETURNS TABLE (
     student_id UUID,
@@ -405,14 +431,19 @@ DROP FUNCTION IF EXISTS fn_solver_list_offer_vacancies(UUID);
 
 CREATE OR REPLACE FUNCTION fn_solver_list_offer_vacancies(p_teaching_schedule_id UUID)
 RETURNS TABLE (
-    assignment_id  UUID,
-    course_id      UUID,
+    assignment_id       UUID,
+    course_id           UUID,
     course_component_id UUID,
-    teacher_id     UUID,
-    classroom_id   UUID,
-    max_capacity   INTEGER,
-    enrolled_count INTEGER,
-    time_slot_ids  UUID[]
+    teacher_id          UUID,
+    classroom_id        UUID,
+    max_capacity        INTEGER,
+    enrolled_count      INTEGER,
+    time_slot_ids       UUID[],
+    slot_start_times    TIME[],
+    slot_end_times      TIME[],
+    section_id          UUID,
+    nrc                 CHAR(5),
+    section_number      SMALLINT
 )
 LANGUAGE plpgsql
 STABLE
@@ -431,14 +462,99 @@ BEGIN
            csa.max_capacity,
            csa.enrolled_count,
            COALESCE(
-             (SELECT array_agg(cas.time_slot_id ORDER BY cas.time_slot_id)
+             (SELECT array_agg(cas.time_slot_id ORDER BY cas.slot_start_time, cas.slot_end_time, cas.time_slot_id)
                 FROM course_assignment_slots cas
                WHERE cas.course_assignment_id = csa.id),
              ARRAY[]::UUID[]
-           )
+           ),
+           COALESCE(
+             (SELECT array_agg(cas.slot_start_time ORDER BY cas.slot_start_time, cas.slot_end_time, cas.time_slot_id)
+                FROM course_assignment_slots cas
+               WHERE cas.course_assignment_id = csa.id),
+             ARRAY[]::TIME[]
+           ),
+           COALESCE(
+             (SELECT array_agg(cas.slot_end_time ORDER BY cas.slot_start_time, cas.slot_end_time, cas.time_slot_id)
+                FROM course_assignment_slots cas
+               WHERE cas.course_assignment_id = csa.id),
+             ARRAY[]::TIME[]
+           ),
+           cs.id,
+           cs.nrc,
+           cs.section_number
       FROM course_schedule_assignments csa
+      LEFT JOIN course_sections cs ON cs.id = csa.section_id
      WHERE csa.teaching_schedule_id = p_teaching_schedule_id
        AND csa.assignment_status IN ('DRAFT', 'CONFIRMED');
+END;
+$$;
+
+-- -----------------------------------------------------------
+-- fn_generate_unique_nrc
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_generate_unique_nrc();
+
+CREATE OR REPLACE FUNCTION fn_generate_unique_nrc()
+RETURNS CHAR(5)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+DECLARE
+    v_candidate CHAR(5);
+    v_attempts  INTEGER := 0;
+BEGIN
+    LOOP
+        v_candidate := LPAD((FLOOR(RANDOM() * 100000))::BIGINT::TEXT, 5, '0');
+
+        IF NOT EXISTS (
+            SELECT 1 FROM course_sections WHERE nrc = v_candidate
+        ) THEN
+            RETURN v_candidate;
+        END IF;
+
+        v_attempts := v_attempts + 1;
+        IF v_attempts >= 100 THEN
+            RAISE EXCEPTION 'fn_generate_unique_nrc: no se pudo generar un NRC único tras 100 intentos.'
+                USING ERRCODE = 'P0001';
+        END IF;
+    END LOOP;
+END;
+$$;
+
+-- -----------------------------------------------------------
+-- fn_list_course_sections
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_list_course_sections(UUID);
+
+CREATE OR REPLACE FUNCTION fn_list_course_sections(p_teaching_schedule_id UUID)
+RETURNS TABLE (
+    id                   UUID,
+    teaching_schedule_id UUID,
+    course_id            UUID,
+    course_code          VARCHAR,
+    course_name          VARCHAR,
+    nrc                  CHAR(5),
+    section_number       SMALLINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT cs.id,
+           cs.teaching_schedule_id,
+           cs.course_id,
+           c.code,
+           c.name,
+           cs.nrc,
+           cs.section_number
+      FROM course_sections cs
+      JOIN courses c ON c.id = cs.course_id
+     WHERE cs.teaching_schedule_id = p_teaching_schedule_id
+       AND cs.is_active = TRUE
+     ORDER BY c.code ASC, cs.section_number ASC;
 END;
 $$;
 
@@ -450,14 +566,18 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_get_run
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_get_run(UUID);
+
 CREATE OR REPLACE FUNCTION fn_solver_get_run(p_run_id UUID)
 RETURNS TABLE (
     id                 UUID,
     run_type           VARCHAR,
     academic_period_id UUID,
     student_id         UUID,
+    teaching_schedule_id UUID,
     status             VARCHAR,
     requested_by       UUID,
+    seed               INTEGER,
     time_limit_ms      INTEGER,
     input_hash         VARCHAR,
     result_summary     TEXT,
@@ -472,7 +592,8 @@ AS $$
 BEGIN
     RETURN QUERY
     SELECT sr.id, sr.run_type, sr.academic_period_id, sr.student_id,
-           sr.status, sr.requested_by, sr.time_limit_ms, sr.input_hash,
+           sr.teaching_schedule_id, sr.status, sr.requested_by, sr.seed,
+           sr.time_limit_ms, sr.input_hash,
            sr.result_summary, sr.started_at, sr.finished_at, sr.created_at
       FROM solver_runs sr
      WHERE sr.id = p_run_id;
@@ -513,13 +634,16 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_create_run
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_create_run(VARCHAR, UUID, UUID, UUID, INTEGER, VARCHAR, INTEGER);
+
 CREATE OR REPLACE FUNCTION fn_solver_create_run(
     p_run_type           VARCHAR,
     p_academic_period_id UUID,
     p_student_id         UUID,
     p_requested_by       UUID,
     p_time_limit_ms      INTEGER,
-    p_input_hash         VARCHAR
+    p_input_hash         VARCHAR,
+    p_seed               INTEGER DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -530,13 +654,14 @@ DECLARE
     v_id UUID;
 BEGIN
     INSERT INTO solver_runs (run_type, academic_period_id, student_id,
-                             status, requested_by, time_limit_ms, input_hash,
+                             status, requested_by, seed, time_limit_ms, input_hash,
                              started_at)
     VALUES (UPPER(TRIM(p_run_type)),
             p_academic_period_id,
             p_student_id,
             'RUNNING',
             p_requested_by,
+            p_seed,
             COALESCE(p_time_limit_ms, 30000),
             p_input_hash,
             NOW())
@@ -548,10 +673,13 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_finish_run
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_finish_run(UUID, VARCHAR, TEXT, UUID);
+
 CREATE OR REPLACE FUNCTION fn_solver_finish_run(
-    p_run_id  UUID,
-    p_status  VARCHAR,
-    p_summary TEXT
+    p_run_id               UUID,
+    p_status               VARCHAR,
+    p_summary              TEXT,
+    p_teaching_schedule_id UUID DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql
@@ -562,6 +690,7 @@ BEGIN
     UPDATE solver_runs
        SET status         = UPPER(TRIM(p_status)),
            result_summary = p_summary,
+           teaching_schedule_id = COALESCE(p_teaching_schedule_id, teaching_schedule_id),
            finished_at    = NOW(),
            updated_at     = NOW()
      WHERE id = p_run_id;
@@ -571,6 +700,8 @@ $$;
 -- -----------------------------------------------------------
 -- fn_solver_set_run_input_hash
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_set_run_input_hash(UUID, VARCHAR);
+
 CREATE OR REPLACE FUNCTION fn_solver_set_run_input_hash(
     p_run_id UUID,
     p_hash   VARCHAR
@@ -602,6 +733,8 @@ $$;
 --     "details":       {} | null
 --   }, ...]
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_add_conflicts(UUID, JSONB);
+
 CREATE OR REPLACE FUNCTION fn_solver_add_conflicts(
     p_run_id    UUID,
     p_conflicts JSONB
@@ -640,6 +773,111 @@ BEGIN
 END;
 $$;
 
+-- -----------------------------------------------------------
+-- fn_solver_reserve_generation_request
+--  Rolling window: máximo 5 generaciones aceptadas por actor
+--  cada 5 minutos. Devuelve reserva o datos para HTTP 429.
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_reserve_generation_request(UUID, UUID);
+
+CREATE OR REPLACE FUNCTION fn_solver_reserve_generation_request(
+    p_actor_id           UUID,
+    p_academic_period_id UUID
+)
+RETURNS TABLE (
+    reservation_id      UUID,
+    accepted            BOOLEAN,
+    retry_after_seconds INTEGER,
+    remaining           INTEGER
+)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+DECLARE
+    v_limit        INTEGER := 5;
+    v_window       INTERVAL := INTERVAL '5 minutes';
+    v_recent_count INTEGER;
+    v_oldest       TIMESTAMPTZ;
+    v_id           UUID;
+BEGIN
+    IF p_actor_id IS NULL THEN
+        RAISE EXCEPTION 'actor_id es obligatorio' USING ERRCODE = 'P0001';
+    END IF;
+
+    UPDATE solver_generation_reservations
+       SET status = 'EXPIRED', updated_at = NOW()
+     WHERE actor_id = p_actor_id
+       AND status = 'ACCEPTED'
+       AND expires_at < NOW();
+
+    SELECT COUNT(*)::INTEGER, MIN(created_at)
+      INTO v_recent_count, v_oldest
+      FROM solver_generation_reservations
+     WHERE actor_id = p_actor_id
+       AND status IN ('ACCEPTED', 'CONSUMED')
+       AND created_at > NOW() - v_window;
+
+    IF v_recent_count >= v_limit THEN
+        RETURN QUERY
+        SELECT NULL::UUID,
+               FALSE,
+               GREATEST(1, CEIL(EXTRACT(EPOCH FROM (v_oldest + v_window - NOW())))::INTEGER),
+               0;
+        RETURN;
+    END IF;
+
+    INSERT INTO solver_generation_reservations (
+        actor_id, academic_period_id, status, expires_at
+    )
+    VALUES (
+        p_actor_id, p_academic_period_id, 'ACCEPTED', NOW() + v_window
+    )
+    RETURNING id INTO v_id;
+
+    RETURN QUERY
+    SELECT v_id,
+           TRUE,
+           0,
+           GREATEST(0, v_limit - v_recent_count - 1);
+END;
+$$;
+
+-- -----------------------------------------------------------
+-- fn_solver_consume_generation_reservation
+--  El solver llama esta función antes de ejecutar para validar
+--  que el backend haya reservado la generación.
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_consume_generation_reservation(UUID, UUID, UUID);
+
+CREATE OR REPLACE FUNCTION fn_solver_consume_generation_reservation(
+    p_reservation_id     UUID,
+    p_actor_id           UUID,
+    p_academic_period_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+DECLARE
+    v_count INTEGER;
+BEGIN
+    UPDATE solver_generation_reservations
+       SET status = 'CONSUMED',
+           consumed_at = NOW(),
+           updated_at = NOW()
+     WHERE id = p_reservation_id
+       AND actor_id = p_actor_id
+       AND academic_period_id = p_academic_period_id
+       AND status = 'ACCEPTED'
+       AND expires_at >= NOW();
+
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count = 1;
+END;
+$$;
+
 
 -- ============================================================
 --  ESCRITURAS — Fase 1: teaching_schedule
@@ -665,10 +903,13 @@ $$;
 --  Para que el caller pueda recuperar los assignment_id creados,
 --  estos quedan disponibles vía fn_solver_list_offer_vacancies.
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_persist_teaching_schedule(UUID, UUID, JSONB, BOOLEAN);
+
 CREATE OR REPLACE FUNCTION fn_solver_persist_teaching_schedule(
     p_academic_period_id UUID,
     p_created_by         UUID,
-    p_offers             JSONB
+    p_offers             JSONB,
+    p_keep_existing_drafts BOOLEAN DEFAULT FALSE
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -676,19 +917,26 @@ VOLATILE
 SECURITY INVOKER
 AS $$
 DECLARE
-    v_schedule_id     UUID;
-    v_offer           JSONB;
-    v_assignment_id   UUID;
-    v_classroom_id    UUID;
-    v_course_id       UUID;
-    v_component_id    UUID;
-    v_teacher_id      UUID;
+    v_schedule_id      UUID;
+    v_offer            JSONB;
+    v_assignment_id    UUID;
+    v_classroom_id     UUID;
+    v_course_id        UUID;
+    v_component_id     UUID;
+    v_teacher_id       UUID;
+    v_section_number   SMALLINT;
+    v_section_id       UUID;
+    v_block            JSONB;
+    v_slot_id          UUID;
+    v_slot_start       TIME;
+    v_slot_end         TIME;
 BEGIN
-    -- Cancel previous draft for this period.
-    UPDATE teaching_schedules
-       SET status = 'CANCELLED', updated_at = NOW()
-     WHERE academic_period_id = p_academic_period_id
-       AND status = 'DRAFT';
+    IF NOT COALESCE(p_keep_existing_drafts, FALSE) THEN
+        UPDATE teaching_schedules
+           SET status = 'CANCELLED', updated_at = NOW()
+         WHERE academic_period_id = p_academic_period_id
+           AND status = 'DRAFT';
+    END IF;
 
     INSERT INTO teaching_schedules (academic_period_id, status, created_by)
     VALUES (p_academic_period_id, 'DRAFT', p_created_by)
@@ -700,38 +948,196 @@ BEGIN
 
     FOR v_offer IN SELECT * FROM jsonb_array_elements(p_offers)
     LOOP
-        v_course_id    := (v_offer->>'course_id')::UUID;
-        v_component_id := (v_offer->>'course_component_id')::UUID;
-        v_teacher_id   := (v_offer->>'teacher_id')::UUID;
-        v_classroom_id := (v_offer->>'classroom_id')::UUID;
+        v_course_id      := (v_offer->>'course_id')::UUID;
+        v_component_id   := (v_offer->>'course_component_id')::UUID;
+        v_teacher_id     := (v_offer->>'teacher_id')::UUID;
+        v_classroom_id   := (v_offer->>'classroom_id')::UUID;
+        v_section_number := COALESCE((v_offer->>'section_number')::SMALLINT, 1);
+
+        INSERT INTO course_sections (
+            teaching_schedule_id, course_id, nrc, section_number
+        )
+        VALUES (
+            v_schedule_id,
+            v_course_id,
+            fn_generate_unique_nrc(),
+            v_section_number
+        )
+        ON CONFLICT (teaching_schedule_id, course_id, section_number) DO NOTHING;
+
+        SELECT id INTO v_section_id
+          FROM course_sections
+         WHERE teaching_schedule_id = v_schedule_id
+           AND course_id            = v_course_id
+           AND section_number       = v_section_number;
 
         INSERT INTO course_schedule_assignments (
             teaching_schedule_id, course_id, course_component_id, teacher_id,
-            assignment_status, max_capacity, enrolled_count
+            assignment_status, max_capacity, enrolled_count, section_id
         )
         VALUES (
             v_schedule_id, v_course_id, v_component_id, v_teacher_id,
             'DRAFT',
             COALESCE((v_offer->>'max_capacity')::INTEGER, 0),
-            0
+            0,
+            v_section_id
         )
         RETURNING id INTO v_assignment_id;
 
-        INSERT INTO course_assignment_slots (
-            course_assignment_id, teaching_schedule_id, course_id,
-            course_component_id, teacher_id, classroom_id, time_slot_id
-        )
-        SELECT v_assignment_id,
-               v_schedule_id,
-               v_course_id,
-               v_component_id,
-               v_teacher_id,
-               v_classroom_id,
-               (slot_id_text)::UUID
-          FROM jsonb_array_elements_text(v_offer->'time_slot_ids') AS slot_id_text;
+        IF v_offer ? 'blocks' THEN
+            FOR v_block IN SELECT * FROM jsonb_array_elements(v_offer->'blocks')
+            LOOP
+                v_slot_id    := (v_block->>'time_slot_id')::UUID;
+                v_slot_start := (v_block->>'start_time')::TIME;
+                v_slot_end   := (v_block->>'end_time')::TIME;
+
+                INSERT INTO course_assignment_slots (
+                    course_assignment_id, teaching_schedule_id, course_id,
+                    course_component_id, teacher_id, classroom_id, time_slot_id,
+                    slot_start_time, slot_end_time
+                )
+                VALUES (
+                    v_assignment_id,
+                    v_schedule_id,
+                    v_course_id,
+                    v_component_id,
+                    v_teacher_id,
+                    v_classroom_id,
+                    v_slot_id,
+                    v_slot_start,
+                    v_slot_end
+                )
+                ON CONFLICT DO NOTHING;
+            END LOOP;
+        ELSE
+            INSERT INTO course_assignment_slots (
+                course_assignment_id, teaching_schedule_id, course_id,
+                course_component_id, teacher_id, classroom_id, time_slot_id,
+                slot_start_time, slot_end_time
+            )
+            SELECT v_assignment_id,
+                   v_schedule_id,
+                   v_course_id,
+                   v_component_id,
+                   v_teacher_id,
+                   v_classroom_id,
+                   (slot_id_text)::UUID,
+                   ts.start_time,
+                   ts.end_time
+              FROM jsonb_array_elements_text(v_offer->'time_slot_ids') AS slot_id_text
+              JOIN time_slots ts ON ts.id = (slot_id_text)::UUID
+            ON CONFLICT DO NOTHING;
+        END IF;
     END LOOP;
 
     RETURN v_schedule_id;
+END;
+$$;
+
+-- -----------------------------------------------------------
+-- fn_list_teaching_schedule_options
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_list_teaching_schedule_options(UUID);
+
+CREATE OR REPLACE FUNCTION fn_list_teaching_schedule_options(p_academic_period_id UUID)
+RETURNS TABLE (
+    id                 UUID,
+    academic_period_id UUID,
+    status             VARCHAR,
+    created_by         UUID,
+    created_at         TIMESTAMPTZ,
+    updated_at         TIMESTAMPTZ,
+    confirmed_at       TIMESTAMPTZ,
+    solver_run_id      UUID,
+    seed               INTEGER,
+    offer_count        INTEGER,
+    slot_count         INTEGER
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT ts.id,
+           ts.academic_period_id,
+           ts.status,
+           ts.created_by,
+           ts.created_at,
+           ts.updated_at,
+           ts.confirmed_at,
+           sr.id,
+           sr.seed,
+           COALESCE(COUNT(DISTINCT csa.id), 0)::INTEGER,
+           COALESCE(COUNT(cas.id), 0)::INTEGER
+      FROM teaching_schedules ts
+ LEFT JOIN solver_runs sr ON sr.teaching_schedule_id = ts.id
+ LEFT JOIN course_schedule_assignments csa ON csa.teaching_schedule_id = ts.id
+ LEFT JOIN course_assignment_slots cas ON cas.course_assignment_id = csa.id
+     WHERE ts.academic_period_id = p_academic_period_id
+       AND ts.status IN ('DRAFT', 'CONFIRMED')
+  GROUP BY ts.id, sr.id, sr.seed
+  ORDER BY ts.created_at DESC;
+END;
+$$;
+
+-- -----------------------------------------------------------
+-- fn_confirm_teaching_schedule
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_confirm_teaching_schedule(UUID, UUID);
+
+CREATE OR REPLACE FUNCTION fn_confirm_teaching_schedule(
+    p_schedule_id   UUID,
+    p_confirmed_by  UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+DECLARE
+    v_period_id UUID;
+BEGIN
+    SELECT academic_period_id INTO v_period_id
+      FROM teaching_schedules
+     WHERE id = p_schedule_id
+       AND status IN ('DRAFT', 'CONFIRMED');
+
+    IF v_period_id IS NULL THEN
+        RAISE EXCEPTION 'Horario no encontrado o no confirmable: %', p_schedule_id
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    UPDATE teaching_schedules
+       SET status = 'CANCELLED',
+           updated_at = NOW()
+     WHERE academic_period_id = v_period_id
+       AND id <> p_schedule_id
+       AND status IN ('DRAFT', 'CONFIRMED');
+
+    UPDATE course_schedule_assignments csa
+       SET assignment_status = 'CANCELLED',
+           updated_at = NOW()
+      FROM teaching_schedules ts
+     WHERE ts.id = csa.teaching_schedule_id
+       AND ts.academic_period_id = v_period_id
+       AND ts.id <> p_schedule_id
+       AND csa.assignment_status IN ('DRAFT', 'CONFIRMED');
+
+    UPDATE teaching_schedules
+       SET status = 'CONFIRMED',
+           confirmed_by = p_confirmed_by,
+           confirmed_at = NOW(),
+           updated_at = NOW()
+     WHERE id = p_schedule_id;
+
+    UPDATE course_schedule_assignments
+       SET assignment_status = 'CONFIRMED',
+           updated_at = NOW()
+     WHERE teaching_schedule_id = p_schedule_id
+       AND assignment_status <> 'CANCELLED';
+
+    RETURN p_schedule_id;
 END;
 $$;
 
@@ -756,6 +1162,8 @@ $$;
 --     }]
 --   }, ...]
 -- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_persist_student_schedule(UUID, UUID, UUID, JSONB);
+
 CREATE OR REPLACE FUNCTION fn_solver_persist_student_schedule(
     p_student_id         UUID,
     p_academic_period_id UUID,

@@ -350,7 +350,7 @@ RETURNS TABLE(
     course_name  VARCHAR(255),
     cycle        INTEGER,
     credits      INTEGER,
-    weekly_hours INTEGER,
+    weekly_hours NUMERIC(3,1),
     required_room_type VARCHAR(100),
     is_active    BOOLEAN
 )

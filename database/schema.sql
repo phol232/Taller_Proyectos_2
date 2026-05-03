@@ -230,7 +230,7 @@ CREATE TABLE courses (
     cycle               INTEGER      NOT NULL DEFAULT 1 CHECK (cycle BETWEEN 1 AND 10),
     credits             INTEGER      NOT NULL CHECK (credits BETWEEN 1 AND 6),
     required_credits    INTEGER      NOT NULL DEFAULT 0 CHECK (required_credits >= 0),
-    weekly_hours        INTEGER      NOT NULL CHECK (weekly_hours >= 1),
+    weekly_hours        NUMERIC(3,1) NOT NULL CHECK (weekly_hours > 0),
     required_room_type  VARCHAR(100) NOT NULL CHECK (BTRIM(required_room_type) <> ''),
     is_active           BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -243,7 +243,7 @@ CREATE TABLE course_components (
     id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id           UUID         NOT NULL,
     component_type      VARCHAR(20)  NOT NULL,
-    weekly_hours        INTEGER      NOT NULL CHECK (weekly_hours >= 1),
+    weekly_hours        NUMERIC(3,1) NOT NULL CHECK (weekly_hours > 0),
     required_room_type  VARCHAR(100) NOT NULL CHECK (BTRIM(required_room_type) <> ''),
     sort_order          INTEGER      NOT NULL DEFAULT 1 CHECK (sort_order >= 1),
     is_active           BOOLEAN      NOT NULL DEFAULT TRUE,
@@ -395,6 +395,7 @@ CREATE TABLE teaching_schedules (
     academic_period_id UUID         NOT NULL,
     version            INTEGER      NOT NULL DEFAULT 1 CHECK (version > 0),
     status             VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
+    option_label       VARCHAR(50),
     created_by         UUID,
     confirmed_by       UUID,
     created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -414,12 +415,32 @@ CREATE UNIQUE INDEX uq_teaching_schedules_confirmed_per_period
     ON teaching_schedules(academic_period_id)
     WHERE status = 'CONFIRMED';
 
+CREATE TABLE course_sections (
+    id                    UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    teaching_schedule_id  UUID         NOT NULL,
+    course_id             UUID         NOT NULL,
+    nrc                   CHAR(5)      NOT NULL,
+    section_number        SMALLINT     NOT NULL,
+    is_active             BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_sections_schedule
+        FOREIGN KEY (teaching_schedule_id) REFERENCES teaching_schedules(id) ON DELETE CASCADE,
+    CONSTRAINT fk_course_sections_course
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE RESTRICT,
+    CONSTRAINT uq_course_sections_nrc UNIQUE (nrc),
+    CONSTRAINT uq_course_sections_per_schedule UNIQUE (teaching_schedule_id, course_id, section_number),
+    CONSTRAINT chk_course_sections_number CHECK (section_number BETWEEN 1 AND 3)
+);
+
 CREATE TABLE course_schedule_assignments (
     id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     teaching_schedule_id UUID         NOT NULL,
     course_id            UUID         NOT NULL,
     course_component_id  UUID         NOT NULL,
     teacher_id           UUID         NOT NULL,
+    section_id           UUID,
     assignment_status    VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
     enrolled_count       INTEGER      NOT NULL DEFAULT 0,
     max_capacity         INTEGER      NOT NULL DEFAULT 0,
@@ -434,6 +455,8 @@ CREATE TABLE course_schedule_assignments (
         FOREIGN KEY (course_component_id) REFERENCES course_components(id) ON DELETE RESTRICT,
     CONSTRAINT fk_course_schedule_assignments_teacher
         FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_csa_section
+        FOREIGN KEY (section_id) REFERENCES course_sections(id) ON DELETE SET NULL,
     CONSTRAINT chk_course_schedule_assignments_status CHECK (assignment_status IN ('DRAFT', 'CONFIRMED', 'CANCELLED')),
     CONSTRAINT chk_csa_enrolled_count_nonneg CHECK (enrolled_count >= 0),
     CONSTRAINT chk_csa_max_capacity_nonneg   CHECK (max_capacity >= 0),
@@ -470,6 +493,8 @@ CREATE TABLE course_assignment_slots (
     teacher_id           UUID         NOT NULL,
     classroom_id         UUID         NOT NULL,
     time_slot_id         UUID         NOT NULL,
+    slot_start_time      TIME         NOT NULL,
+    slot_end_time        TIME         NOT NULL,
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
@@ -487,9 +512,11 @@ CREATE TABLE course_assignment_slots (
         FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE RESTRICT,
     CONSTRAINT fk_course_assignment_slots_slot
         FOREIGN KEY (time_slot_id) REFERENCES time_slots(id) ON DELETE RESTRICT,
-    CONSTRAINT uq_course_assignment_slots_assignment UNIQUE (course_assignment_id, time_slot_id),
-    CONSTRAINT uq_course_assignment_slots_teacher UNIQUE (teaching_schedule_id, teacher_id, time_slot_id),
-    CONSTRAINT uq_course_assignment_slots_classroom UNIQUE (teaching_schedule_id, classroom_id, time_slot_id)
+    CONSTRAINT chk_course_assignment_slot_block_range CHECK (slot_end_time > slot_start_time),
+    CONSTRAINT chk_course_assignment_slot_block_duration CHECK (slot_end_time = slot_start_time + INTERVAL '90 minutes'),
+    CONSTRAINT uq_course_assignment_slots_assignment UNIQUE (course_assignment_id, time_slot_id, slot_start_time, slot_end_time),
+    CONSTRAINT uq_course_assignment_slots_teacher UNIQUE (teaching_schedule_id, teacher_id, time_slot_id, slot_start_time, slot_end_time),
+    CONSTRAINT uq_course_assignment_slots_classroom UNIQUE (teaching_schedule_id, classroom_id, time_slot_id, slot_start_time, slot_end_time)
 );
 
 CREATE TABLE student_schedules (
@@ -563,8 +590,10 @@ CREATE TABLE solver_runs (
     run_type         VARCHAR(20)  NOT NULL,
     academic_period_id UUID       NOT NULL,
     student_id       UUID,
+    teaching_schedule_id UUID,
     status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     requested_by     UUID,
+    seed             INTEGER,
     time_limit_ms    INTEGER      NOT NULL DEFAULT 30000 CHECK (time_limit_ms > 0),
     input_hash       VARCHAR(128),
     result_summary   TEXT,
@@ -577,10 +606,30 @@ CREATE TABLE solver_runs (
         FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE CASCADE,
     CONSTRAINT fk_solver_runs_student
         FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    CONSTRAINT fk_solver_runs_teaching_schedule
+        FOREIGN KEY (teaching_schedule_id) REFERENCES teaching_schedules(id) ON DELETE SET NULL,
     CONSTRAINT fk_solver_runs_requested_by
         FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT chk_solver_runs_type CHECK (run_type IN ('TEACHER', 'STUDENT')),
     CONSTRAINT chk_solver_runs_status CHECK (status IN ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED'))
+);
+
+CREATE TABLE solver_generation_reservations (
+    id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id           UUID         NOT NULL,
+    academic_period_id UUID         NOT NULL,
+    status             VARCHAR(20)  NOT NULL DEFAULT 'ACCEPTED',
+    expires_at         TIMESTAMPTZ  NOT NULL DEFAULT (NOW() + INTERVAL '5 minutes'),
+    consumed_at        TIMESTAMPTZ,
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_solver_generation_reservations_actor
+        FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_solver_generation_reservations_period
+        FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE CASCADE,
+    CONSTRAINT chk_solver_generation_reservations_status
+        CHECK (status IN ('ACCEPTED', 'CONSUMED', 'EXPIRED', 'CANCELLED'))
 );
 
 CREATE TABLE solver_run_conflicts (
@@ -759,10 +808,15 @@ CREATE INDEX idx_student_completed_courses_course_id ON student_completed_course
 
 CREATE INDEX idx_teaching_schedules_period_id ON teaching_schedules(academic_period_id);
 
+CREATE INDEX idx_course_sections_schedule_id ON course_sections(teaching_schedule_id);
+CREATE INDEX idx_course_sections_course_id ON course_sections(course_id);
+CREATE INDEX idx_course_sections_nrc ON course_sections(nrc);
+
 CREATE INDEX idx_course_schedule_assignments_schedule_id ON course_schedule_assignments(teaching_schedule_id);
 CREATE INDEX idx_course_schedule_assignments_course_id ON course_schedule_assignments(course_id);
 CREATE INDEX idx_course_schedule_assignments_component_id ON course_schedule_assignments(course_component_id);
 CREATE INDEX idx_course_schedule_assignments_teacher_id ON course_schedule_assignments(teacher_id);
+CREATE INDEX idx_csa_section_id ON course_schedule_assignments(section_id);
 
 CREATE INDEX idx_course_assignment_slots_schedule_id ON course_assignment_slots(teaching_schedule_id);
 CREATE INDEX idx_course_assignment_slots_course_id ON course_assignment_slots(course_id);
@@ -782,8 +836,15 @@ CREATE INDEX idx_ssic_assignment_id ON student_schedule_item_components(course_a
 CREATE INDEX idx_solver_runs_period_id ON solver_runs(academic_period_id);
 CREATE INDEX idx_solver_runs_student_id ON solver_runs(student_id) WHERE student_id IS NOT NULL;
 CREATE INDEX idx_solver_runs_status ON solver_runs(status);
+CREATE INDEX idx_solver_runs_teaching_schedule_id ON solver_runs(teaching_schedule_id) WHERE teaching_schedule_id IS NOT NULL;
 
 CREATE INDEX idx_solver_run_conflicts_run_id ON solver_run_conflicts(solver_run_id);
+
+CREATE INDEX idx_solver_generation_reservations_actor_window
+    ON solver_generation_reservations(actor_id, created_at DESC)
+    WHERE status IN ('ACCEPTED', 'CONSUMED');
+CREATE INDEX idx_solver_generation_reservations_period
+    ON solver_generation_reservations(academic_period_id);
 
 CREATE INDEX idx_schedule_feedback_events_period_id ON schedule_feedback_events(academic_period_id);
 

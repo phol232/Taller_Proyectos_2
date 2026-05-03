@@ -1,10 +1,30 @@
--- ============================================================
---  Funciones de gestión de courses
--- ============================================================
+-- Sincroniza la fuente de verdad del repo con el contrato real ya aplicado:
+-- weekly_hours en courses y course_components debe ser NUMERIC(3,1).
+-- Además re-publica las funciones afectadas para evitar truncamientos.
 
--- ----------------------------------------------------------
--- fn_create_course
--- ----------------------------------------------------------
+BEGIN;
+
+ALTER TABLE courses
+    ALTER COLUMN weekly_hours TYPE NUMERIC(3,1) USING weekly_hours::NUMERIC(3,1);
+
+ALTER TABLE courses
+    DROP CONSTRAINT IF EXISTS courses_weekly_hours_check;
+
+ALTER TABLE courses
+    ADD CONSTRAINT courses_weekly_hours_check CHECK (weekly_hours > 0);
+
+ALTER TABLE course_components
+    ALTER COLUMN weekly_hours TYPE NUMERIC(3,1) USING weekly_hours::NUMERIC(3,1);
+
+ALTER TABLE course_components
+    DROP CONSTRAINT IF EXISTS course_components_weekly_hours_check;
+
+ALTER TABLE course_components
+    ADD CONSTRAINT course_components_weekly_hours_check CHECK (weekly_hours > 0);
+
+DROP FUNCTION IF EXISTS fn_create_course(VARCHAR(50), VARCHAR(255), INTEGER, INTEGER, INTEGER, INTEGER, VARCHAR(100), BOOLEAN);
+DROP FUNCTION IF EXISTS fn_create_course(VARCHAR(50), VARCHAR(255), INTEGER, INTEGER, INTEGER, NUMERIC(3,1), VARCHAR(100), BOOLEAN);
+
 CREATE OR REPLACE FUNCTION fn_create_course(
     p_code               VARCHAR(50),
     p_name               VARCHAR(255),
@@ -44,9 +64,9 @@ BEGIN
 END;
 $$;
 
--- ----------------------------------------------------------
--- fn_update_course
--- ----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_update_course(UUID, VARCHAR(50), VARCHAR(255), INTEGER, INTEGER, INTEGER, INTEGER, VARCHAR(100), BOOLEAN);
+DROP FUNCTION IF EXISTS fn_update_course(UUID, VARCHAR(50), VARCHAR(255), INTEGER, INTEGER, INTEGER, NUMERIC(3,1), VARCHAR(100), BOOLEAN);
+
 CREATE OR REPLACE FUNCTION fn_update_course(
     p_course_id          UUID,
     p_code               VARCHAR(50),
@@ -99,16 +119,8 @@ BEGIN
 END;
 $$;
 
--- ----------------------------------------------------------
--- fn_replace_course_components
--- Reemplaza los componentes horarios de un curso.
--- p_components shape:
---   [{ "componentType": "GENERAL|THEORY|PRACTICE",
---      "weeklyHours": 4,
---      "requiredRoomType": "Aula",
---      "sortOrder": 1,
---      "isActive": true }]
--- ----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_replace_course_components(UUID, JSONB);
+
 CREATE OR REPLACE FUNCTION fn_replace_course_components(
     p_course_id   UUID,
     p_components  JSONB
@@ -138,7 +150,6 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
-    -- Verificar que el curso existe
     IF NOT EXISTS (SELECT 1 FROM courses WHERE id = p_course_id) THEN
         RAISE EXCEPTION 'El curso no existe.'
             USING ERRCODE = '23503';
@@ -164,11 +175,7 @@ BEGIN
         RAISE EXCEPTION 'Los componentes deben ser GENERAL, THEORY o PRACTICE.'
             USING ERRCODE = '22023';
     END IF;
-    -- Nota: no se valida que v_hours_sum coincida con weekly_hours del curso,
-    -- ya que ambos se gestionan de forma independiente (modal Horarios vs formulario del curso).
 
-    -- Desplazar sort_order de los componentes existentes para evitar conflictos de unicidad
-    -- durante el upsert (ej. cambio GENERAL → THEORY+PRACTICE ambos empezando en sort_order=1)
     UPDATE course_components
     SET    sort_order = sort_order + 10000
     WHERE  course_id = p_course_id;
@@ -248,202 +255,8 @@ BEGIN
 END;
 $$;
 
--- ----------------------------------------------------------
--- fn_get_course_by_id
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_get_course_by_id(
-    p_course_id UUID
-)
-RETURNS courses
-LANGUAGE plpgsql
-STABLE
-SECURITY INVOKER
-AS $$
-DECLARE
-    v_course courses;
-BEGIN
-    SELECT * INTO v_course
-    FROM   courses
-    WHERE  id = p_course_id;
-    RETURN v_course;
-END;
-$$;
+DROP FUNCTION IF EXISTS fn_list_course_components(UUID);
 
--- ----------------------------------------------------------
--- fn_list_all_courses
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_list_all_courses()
-RETURNS SETOF courses
-LANGUAGE plpgsql
-STABLE
-SECURITY INVOKER
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT *
-    FROM   courses
-    ORDER  BY code ASC;
-END;
-$$;
-
--- ----------------------------------------------------------
--- fn_search_courses
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_search_courses(
-    p_query VARCHAR(255)
-)
-RETURNS SETOF courses
-LANGUAGE plpgsql
-STABLE
-SECURITY INVOKER
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT *
-    FROM   courses
-    WHERE  unaccent(LOWER(code)) LIKE '%' || unaccent(LOWER(p_query)) || '%'
-       OR  unaccent(LOWER(name)) LIKE '%' || unaccent(LOWER(p_query)) || '%'
-    ORDER  BY code ASC;
-END;
-$$;
-
--- ----------------------------------------------------------
--- fn_deactivate_course
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_deactivate_course(
-    p_course_id UUID
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-BEGIN
-    UPDATE courses
-    SET    is_active = FALSE
-    WHERE  id = p_course_id;
-END;
-$$;
-
--- ----------------------------------------------------------
--- fn_delete_course
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_delete_course(
-    p_course_id UUID
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-DECLARE
-    v_assignments_count   INTEGER;
-    v_prereq_of_count     INTEGER;
-    v_completed_count     INTEGER;
-BEGIN
-    SELECT COUNT(*) INTO v_assignments_count
-    FROM   course_schedule_assignments WHERE course_id = p_course_id;
-
-    IF v_assignments_count > 0 THEN
-        RAISE EXCEPTION 'El curso tiene % asignación(es) de horario y no puede eliminarse. Desactívelo en su lugar.', v_assignments_count
-            USING ERRCODE = '23503';
-    END IF;
-
-    SELECT COUNT(*) INTO v_prereq_of_count
-    FROM   course_prerequisites WHERE prerequisite_course_id = p_course_id;
-
-    IF v_prereq_of_count > 0 THEN
-        RAISE EXCEPTION 'El curso es prerrequisito de % curso(s) y no puede eliminarse.', v_prereq_of_count
-            USING ERRCODE = '23503';
-    END IF;
-
-    SELECT COUNT(*) INTO v_completed_count
-    FROM   student_completed_courses WHERE course_id = p_course_id;
-
-    IF v_completed_count > 0 THEN
-        RAISE EXCEPTION 'El curso tiene % aprobación(es) por estudiantes y no puede eliminarse. Desactívelo en su lugar.', v_completed_count
-            USING ERRCODE = '23503';
-    END IF;
-
-    DELETE FROM course_prerequisites WHERE course_id = p_course_id;
-    DELETE FROM courses WHERE id = p_course_id;
-END;
-$$;
-
--- ----------------------------------------------------------
--- fn_add_course_prerequisite_by_code
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_add_course_prerequisite_by_code(
-    p_course_id          UUID,
-    p_prerequisite_code  VARCHAR(50)
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-DECLARE
-    v_prerequisite_id UUID;
-BEGIN
-    SELECT id INTO v_prerequisite_id
-    FROM   courses
-    WHERE  code = TRIM(p_prerequisite_code);
-
-    IF v_prerequisite_id IS NULL THEN
-        RAISE EXCEPTION 'El curso prerrequisito no existe: %', p_prerequisite_code;
-    END IF;
-
-    IF v_prerequisite_id = p_course_id THEN
-        RAISE EXCEPTION 'Un curso no puede ser prerrequisito de sí mismo.';
-    END IF;
-
-    INSERT INTO course_prerequisites(course_id, prerequisite_course_id)
-    VALUES (p_course_id, v_prerequisite_id)
-    ON CONFLICT (course_id, prerequisite_course_id) DO NOTHING;
-END;
-$$;
-
--- ----------------------------------------------------------
--- fn_clear_course_prerequisites
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_clear_course_prerequisites(
-    p_course_id UUID
-)
-RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-SECURITY INVOKER
-AS $$
-BEGIN
-    DELETE FROM course_prerequisites
-    WHERE  course_id = p_course_id;
-END;
-$$;
-
--- ----------------------------------------------------------
--- fn_list_course_prerequisite_codes
--- ----------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_list_course_prerequisite_codes(
-    p_course_id UUID
-)
-RETURNS TABLE(prerequisite_code VARCHAR(50))
-LANGUAGE plpgsql
-STABLE
-SECURITY INVOKER
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT c.code
-    FROM   course_prerequisites cp
-    JOIN   courses c ON c.id = cp.prerequisite_course_id
-    WHERE  cp.course_id = p_course_id
-    ORDER  BY c.code ASC;
-END;
-$$;
-
--- ----------------------------------------------------------
--- fn_list_course_components
--- ----------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_list_course_components(
     p_course_id UUID
 )
@@ -469,9 +282,8 @@ BEGIN
 END;
 $$;
 
--- ----------------------------------------------------------
--- fn_list_courses_paged
--- ----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_list_courses_paged(INTEGER, INTEGER);
+
 CREATE OR REPLACE FUNCTION fn_list_courses_paged(
     p_page      INTEGER DEFAULT 1,
     p_page_size INTEGER DEFAULT 12
@@ -506,9 +318,8 @@ BEGIN
 END;
 $$;
 
--- ----------------------------------------------------------
--- fn_search_courses_paged
--- ----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_search_courses_paged(VARCHAR(255), INTEGER, INTEGER);
+
 CREATE OR REPLACE FUNCTION fn_search_courses_paged(
     p_query     VARCHAR(255),
     p_page      INTEGER DEFAULT 1,
@@ -545,29 +356,92 @@ BEGIN
     OFFSET (GREATEST(p_page, 1) - 1) * GREATEST(p_page_size, 1);
 END;
 $$;
--- ----------------------------------------------------------
--- fn_find_courses_by_codes
--- Lookup courses by a list of codes (used for prereq hydration)
--- ----------------------------------------------------------
-DROP FUNCTION IF EXISTS fn_find_courses_by_codes(VARCHAR[]);
 
-CREATE OR REPLACE FUNCTION fn_find_courses_by_codes(
-    p_codes VARCHAR[]
+DROP FUNCTION IF EXISTS fn_list_classroom_courses(UUID);
+
+CREATE OR REPLACE FUNCTION fn_list_classroom_courses(
+    p_classroom_id UUID
 )
-RETURNS SETOF courses
+RETURNS TABLE(
+    course_id    UUID,
+    course_code  VARCHAR(50),
+    course_name  VARCHAR(255),
+    cycle        INTEGER,
+    credits      INTEGER,
+    weekly_hours NUMERIC(3,1),
+    required_room_type VARCHAR(100),
+    is_active    BOOLEAN
+)
 LANGUAGE plpgsql
 STABLE
 SECURITY INVOKER
 AS $$
 BEGIN
-    IF p_codes IS NULL OR array_length(p_codes, 1) IS NULL THEN
-        RETURN;
-    END IF;
-
     RETURN QUERY
-    SELECT *
-    FROM   courses
-    WHERE  code = ANY(p_codes)
-    ORDER  BY code ASC;
+    SELECT c.id, c.code, c.name, c.cycle, c.credits,
+           c.weekly_hours, c.required_room_type, c.is_active
+    FROM   classroom_courses cc
+    JOIN   courses c ON c.id = cc.course_id
+    WHERE  cc.classroom_id = p_classroom_id
+    ORDER  BY c.code ASC;
 END;
 $$;
+
+DROP FUNCTION IF EXISTS fn_solver_list_active_courses();
+
+CREATE OR REPLACE FUNCTION fn_solver_list_active_courses()
+RETURNS TABLE (
+    id                 UUID,
+    code               VARCHAR,
+    name               VARCHAR,
+    cycle              INTEGER,
+    credits            INTEGER,
+    required_credits   INTEGER,
+    weekly_hours       NUMERIC(3,1),
+    required_room_type VARCHAR
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT c.id, c.code, c.name, c.cycle, c.credits, c.required_credits,
+           c.weekly_hours, c.required_room_type
+      FROM courses c
+     WHERE c.is_active = TRUE;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS fn_solver_list_active_course_components();
+
+CREATE OR REPLACE FUNCTION fn_solver_list_active_course_components()
+RETURNS TABLE (
+    id                 UUID,
+    course_id          UUID,
+    component_type     VARCHAR,
+    weekly_hours       NUMERIC(3,1),
+    required_room_type VARCHAR,
+    sort_order         INTEGER
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT cc.id,
+           cc.course_id,
+           cc.component_type,
+           cc.weekly_hours,
+           cc.required_room_type,
+           cc.sort_order
+      FROM course_components cc
+      JOIN courses c ON c.id = cc.course_id
+     WHERE c.is_active = TRUE
+       AND cc.is_active = TRUE
+     ORDER BY c.code ASC, cc.sort_order ASC;
+END;
+$$;
+
+COMMIT;
