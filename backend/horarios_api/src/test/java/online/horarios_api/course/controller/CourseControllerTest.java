@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -64,7 +65,7 @@ class CourseControllerTest {
     void listCourses_returnsOk() throws Exception {
         when(courseQueryUseCase.listCoursesPaged(1, 12)).thenReturn(Page.of(List.of(
                 new Course(UUID.randomUUID(), "INF-101", "Curso", 1, 4, 0,
-                        4, "Presencial", true, List.of(), List.of("MAT-001"), Instant.now(), Instant.now())
+                        BigDecimal.valueOf(4.0), "Presencial", true, List.of(), List.of("MAT-001"), Instant.now(), Instant.now())
         ), 1, 12, 1));
 
         mockMvc.perform(get("/api/courses"))
@@ -75,7 +76,7 @@ class CourseControllerTest {
     @Test
     @DisplayName("POST /api/courses: payload inválido → 400")
     void createCourse_invalidPayload_returns400() throws Exception {
-        CourseRequest request = new CourseRequest("", "", 0, 0, 0, 0, null, true, null, List.of());
+        CourseRequest request = new CourseRequest("", "", 0, 0, 0, BigDecimal.ZERO, null, true, null, List.of());
 
         mockMvc.perform(post("/api/courses")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -89,13 +90,13 @@ class CourseControllerTest {
     @DisplayName("POST /api/courses: payload válido → 200")
     void createCourse_validPayload_returns200() throws Exception {
         Course course = new Course(UUID.randomUUID(), "INF-101", "Curso", 1, 4, 0,
-                4, "Presencial", true, List.of(), List.of(), Instant.now(), Instant.now());
+                BigDecimal.valueOf(4.0), "Presencial", true, List.of(), List.of(), Instant.now(), Instant.now());
         when(courseCommandUseCase.createCourse(any())).thenReturn(course);
 
         mockMvc.perform(post("/api/courses")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new CourseRequest("INF-101", "Curso", 1, 4, 0, 4, "Presencial", true, null, List.of())
+                                new CourseRequest("INF-101", "Curso", 1, 4, 0, BigDecimal.valueOf(4.0), "Presencial", true, null, List.of())
                         )))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("INF-101"))

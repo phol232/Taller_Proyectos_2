@@ -15,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -52,11 +53,11 @@ class CourseServiceTest {
                 3,
                 4,
                 12,
-                6,
+                BigDecimal.valueOf(6.0),
                 " lab ",
                 null,
-                List.of(new CourseComponentData("THEORY", 3, "Aula", 1, true),
-                        new CourseComponentData("PRACTICE", 3, "Lab", 2, true)),
+                List.of(new CourseComponentData("THEORY", BigDecimal.valueOf(3.0), "Aula", 1, true),
+                        new CourseComponentData("PRACTICE", BigDecimal.valueOf(3.0), "Lab", 2, true)),
                 List.of("mat-001", "MAT-001", " fis-100 ")
         ));
 
@@ -83,7 +84,7 @@ class CourseServiceTest {
                 1,
                 4,
                 0,
-                4,
+                BigDecimal.valueOf(4.0),
                 "lab",
                 true,
                 null,

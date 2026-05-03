@@ -2,12 +2,13 @@ package online.horarios_api.course.infrastructure.in.web.dto;
 
 import online.horarios_api.course.domain.model.CourseComponent;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public record CourseComponentResponse(
         UUID id,
         String componentType,
-        int weeklyHours,
+        BigDecimal weeklyHours,
         String requiredRoomType,
         int sortOrder,
         boolean isActive

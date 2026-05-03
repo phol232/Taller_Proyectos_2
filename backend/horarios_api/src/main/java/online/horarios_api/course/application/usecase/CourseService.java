@@ -12,6 +12,7 @@ import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -125,8 +126,8 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
         if (requiredCredits < 0) {
             throw new BadRequestException("Los créditos requeridos no pueden ser negativos.");
         }
-        if (command.weeklyHours() < 1) {
-            throw new BadRequestException("Las horas semanales deben ser mayores o iguales a 1.");
+        if (command.weeklyHours() == null || command.weeklyHours().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Las horas semanales deben ser mayores a 0.");
         }
 
         List<CourseComponentData> components = normalizeComponents(
@@ -166,7 +167,7 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
 
     private List<CourseComponentData> normalizeComponents(
             List<CourseComponentData> components,
-            int courseWeeklyHours,
+            BigDecimal courseWeeklyHours,
             String fallbackRoomType
     ) {
         if (components == null || components.isEmpty()) {
@@ -223,8 +224,8 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
         if (!List.of("GENERAL", "THEORY", "PRACTICE").contains(type)) {
             throw new BadRequestException("El tipo de componente debe ser GENERAL, THEORY o PRACTICE.");
         }
-        if (component.weeklyHours() < 1) {
-            throw new BadRequestException("Las horas del componente deben ser mayores o iguales a 1.");
+        if (component.weeklyHours() == null || component.weeklyHours().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Las horas del componente deben ser mayores a 0.");
         }
         String componentRoomType = normalizeNullable(component.requiredRoomType());
         if (componentRoomType == null) {

@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.PreparedStatementCallback;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -38,7 +39,7 @@ public class CourseJdbcAdapter implements CoursePort {
             rs.getInt("cycle"),
             rs.getInt("credits"),
             rs.getInt("required_credits"),
-            rs.getInt("weekly_hours"),
+            getBigDecimal(rs, "weekly_hours"),
             rs.getString("required_room_type"),
             rs.getBoolean("is_active"),
             List.of(),
@@ -216,7 +217,7 @@ public class CourseJdbcAdapter implements CoursePort {
                 (rs, rowNum) -> new CourseComponent(
                         rs.getObject("id", UUID.class),
                         rs.getString("component_type"),
-                        rs.getInt("weekly_hours"),
+                        getBigDecimal(rs, "weekly_hours"),
                         rs.getString("required_room_type"),
                         rs.getInt("sort_order"),
                         rs.getBoolean("is_active")
@@ -280,5 +281,10 @@ public class CourseJdbcAdapter implements CoursePort {
 
     private Instant toInstant(ResultSet rs, String column) throws SQLException {
         return rs.getTimestamp(column) != null ? rs.getTimestamp(column).toInstant() : null;
+    }
+
+    private BigDecimal getBigDecimal(ResultSet rs, String column) throws SQLException {
+        BigDecimal value = rs.getBigDecimal(column);
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

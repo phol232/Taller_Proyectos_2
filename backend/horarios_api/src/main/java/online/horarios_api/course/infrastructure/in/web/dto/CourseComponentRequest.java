@@ -1,14 +1,19 @@
 package online.horarios_api.course.infrastructure.in.web.dto;
 
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Min;
+
+import java.math.BigDecimal;
 
 public record CourseComponentRequest(
         @NotBlank(message = "El tipo de componente es obligatorio")
         String componentType,
 
-        @Min(value = 1, message = "Las horas del componente deben ser mayores o iguales a 1")
-        Integer weeklyHours,
+        @DecimalMin(value = "0.1", message = "Las horas del componente deben ser mayores a 0")
+        @Digits(integer = 2, fraction = 1, message = "Las horas del componente deben tener máximo 1 decimal")
+        BigDecimal weeklyHours,
 
         String requiredRoomType,
 

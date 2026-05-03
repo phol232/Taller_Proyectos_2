@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @RestController
@@ -125,7 +126,7 @@ public class CourseController {
         return request.components().stream()
                 .map(component -> new CourseComponentData(
                         component.componentType(),
-                        component.weeklyHours() == null ? 0 : component.weeklyHours(),
+                        component.weeklyHours() == null ? BigDecimal.ZERO : component.weeklyHours(),
                         component.requiredRoomType(),
                         component.sortOrder(),
                         component.isActive()

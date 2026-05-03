@@ -1,5 +1,6 @@
 package online.horarios_api.course.domain.model;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public record CourseData(
@@ -8,7 +9,7 @@ public record CourseData(
         Integer cycle,
         int credits,
         Integer requiredCredits,
-        int weeklyHours,
+        BigDecimal weeklyHours,
         String requiredRoomType,
         Boolean isActive,
         List<CourseComponentData> components,
