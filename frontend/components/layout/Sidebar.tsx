@@ -110,6 +110,12 @@ function getNavGroups(t: TranslationDictionary): Record<Role, NavGroup[]> {
           { label: "Períodos", href: "/admin/academic-periods", icon: <CalendarDays className="h-4 w-4" />, color: "#7c3aed", bgColor: "rgba(124,58,237,0.15)" },
         ],
       },
+      {
+        group: t.sidebar.nav.schedules,
+        items: [
+          { label: t.sidebar.nav.generate, href: "/admin/schedule/generate", icon: <CalendarCheck className="h-4 w-4" />, color: "#16a34a", bgColor: "rgba(22,163,74,0.15)" },
+        ],
+      },
     ],
   };
 }

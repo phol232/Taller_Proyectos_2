@@ -86,7 +86,7 @@ async function waitForGenerationRun(
   return getScheduleGenerationRun(runId);
 }
 
-export default function GenerateSchedulePage() {
+export default function AdminGenerateSchedulePage() {
   const { t } = useTranslation();
   const router = useRouter();
   const [academicPeriodId, setAcademicPeriodId] = useState("");
@@ -611,7 +611,7 @@ export default function GenerateSchedulePage() {
                   cancelling={cancellingScheduleId === option.id}
                   onConfirm={() => handleConfirm(option.id)}
                   onCancel={() => setPendingCancelOption(option)}
-                  onView={() => router.push(`/coordinator/schedule/view?scheduleId=${option.id}`)}
+                  onView={() => router.push(`/admin/schedule/view?scheduleId=${option.id}`)}
                 />
               ))
             : (
@@ -672,7 +672,6 @@ function ClassroomToggle({
           : "bg-white ring-1 ring-[#e5e5e5] hover:ring-[#c4b5fd] hover:bg-[#faf5ff]",
       )}
     >
-      {/* Name + dot */}
       <span className="flex items-center justify-between gap-2">
         <span className={cn(
           "text-xs font-semibold leading-tight",
@@ -685,7 +684,6 @@ function ClassroomToggle({
           selected ? "bg-[#6B21A8]" : "bg-[#e5e5e5]",
         )} />
       </span>
-      {/* Type + capacity */}
       <span className="flex items-center gap-1.5">
         <span className={cn(
           "rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide",

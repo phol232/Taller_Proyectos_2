@@ -62,8 +62,8 @@ export const adminApi = {
   deactivateTeacher: async (id: string) => api.post(`/api/teachers/${id}/deactivate`),
   deleteTeacher: async (id: string) => api.delete(`/api/teachers/${id}`),
 
-  listClassrooms: async (page = 1) =>
-    (await api.get<PagedResult<ClassroomAdmin>>("/api/classrooms", { params: { page, pageSize: 12 } })).data,
+  listClassrooms: async (page = 1, pageSize = 12) =>
+    (await api.get<PagedResult<ClassroomAdmin>>("/api/classrooms", { params: { page, pageSize } })).data,
   searchClassrooms: async (query: string, page = 1) =>
     (await api.get<PagedResult<ClassroomAdmin>>("/api/classrooms/search", { params: { q: query, page, pageSize: 12 } })).data,
   createClassroom: async (payload: Partial<ClassroomAdmin>) =>

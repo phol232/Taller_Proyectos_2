@@ -49,6 +49,7 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { SelectField } from "@/components/admin/SelectField";
 import { FiltersPopover, type StatusFilter } from "@/components/admin/FiltersPopover";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
+import { formatDecimal, splitHoursInTenths } from "@/lib/decimalFormat";
 import { courseSchema } from "@/lib/validators/course.schema";
 import { toastError, toastSuccess, cn } from "@/lib/utils";
 import { useAdminEvents } from "@/hooks/useAdminEvents";
@@ -100,6 +101,17 @@ function flattenErrors(error: z.ZodError): Record<string, string> {
     if (key && !acc[key]) acc[key] = issue.message;
     return acc;
   }, {});
+}
+
+const DECIMAL_STEP = "0.1";
+const DECIMAL_EPSILON = 0.000001;
+
+function parseNumericInput(value: string): number {
+  return value === "" ? 0 : Number(value);
+}
+
+function areNumbersEqual(left: number, right: number): boolean {
+  return Math.abs(left - right) < DECIMAL_EPSILON;
 }
 
 // ─── Form types ───────────────────────────────────────────────────────────────
@@ -166,11 +178,11 @@ function normalizeCourseComponents(course: CourseAdmin): CourseComponentAdmin[] 
 }
 
 function summarizeComponents(components: CourseComponentAdmin[] | undefined, fallbackHours: number) {
-  if (!components || components.length === 0) return `${fallbackHours} h/sem`;
+  if (!components || components.length === 0) return `${formatDecimal(fallbackHours)} h/sem`;
   return components
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((component) => `${component.weeklyHours} ${COMPONENT_LABELS[component.componentType].toLowerCase()}`)
+    .map((component) => `${formatDecimal(component.weeklyHours)} ${COMPONENT_LABELS[component.componentType].toLowerCase()}`)
     .join(" + ");
 }
 
@@ -398,24 +410,13 @@ export default function CoursesPage() {
     setActiveScheduleCourse(updated);
   }
 
-  function updateComponents(components: CourseComponentAdmin[]) {
-    const ordered = components.map((component, index) => ({ ...component, sortOrder: index + 1 }));
-    const weeklyHours = ordered.reduce((sum, component) => sum + component.weeklyHours, 0);
-    setForm((prev) => ({
-      ...prev,
-      components: ordered,
-      weeklyHours,
-      requiredRoomType: ordered[0]?.requiredRoomType ?? prev.requiredRoomType,
-    }));
-  }
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <PageShell
       title="Cursos"
       actions={
-        <Button onClick={openCreate} className="h-10 rounded-md bg-[#6B21A8] px-4 text-white hover:bg-[#581C87]">
+        <Button onClick={openCreate} size="md">
           <Plus className="h-4 w-4" />
           Nuevo curso
         </Button>
@@ -456,6 +457,7 @@ export default function CoursesPage() {
                   <Input
                     type="number"
                     min={0}
+                    step={DECIMAL_STEP}
                     value={minCredits}
                     onChange={(e) => setMinCredits(e.target.value)}
                     placeholder="Mín."
@@ -463,6 +465,7 @@ export default function CoursesPage() {
                   <Input
                     type="number"
                     min={0}
+                    step={DECIMAL_STEP}
                     value={maxCredits}
                     onChange={(e) => setMaxCredits(e.target.value)}
                     placeholder="Máx."
@@ -587,8 +590,9 @@ export default function CoursesPage() {
                     type="number"
                     min={1}
                     max={6}
+                    step={1}
                     value={form.credits}
-                    onChange={(e) => setForm((p) => ({ ...p, credits: Number(e.target.value) }))}
+                    onChange={(e) => setForm((p) => ({ ...p, credits: parseNumericInput(e.target.value) }))}
                   />
                 </FormField>
               </div>
@@ -596,17 +600,19 @@ export default function CoursesPage() {
                 <FormField label="Horas semanales" error={errors.weeklyHours}>
                   <Input
                     type="number"
-                    min={1}
-                    value={form.weeklyHours}
-                    onChange={(e) => setForm((p) => ({ ...p, weeklyHours: Number(e.target.value) }))}
+                    min={0.1}
+                    step={DECIMAL_STEP}
+                    value={formatDecimal(form.weeklyHours)}
+                    onChange={(e) => setForm((p) => ({ ...p, weeklyHours: parseNumericInput(e.target.value) }))}
                   />
                 </FormField>
                 <FormField label="Créditos requeridos" error={errors.requiredCredits}>
                   <Input
                     type="number"
                     min={0}
-                    value={form.requiredCredits}
-                    onChange={(e) => setForm((p) => ({ ...p, requiredCredits: Number(e.target.value) }))}
+                    step={DECIMAL_STEP}
+                    value={formatDecimal(form.requiredCredits)}
+                    onChange={(e) => setForm((p) => ({ ...p, requiredCredits: parseNumericInput(e.target.value) }))}
                   />
                 </FormField>
               </div>
@@ -625,11 +631,11 @@ export default function CoursesPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+            <Button variant="outline" size="md" onClick={() => setDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={() => void handleSubmit()} disabled={submitting}>
-              {submitting ? "Guardando…" : editing ? "Guardar" : "Crear"}
+            <Button size="md" onClick={() => void handleSubmit()} disabled={submitting}>
+              {submitting ? "Guardando…" : editing ? "Guardar curso" : "Crear curso"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -679,7 +685,7 @@ function CourseComponentsEditor({
       onChange([{
         id: first?.componentType === "GENERAL" ? first.id : null,
         componentType: "GENERAL",
-        weeklyHours: Math.max(1, value.reduce((sum, component) => sum + component.weeklyHours, 0) || 4),
+        weeklyHours: Math.max(0.1, value.reduce((sum, component) => sum + component.weeklyHours, 0) || 4),
         requiredRoomType: first?.requiredRoomType ?? "",
         sortOrder: 1,
         isActive: true,
@@ -687,11 +693,11 @@ function CourseComponentsEditor({
       return;
     }
     const roomType = value[0]?.requiredRoomType ?? "";
-    const total = Math.max(2, value.reduce((sum, component) => sum + component.weeklyHours, 0) || 4);
-    const theoryHours = Math.max(1, Math.floor(total / 2));
+    const total = Math.max(0.2, value.reduce((sum, component) => sum + component.weeklyHours, 0) || 4);
+    const { theoryHours, practiceHours } = splitHoursInTenths(total);
     onChange([
       { id: null, componentType: "THEORY", weeklyHours: theoryHours, requiredRoomType: roomType, sortOrder: 1, isActive: true },
-      { id: null, componentType: "PRACTICE", weeklyHours: Math.max(1, total - theoryHours), requiredRoomType: roomType, sortOrder: 2, isActive: true },
+      { id: null, componentType: "PRACTICE", weeklyHours: practiceHours, requiredRoomType: roomType, sortOrder: 2, isActive: true },
     ]);
   }
 
@@ -749,9 +755,10 @@ function CourseComponentsEditor({
             <FormField label="Horas" error={fieldErrors[`components.${index}.weeklyHours`]}>
               <Input
                 type="number"
-                min={1}
-                value={component.weeklyHours}
-                onChange={(event) => updateComponent(index, { weeklyHours: Number(event.target.value) })}
+                min={0.1}
+                step={DECIMAL_STEP}
+                value={formatDecimal(component.weeklyHours)}
+                onChange={(event) => updateComponent(index, { weeklyHours: parseNumericInput(event.target.value) })}
               />
             </FormField>
             <FormField label="Tipo de aula" error={fieldErrors[`components.${index}.requiredRoomType`]}>
@@ -818,12 +825,12 @@ function CourseCard({
         {requiredCredits > 0 && (
           <div className="flex items-center gap-2">
             <Target className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-            <span className="text-xs text-muted-foreground">{requiredCredits} créditos requeridos</span>
+            <span className="text-xs text-muted-foreground">{formatDecimal(requiredCredits)} créditos requeridos</span>
           </div>
         )}
         <div className="flex items-center gap-2">
           <Clock className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-          <span className="text-xs text-muted-foreground">{course.weeklyHours} h/sem · {summarizeComponents(course.components, course.weeklyHours)}</span>
+          <span className="text-xs text-muted-foreground">{formatDecimal(course.weeklyHours)} h/sem · {summarizeComponents(course.components, course.weeklyHours)}</span>
         </div>
         {(course.components ?? []).length > 1 && (
           <div className="space-y-1 pl-5">
@@ -832,7 +839,7 @@ function CourseCard({
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((component) => (
                 <p key={component.id ?? component.componentType} className="text-xs text-muted-foreground">
-                  {COMPONENT_LABELS[component.componentType]} · {component.weeklyHours}h · {component.requiredRoomType}
+                  {COMPONENT_LABELS[component.componentType]} · {formatDecimal(component.weeklyHours)}h · {component.requiredRoomType}
                 </p>
               ))}
           </div>
@@ -954,7 +961,7 @@ function PrerequisitesModal({
   const [saving, setSaving]                   = useState(false);
   const [confirmRemove, setConfirmRemove]     = useState<string | null>(null);
   const [detailCode, setDetailCode]           = useState<string | null>(null);
-  const [requiredCreditsDraft, setRequiredCreditsDraft] = useState(0);
+  const [requiredCreditsDraft, setRequiredCreditsDraft] = useState<number>(0);
   const [resolved, setResolved]               = useState<Record<string, CourseAdmin>>({});
   const [searchResults, setSearchResults]     = useState<CourseAdmin[]>([]);
   const [searchLoading, setSearchLoading]     = useState(false);
@@ -1066,8 +1073,8 @@ function PrerequisitesModal({
 
   async function handleSaveRequiredCredits() {
     if (!course) return;
-    if (!Number.isInteger(requiredCreditsDraft) || requiredCreditsDraft < 0) {
-      toastError("Créditos requeridos inválidos", "Ingresa un número entero mayor o igual a 0.");
+    if (Number.isNaN(requiredCreditsDraft) || requiredCreditsDraft < 0) {
+      toastError("Créditos requeridos inválidos", "Ingresa un número mayor o igual a 0.");
       return;
     }
     setSaving(true);
@@ -1135,7 +1142,7 @@ function PrerequisitesModal({
             <span className="text-xs text-muted-foreground">
               {course.prerequisites.length}{" "}
               {course.prerequisites.length === 1 ? "curso requerido" : "cursos requeridos"}
-              {(course.requiredCredits ?? 0) > 0 ? ` · ${course.requiredCredits ?? 0} créditos requeridos` : ""}
+              {(course.requiredCredits ?? 0) > 0 ? ` · ${formatDecimal(course.requiredCredits ?? 0)} créditos requeridos` : ""}
             </span>
           </div>
 
@@ -1148,14 +1155,15 @@ function PrerequisitesModal({
                 <Input
                   type="number"
                   min={0}
-                  value={requiredCreditsDraft}
-                  onChange={(e) => setRequiredCreditsDraft(Number(e.target.value))}
+                  step={DECIMAL_STEP}
+                  value={formatDecimal(requiredCreditsDraft)}
+                  onChange={(e) => setRequiredCreditsDraft(parseNumericInput(e.target.value))}
                   className="h-9 bg-background"
                 />
                 <Button
                   type="button"
                   size="sm"
-                  disabled={saving || requiredCreditsDraft === (course.requiredCredits ?? 0)}
+                  disabled={saving || areNumbersEqual(requiredCreditsDraft, course.requiredCredits ?? 0)}
                   onClick={() => void handleSaveRequiredCredits()}
                 >
                   Guardar
@@ -1206,7 +1214,7 @@ function PrerequisitesModal({
                             </div>
                           </div>
                           <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                            Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
+                            Ciclo {c.cycle ?? 1} · {c.credits} cr · {formatDecimal(c.weeklyHours)}h/sem
                           </span>
                         </button>
                       ))}
@@ -1264,7 +1272,7 @@ function PrerequisitesModal({
                       </div>
                       {c ? (
                         <p className="text-xs text-muted-foreground">
-                          Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
+                          Ciclo {c.cycle ?? 1} · {c.credits} cr · {formatDecimal(c.weeklyHours)}h/sem
                           {c.requiredRoomType ? ` · ${c.requiredRoomType}` : ""}
                         </p>
                       ) : (
@@ -1331,8 +1339,8 @@ function ScheduleModal({
 
     // Validar que la suma de horas coincida con las horas semanales del curso
     const hoursSum = components.reduce((sum, c) => sum + c.weeklyHours, 0);
-    if (hoursSum !== course.weeklyHours) {
-      const msg = `La suma de componentes es ${hoursSum} h — debe ser ${course.weeklyHours} h (horas semanales del curso).`;
+    if (!areNumbersEqual(hoursSum, course.weeklyHours)) {
+      const msg = `La suma de componentes es ${formatDecimal(hoursSum)} h y debe ser ${formatDecimal(course.weeklyHours)} h (horas semanales del curso).`;
       setFieldErrors({ components: msg });
       toastError("No se pueden guardar los componentes", msg);
       return;
@@ -1382,14 +1390,14 @@ function ScheduleModal({
         {/* Resumen actual */}
         {(() => {
           const hoursSum = components.reduce((sum, c) => sum + c.weeklyHours, 0);
-          const match = hoursSum === course.weeklyHours;
+          const match = areNumbersEqual(hoursSum, course.weeklyHours);
           return (
             <div className={`flex items-center gap-2 border-b border-border px-6 py-3 ${match ? "bg-muted/30" : "bg-amber-50 dark:bg-amber-950/30"}`}>
               <Clock className={`h-3.5 w-3.5 ${match ? "text-blue-500" : "text-amber-500"}`} />
               <span className={`text-xs ${match ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400"}`}>
                 {match
-                  ? `${hoursSum} h/sem · ${summarizeComponents(components, course.weeklyHours)}`
-                  : `Suma actual: ${hoursSum} h — debe coincidir con las horas del curso (${course.weeklyHours} h)`}
+                  ? `${formatDecimal(hoursSum)} h/sem · ${summarizeComponents(components, course.weeklyHours)}`
+                  : `Suma actual: ${formatDecimal(hoursSum)} h y debe coincidir con las horas del curso (${formatDecimal(course.weeklyHours)} h)`}
               </span>
             </div>
           );
@@ -1404,10 +1412,10 @@ function ScheduleModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" size="md" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={() => void handleSave()} disabled={saving}>
+          <Button size="md" onClick={() => void handleSave()} disabled={saving}>
             {saving ? "Guardando…" : "Guardar cambios"}
           </Button>
         </div>
@@ -1627,7 +1635,7 @@ function PrerequisitesPicker({
                   </div>
                   {course && (
                     <p className="text-xs text-muted-foreground">
-                      Ciclo {course.cycle ?? 1} · {course.credits} cr · {course.weeklyHours}h/sem
+                      Ciclo {course.cycle ?? 1} · {course.credits} cr · {formatDecimal(course.weeklyHours)}h/sem
                     </p>
                   )}
                 </div>
@@ -1703,8 +1711,8 @@ function PrereqDetailModal({ course, onClose }: { course: CourseAdmin | null; on
           <PrereqRow label="Nombre"          value={course.name} />
           <PrereqRow label="Ciclo"           value={String(course.cycle ?? 1)} />
           <PrereqRow label="Créditos"        value={String(course.credits)} />
-          <PrereqRow label="Créditos requeridos" value={String(course.requiredCredits ?? 0)} />
-          <PrereqRow label="Horas semanales" value={String(course.weeklyHours)} />
+          <PrereqRow label="Créditos requeridos" value={formatDecimal(course.requiredCredits ?? 0)} />
+          <PrereqRow label="Horas semanales" value={formatDecimal(course.weeklyHours)} />
           <PrereqRow label="Componentes" value={summarizeComponents(course.components, course.weeklyHours)} />
           <PrereqRow label="Tipo de aula"    value={course.requiredRoomType ?? "—"} />
           <PrereqRow label="Estado"          value={course.isActive ? "Activo" : "Inactivo"} />

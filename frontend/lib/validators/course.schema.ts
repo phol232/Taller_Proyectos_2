@@ -5,8 +5,7 @@ export const courseComponentSchema = z.object({
   componentType: z.enum(["GENERAL", "THEORY", "PRACTICE"]),
   weeklyHours: z
     .number({ error: "Las horas del componente deben ser un número" })
-    .int()
-    .min(1, "Mínimo 1 hora"),
+    .min(0.1, "Mínimo 0.1 horas"),
   requiredRoomType: z
     .string()
     .trim()
@@ -36,18 +35,16 @@ export const courseSchema = z.object({
     .default(1),
   credits: z
     .number({ error: "Los créditos deben ser un número" })
-    .int()
+    .refine(Number.isInteger, "Los créditos deben ser enteros")
     .min(1, "Mínimo 1 crédito")
     .max(6, "Máximo 6 créditos"),
   requiredCredits: z
     .number({ error: "Los créditos requeridos deben ser un número" })
-    .int()
     .min(0, "No puede ser negativo")
     .default(0),
   weeklyHours: z
     .number({ error: "Las horas deben ser un número" })
-    .int()
-    .min(1, "Mínimo 1 hora semanal"),
+    .min(0.1, "Mínimo 0.1 horas semanales"),
   requiredRoomType: z
     .string()
     .trim()
