@@ -48,17 +48,44 @@ services:
       DB_URL: jdbc:postgresql://db:5432/horarios_db
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      SOLVER_BASE_URL: http://solver:8090
     ports:
       - "8080:8080"
     depends_on:
       - db
       - redis
+      - solver
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 90s
+    networks:
+      - app-network
+
+  # ── Solver CSP Microservice (FastAPI) ───────────────────────
+  solver:
+    build:
+      context: ./solver
+      dockerfile: Dockerfile.prod
+    restart: always
+    env_file:
+      - .env
+    environment:
+      TZ: America/Lima
+      SOLVER_DB_DSN: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/horarios_db
+    ports:
+      - "8090:8090"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - app-network
 

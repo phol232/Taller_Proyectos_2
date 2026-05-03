@@ -45,9 +45,10 @@ services:
     env_file:
       - ./backend/horarios_api/.env
     environment:
-      DB_URL: jdbc:postgresql://db:5432/horarios_db
+      DB_URL: jdbc:postgresql://db:5432/horarios_db_prueba
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      SOLVER_BASE_URL: http://solver:8090
       TZ: America/Lima
     ports:
       - "8080:8080"
@@ -79,8 +80,6 @@ services:
     env_file:
       - ./solver/.env
     environment:
-      # Sobreescribe el DSN del .env para que dentro del contenedor
-      # use el hostname 'db' en lugar de 'localhost'.
       SOLVER_DB_DSN: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/horarios_db_prueba
       TZ: America/Lima
     ports:
