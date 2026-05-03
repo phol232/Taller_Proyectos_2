@@ -335,7 +335,7 @@ export default function TeachersPage() {
     <PageShell
       title="Docentes"
       actions={
-        <Button onClick={openCreate} className="h-10 rounded-md bg-[#6B21A8] px-4 text-white hover:bg-[#581C87]">
+        <Button onClick={openCreate} size="md">
           <Plus className="h-4 w-4" />
           Nuevo docente
         </Button>
@@ -508,11 +508,11 @@ export default function TeachersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+            <Button variant="outline" size="md" onClick={() => setDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={() => void handleSubmit()} disabled={submitting}>
-              {submitting ? "Guardando…" : editing ? "Guardar" : "Crear"}
+            <Button size="md" onClick={() => void handleSubmit()} disabled={submitting}>
+              {submitting ? "Guardando…" : editing ? "Guardar docente" : "Crear docente"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1312,10 +1312,10 @@ function AvailabilityModal({
           <AvailabilityEditor label="" value={availability} onChange={setAvailability} />
         </div>
         <DialogFooter className="border-t border-border px-6 py-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" size="md" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={() => void handleSave()} disabled={saving}>
+          <Button size="md" onClick={() => void handleSave()} disabled={saving}>
             {saving ? "Guardando…" : "Guardar"}
           </Button>
         </DialogFooter>

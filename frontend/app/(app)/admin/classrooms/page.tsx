@@ -39,6 +39,7 @@ import { FiltersPopover, type StatusFilter } from "@/components/admin/FiltersPop
 import { SelectField } from "@/components/admin/SelectField";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
+import { formatDecimal } from "@/lib/decimalFormat";
 import { classroomSchema } from "@/lib/validators/classroom.schema";
 import { cn, toastError, toastSuccess } from "@/lib/utils";
 import { useAdminEvents } from "@/hooks/useAdminEvents";
@@ -321,7 +322,7 @@ export default function ClassroomsPage() {
     <PageShell
       title="Aulas"
       actions={
-        <Button onClick={openCreate} className="h-10 rounded-md bg-[#6B21A8] px-4 text-white hover:bg-[#581C87]">
+        <Button onClick={openCreate} size="md">
           <Plus className="h-4 w-4" />
           Nueva aula
         </Button>
@@ -499,11 +500,11 @@ export default function ClassroomsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+            <Button variant="outline" size="md" onClick={() => setDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={() => void handleSubmit()} disabled={submitting}>
-              {submitting ? "Guardando…" : editing ? "Guardar" : "Crear"}
+            <Button size="md" onClick={() => void handleSubmit()} disabled={submitting}>
+              {submitting ? "Guardando…" : editing ? "Guardar aula" : "Crear aula"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -965,7 +966,7 @@ function ClassroomCoursesModal({
                           {COMPONENT_LABELS[comp.componentType] ?? comp.componentType}
                         </span>
                         <span className="text-xs text-muted-foreground mt-0.5">
-                          {comp.weeklyHours}h/sem{comp.requiredRoomType ? ` · ${comp.requiredRoomType}` : ""}
+                          {formatDecimal(comp.weeklyHours)}h/sem{comp.requiredRoomType ? ` · ${comp.requiredRoomType}` : ""}
                         </span>
                         {selected && (
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white">
@@ -1119,7 +1120,7 @@ function ClassroomCoursesModal({
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
-                              Ciclo {course.cycle ?? 1} · {course.credits} cr · {course.weeklyHours}h/sem
+                              Ciclo {course.cycle ?? 1} · {course.credits} cr · {formatDecimal(course.weeklyHours)}h/sem
                             </p>
                           )
                         ) : (
@@ -1213,10 +1214,10 @@ function AvailabilityModal({
           <AvailabilityEditor label="" value={availability} onChange={setAvailability} />
         </div>
         <DialogFooter className="border-t border-border px-6 py-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" size="md" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={() => void handleSave()} disabled={saving}>
+          <Button size="md" onClick={() => void handleSave()} disabled={saving}>
             {saving ? "Guardando…" : "Guardar"}
           </Button>
         </DialogFooter>

@@ -6,6 +6,7 @@ import { Search, X, BookOpen, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { adminApi } from "@/lib/adminApi";
+import { formatDecimal } from "@/lib/decimalFormat";
 import type { CourseAdmin } from "@/types/admin";
 
 interface ApprovedCoursePickerProps {
@@ -296,7 +297,7 @@ function ApprovedCourseCard({
         </div>
       </div>
       {hasDetails && (
-        <p className="text-xs text-muted-foreground">Ciclo {course.cycle} · {course.credits} cr · {course.weeklyHours}h/sem</p>
+        <p className="text-xs text-muted-foreground">Ciclo {course.cycle} · {course.credits} cr · {formatDecimal(course.weeklyHours)}h/sem</p>
       )}
     </div>
   );
@@ -354,7 +355,7 @@ function CourseDetailModal({
           <Row label="Nombre" value={course.name} />
           <Row label="Ciclo" value={String(course.cycle)} />
           <Row label="Créditos" value={String(course.credits)} />
-          <Row label="Horas semanales" value={String(course.weeklyHours)} />
+          <Row label="Horas semanales" value={formatDecimal(course.weeklyHours)} />
           <Row label="Tipo de aula requerida" value={course.requiredRoomType ?? "—"} />
           <Row label="Estado" value={course.isActive ? "Activo" : "Inactivo"} />
           {course.prerequisites.length > 0 && (
