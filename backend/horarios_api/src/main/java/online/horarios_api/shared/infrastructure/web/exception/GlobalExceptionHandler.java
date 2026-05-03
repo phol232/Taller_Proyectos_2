@@ -2,6 +2,7 @@ package online.horarios_api.shared.infrastructure.web.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import online.horarios_api.scheduling.domain.exception.GenerationRateLimitException;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.ConflictException;
 import online.horarios_api.shared.domain.exception.DuplicateFieldException;
@@ -71,6 +72,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(new ApiError("TOO_MANY_REQUESTS", ex.getMessage()));
+    }
+
+    @ExceptionHandler(GenerationRateLimitException.class)
+    public ResponseEntity<Map<String, Object>> handleGenerationRateLimit(GenerationRateLimitException ex) {
+        log.warn("Rate limit de generación excedido: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Map.of(
+                        "message", ex.getMessage(),
+                        "retryAfterSeconds", ex.getRetryAfterSeconds(),
+                        "remaining", ex.getRemaining()
+                ));
     }
 
     @ExceptionHandler(DuplicateFieldException.class)

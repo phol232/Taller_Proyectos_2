@@ -27,7 +27,7 @@ public class ClassroomController {
     private final ClassroomQueryUseCase classroomQueryUseCase;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
     @Operation(summary = "Listar aulas (paginado)")
     public ResponseEntity<Page<ClassroomResponse>> listAll(
             @RequestParam(defaultValue = "1") int page,
@@ -36,14 +36,14 @@ public class ClassroomController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
     @Operation(summary = "Obtener aula por ID")
     public ResponseEntity<ClassroomResponse> findById(@PathVariable UUID id) {
         return ResponseEntity.ok(ClassroomResponse.from(classroomQueryUseCase.getClassroom(id)));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
     @Operation(summary = "Buscar aulas (paginado)")
     public ResponseEntity<Page<ClassroomResponse>> search(
             @RequestParam String q,

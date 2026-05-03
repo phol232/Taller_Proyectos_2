@@ -31,8 +31,6 @@ public class CatalogController {
     private final CatalogQueryUseCase catalogQueryUseCase;
     private final CatalogCommandUseCase catalogCommandUseCase;
 
-    // ─── Lectura pública (autenticada) ─────────────────────────────
-
     @GetMapping("/facultades")
     public ResponseEntity<List<FacultadResponse>> listFacultades() {
         List<FacultadResponse> result = catalogQueryUseCase.listFacultades().stream()
@@ -49,8 +47,6 @@ public class CatalogController {
                 .toList();
         return ResponseEntity.ok(result);
     }
-
-    // ─── Lectura admin (incluye inactivas) ─────────────────────────
 
     @GetMapping("/facultades/all")
     @PreAuthorize("hasRole('ADMIN')")
@@ -71,8 +67,6 @@ public class CatalogController {
                 .toList();
         return ResponseEntity.ok(result);
     }
-
-    // ─── Mutación: Facultades ──────────────────────────────────────
 
     @PostMapping("/facultades")
     @PreAuthorize("hasRole('ADMIN')")
@@ -107,8 +101,6 @@ public class CatalogController {
         catalogCommandUseCase.deleteFacultad(id);
         return ResponseEntity.noContent().build();
     }
-
-    // ─── Mutación: Carreras ────────────────────────────────────────
 
     @PostMapping("/carreras")
     @PreAuthorize("hasRole('ADMIN')")

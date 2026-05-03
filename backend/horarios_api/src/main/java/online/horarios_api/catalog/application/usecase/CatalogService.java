@@ -17,8 +17,6 @@ public class CatalogService implements CatalogQueryUseCase, CatalogCommandUseCas
 
     private final CatalogPort catalogPort;
 
-    // ─── Query (público autenticado) ────────────────────────────────
-
     @Override
     @Transactional(readOnly = true)
     public List<Facultad> listFacultades() {
@@ -34,8 +32,6 @@ public class CatalogService implements CatalogQueryUseCase, CatalogCommandUseCas
         return catalogPort.listCarrerasByFacultad(facultadId);
     }
 
-    // ─── Query admin (incluye inactivas) ────────────────────────────
-
     @Override
     @Transactional(readOnly = true)
     public List<Facultad> listAllFacultades() {
@@ -50,8 +46,6 @@ public class CatalogService implements CatalogQueryUseCase, CatalogCommandUseCas
         }
         return catalogPort.listAllCarrerasByFacultad(facultadId);
     }
-
-    // ─── Command: facultades ────────────────────────────────────────
 
     @Override
     @Transactional
@@ -78,8 +72,6 @@ public class CatalogService implements CatalogQueryUseCase, CatalogCommandUseCas
     public void deleteFacultad(UUID id) {
         catalogPort.deleteFacultad(id);
     }
-
-    // ─── Command: carreras ──────────────────────────────────────────
 
     @Override
     @Transactional
@@ -108,8 +100,6 @@ public class CatalogService implements CatalogQueryUseCase, CatalogCommandUseCas
     public void deleteCarrera(UUID id) {
         catalogPort.deleteCarrera(id);
     }
-
-    // ─── Validaciones ───────────────────────────────────────────────
 
     private void validateFacultadInput(String code, String name) {
         if (code == null || code.trim().isEmpty()) {
