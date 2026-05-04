@@ -284,10 +284,10 @@ export default function GenerateSchedulePage() {
     >
       <div className="space-y-4">
         {/* ── Wizard ── */}
-        <section className="overflow-hidden rounded-xl border border-[#e5e5e5] bg-white shadow-sm">
+        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 
           {/* Stepper header */}
-          <div className="grid grid-cols-3 border-b border-[#f0f0f0]">
+          <div className="grid grid-cols-3 border-b border-border">
             {([
               { n: 1, label: "Período", sub: "Año académico y solver" },
               { n: 2, label: "Aulas", sub: `${selectedClassroomIds.length} seleccionadas` },
@@ -302,19 +302,19 @@ export default function GenerateSchedulePage() {
                   onClick={() => done && setStep(n)}
                   className={cn(
                     "flex items-center gap-3 px-6 py-4 text-left transition",
-                    idx < 2 && "border-r border-[#f0f0f0]",
-                    done ? "cursor-pointer hover:bg-[#fafafa]" : "cursor-default",
+                    idx < 2 && "border-r border-border",
+                    done ? "cursor-pointer hover:bg-muted" : "cursor-default",
                   )}
                 >
                   <span className={cn(
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition",
-                    done ? "bg-emerald-500 text-white" : active ? "bg-[#6B21A8] text-white" : "bg-[#f0f0f0] text-[#aaa]",
+                    done ? "bg-emerald-500 text-white" : active ? "bg-[#6B21A8] text-white" : "bg-[#f0f0f0] text-muted-foreground",
                   )}>
                     {done ? <CheckCircle2 className="h-4 w-4" /> : n}
                   </span>
                   <div className="min-w-0">
-                    <p className={cn("text-sm font-semibold", active ? "text-[#6B21A8]" : done ? "text-[#171717]" : "text-[#aaa]")}>{label}</p>
-                    <p className="truncate text-[11px] text-[#bbb]">{sub}</p>
+                    <p className={cn("text-sm font-semibold", active ? "text-[#6B21A8]" : done ? "text-foreground" : "text-muted-foreground")}>{label}</p>
+                    <p className="truncate text-[11px] text-muted-foreground/60">{sub}</p>
                   </div>
                   {active && <div className="ml-auto h-0.5 w-6 rounded-full bg-[#6B21A8] self-end mb-0" />}
                 </button>
@@ -329,12 +329,12 @@ export default function GenerateSchedulePage() {
             {step === 1 && (
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-[#171717]">Período académico</label>
+                  <label className="block text-xs font-semibold text-foreground">Período académico</label>
                   <select
                     value={academicPeriodId}
                     onChange={(e) => setAcademicPeriodId(e.target.value)}
                     disabled={periodsLoading}
-                    className="h-10 w-full rounded-lg border border-[#e5e5e5] bg-white px-3 text-sm text-[#171717] outline-none transition focus:border-[#6B21A8] focus:ring-2 focus:ring-[#6B21A8]/20"
+                    className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-[#6B21A8] focus:ring-2 focus:ring-[#6B21A8]/20"
                   >
                     {activePeriods.map((p) => (
                       <option key={p.id} value={p.id}>{getPeriodLabel(p)}</option>
@@ -343,7 +343,7 @@ export default function GenerateSchedulePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-[#171717]">Tiempo máximo del solver</label>
+                  <label className="block text-xs font-semibold text-foreground">Tiempo máximo del solver</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[30_000, 60_000, 120_000].map((val) => (
                       <button
@@ -354,15 +354,15 @@ export default function GenerateSchedulePage() {
                           "h-10 rounded-lg text-sm font-semibold transition",
                           timeLimitMs === val
                             ? "bg-[#6B21A8] text-white shadow-sm"
-                            : "bg-white text-[#555] ring-1 ring-[#e5e5e5] hover:ring-[#6B21A8]/40 hover:text-[#6B21A8]",
+                            : "bg-white text-foreground/80 ring-1 ring-[#e5e5e5] hover:ring-[#6B21A8]/40 hover:text-[#6B21A8]",
                         )}
                       >
                         {Math.round(val / 1000)}s
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-[#aaa]">
-                    Cada generación crea un <span className="font-medium text-[#777]">borrador independiente</span>.
+                  <p className="text-xs text-muted-foreground">
+                    Cada generación crea un <span className="font-medium text-foreground/70">borrador independiente</span>.
                     Confirmar uno cancela los demás del período.
                   </p>
                 </div>
@@ -376,7 +376,7 @@ export default function GenerateSchedulePage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-[#171717]">Aulas incluidas</span>
+                      <span className="text-sm font-semibold text-foreground">Aulas incluidas</span>
                       <span className="rounded-full bg-[#f3e8ff] px-2.5 py-0.5 text-xs font-semibold text-[#6B21A8]">
                         {selectedClassroomIds.length} / {classrooms.length}
                       </span>
@@ -392,7 +392,7 @@ export default function GenerateSchedulePage() {
                       <button
                         type="button"
                         onClick={() => setSelectedClassroomIds([])}
-                        className="h-7 rounded-md px-2.5 text-xs font-medium text-[#999] transition hover:text-[#555]"
+                        className="h-7 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition hover:text-foreground/80"
                       >
                         Limpiar
                       </button>
@@ -400,12 +400,12 @@ export default function GenerateSchedulePage() {
                   </div>
 
                   <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#ccc]" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
                     <Input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Buscar por código o tipo…"
-                      className="h-9 rounded-lg border-[#e5e5e5] pl-9 text-sm placeholder:text-[#ccc]"
+                      className="h-9 rounded-lg border-border pl-9 text-sm placeholder:text-muted-foreground/40"
                     />
                   </div>
 
@@ -420,7 +420,7 @@ export default function GenerateSchedulePage() {
                           "h-7 rounded-full px-3 text-xs font-medium transition",
                           typeFilter === t
                             ? "bg-[#6B21A8] text-white"
-                            : "bg-[#f5f5f5] text-[#555] hover:bg-[#ebe5ff] hover:text-[#6B21A8]",
+                            : "bg-[#f5f5f5] text-foreground/80 hover:bg-[#ebe5ff] hover:text-[#6B21A8]",
                         )}
                       >
                         {t}
@@ -431,7 +431,7 @@ export default function GenerateSchedulePage() {
                   <div className="grid max-h-[300px] grid-cols-3 gap-2 overflow-y-auto p-0.5">
                     {classroomsLoading
                       ? Array.from({ length: 9 }).map((_, i) => (
-                          <div key={i} className="h-[64px] animate-pulse rounded-lg bg-[#f5f5f5]" />
+                          <div key={i} className="h-[64px] animate-pulse rounded-lg bg-muted" />
                         ))
                       : filteredClassrooms.length > 0
                       ? filteredClassrooms.map((c) => (
@@ -443,7 +443,7 @@ export default function GenerateSchedulePage() {
                           />
                         ))
                       : (
-                        <p className="col-span-3 rounded-lg bg-[#fafafa] px-4 py-5 text-sm text-[#bbb] ring-1 ring-[#ebebeb]">
+                        <p className="col-span-3 rounded-lg bg-muted px-4 py-5 text-sm text-muted-foreground ring-1 ring-border">
                           Sin aulas que coincidan.
                         </p>
                       )}
@@ -457,10 +457,10 @@ export default function GenerateSchedulePage() {
                     { label: "Tiempo solver", value: `${Math.round(timeLimitMs / 1000)}s`, accent: true },
                     { label: "Borradores activos", value: options.filter((o) => o.status === "DRAFT").length.toString(), sub: "máx. 5 por período" },
                   ].map(({ label, value, sub, accent }) => (
-                    <div key={label} className="rounded-lg border border-[#f0f0f0] bg-[#fafafa] px-4 py-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[#999]">{label}</p>
+                    <div key={label} className="rounded-lg border border-border bg-muted/50 px-4 py-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
                       <p className={cn("mt-1 text-2xl font-bold", accent ? "text-[#6B21A8]" : "text-emerald-600")}>{value}</p>
-                      {sub && <p className="mt-0.5 text-[10px] text-[#bbb]">{sub}</p>}
+                      {sub && <p className="mt-0.5 text-[10px] text-muted-foreground/60">{sub}</p>}
                     </div>
                   ))}
                 </div>
@@ -471,8 +471,8 @@ export default function GenerateSchedulePage() {
             {step === 3 && (
               <div className="grid gap-4 sm:grid-cols-2">
                 {/* Summary */}
-                <div className="rounded-xl border border-[#f0f0f0] bg-[#fafafa] p-5">
-                  <p className="mb-4 text-[10px] font-semibold uppercase tracking-widest text-[#999]">Resumen de configuración</p>
+                <div className="rounded-xl border border-border bg-muted/50 p-5">
+                  <p className="mb-4 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Resumen de configuración</p>
                   <div className="space-y-2.5">
                     {[
                       { label: "Período", value: selectedPeriod ? `${selectedPeriod.code} · ${selectedPeriod.name}` : "—" },
@@ -481,8 +481,8 @@ export default function GenerateSchedulePage() {
                       { label: "Borradores activos", value: `${options.filter((o) => o.status === "DRAFT").length} / 5` },
                     ].map(({ label, value, accent }) => (
                       <div key={label} className="flex items-center justify-between text-sm">
-                        <span className="text-[#888]">{label}</span>
-                        <span className={cn("font-semibold", accent ? "text-[#6B21A8]" : "text-[#171717]")}>{value}</span>
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className={cn("font-semibold", accent ? "text-[#6B21A8]" : "text-foreground")}>{value}</span>
                       </div>
                     ))}
                   </div>
@@ -493,7 +493,7 @@ export default function GenerateSchedulePage() {
                       </span>
                     ))}
                     {selectedClassrooms.length > 12 && (
-                      <span className="rounded-full bg-[#f5f5f5] px-2 py-0.5 text-[10px] text-[#aaa]">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                         +{selectedClassrooms.length - 12} más
                       </span>
                     )}
@@ -504,7 +504,7 @@ export default function GenerateSchedulePage() {
                 <div className="flex flex-col gap-4 rounded-xl border-2 border-[#6B21A8] bg-[#faf5ff] p-5">
                   <div>
                     <p className="font-semibold text-[#6B21A8]">Crear borrador</p>
-                    <p className="mt-1 text-xs text-[#888]">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       El solver ejecutará {Math.round(timeLimitMs / 1000)}s buscando la mejor distribución
                       de bloques en {selectedClassroomIds.length} aulas. El resultado se añadirá a Opciones generadas.
                     </p>
@@ -526,18 +526,18 @@ export default function GenerateSchedulePage() {
           </div>
 
           {/* Footer nav */}
-          <div className="flex items-center justify-between border-t border-[#f0f0f0] bg-[#fafafa] px-6 py-3">
-            <div className="text-xs text-[#aaa]">
-              {step === 1 && (selectedPeriod ? <>Período: <span className="font-semibold text-[#555]">{selectedPeriod.code} · {selectedPeriod.name.split(" ").slice(0, 3).join(" ")}</span></> : "Selecciona un período")}
-              {step === 2 && <><span className="font-semibold text-[#555]">{selectedClassroomIds.length}</span> aulas seleccionadas para el solver</>}
-              {step === 3 && <>Listo para generar · <span className="font-semibold text-[#555]">{selectedClassroomIds.length} aulas</span> · <span className="font-semibold text-[#555]">{Math.round(timeLimitMs / 1000)}s</span></>}
+          <div className="flex items-center justify-between border-t border-border bg-muted/50 px-6 py-3">
+            <div className="text-xs text-muted-foreground">
+              {step === 1 && (selectedPeriod ? <>Período: <span className="font-semibold text-foreground/80">{selectedPeriod.code} · {selectedPeriod.name.split(" ").slice(0, 3).join(" ")}</span></> : "Selecciona un período")}
+              {step === 2 && <><span className="font-semibold text-foreground/80">{selectedClassroomIds.length}</span> aulas seleccionadas para el solver</>}
+              {step === 3 && <>Listo para generar · <span className="font-semibold text-foreground/80">{selectedClassroomIds.length} aulas</span> · <span className="font-semibold text-foreground/80">{Math.round(timeLimitMs / 1000)}s</span></>}
             </div>
             <div className="flex gap-2">
               {step > 1 && (
                 <Button
                   type="button"
                   onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
-                  className="h-8 rounded-lg bg-white px-4 text-xs font-medium text-[#555] ring-1 ring-[#e5e5e5] hover:bg-[#fafafa]"
+                  className="h-8 rounded-lg bg-card px-4 text-xs font-medium text-foreground/80 ring-1 ring-border hover:bg-muted"
                 >
                   <ArrowRight className="h-3.5 w-3.5 rotate-180" /> Atrás
                 </Button>
@@ -558,10 +558,10 @@ export default function GenerateSchedulePage() {
 
       {/* ── Options table ── */}
       <section className="card-elevated rounded-xl bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ebebeb] px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold text-[#171717]">Opciones generadas</h2>
-            <p className="text-xs text-[#888]">Compara borradores y aprueba el elegido</p>
+            <h2 className="text-sm font-semibold text-foreground">Opciones generadas</h2>
+            <p className="text-xs text-muted-foreground">Compara borradores y aprueba el elegido</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {lastSlotCount !== null && (
@@ -577,7 +577,7 @@ export default function GenerateSchedulePage() {
                 "rounded-full px-3 py-1 text-xs font-medium ring-1",
                 remainingRequests === 0
                   ? "bg-rose-50 text-rose-600 ring-rose-200"
-                  : "bg-[#fafafa] text-[#666] ring-[#ebebeb]",
+                  : "bg-muted text-muted-foreground ring-border",
               )}>
                 {remainingRequests} generaciones restantes
               </span>
@@ -586,20 +586,20 @@ export default function GenerateSchedulePage() {
               type="button"
               onClick={() => refreshOptions()}
               aria-label="Actualizar"
-              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[#888] transition hover:bg-[#fafafa] hover:text-[#444]"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground/90"
             >
               <RefreshCcw className="h-3.5 w-3.5" />
             </button>
-            <span className="rounded-full bg-[#fafafa] px-3 py-1 text-xs font-medium text-[#666] ring-1 ring-[#ebebeb]">
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border">
               {options.filter(o => o.status !== "CANCELLED").length} {options.filter(o => o.status !== "CANCELLED").length === 1 ? "opción" : "opciones"}
             </span>
           </div>
         </div>
 
-        <div className="divide-y divide-[#f0f0f0]">
+        <div className="divide-y divide-border">
           {optionsLoading
             ? Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-[80px] animate-pulse bg-[#fafafa]" />
+                <div key={i} className="h-[80px] animate-pulse bg-muted" />
               ))
             : options.length > 0
             ? options.map((option, i) => (
@@ -616,10 +616,10 @@ export default function GenerateSchedulePage() {
               ))
             : (
               <div className="flex items-start gap-3 px-5 py-8">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#bbb]" />
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/60" />
                 <div>
-                  <p className="text-sm font-medium text-[#444]">Aún no hay opciones para este período.</p>
-                  <p className="mt-0.5 text-xs text-[#888]">Configura las aulas y crea el primer borrador.</p>
+                  <p className="text-sm font-medium text-foreground/90">Aún no hay opciones para este período.</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Configura las aulas y crea el primer borrador.</p>
                 </div>
               </div>
             )}
@@ -669,14 +669,14 @@ function ClassroomToggle({
         "flex flex-col gap-1.5 rounded-lg p-3 text-left transition cursor-pointer w-full",
         selected
           ? "bg-[#f3e8ff] ring-2 ring-[#6B21A8]"
-          : "bg-white ring-1 ring-[#e5e5e5] hover:ring-[#c4b5fd] hover:bg-[#faf5ff]",
+          : "bg-card ring-1 ring-border hover:ring-[#c4b5fd] hover:bg-[#f5f0ff] dark:hover:bg-[#6B21A8]/10",
       )}
     >
       {/* Name + dot */}
       <span className="flex items-center justify-between gap-2">
         <span className={cn(
           "text-xs font-semibold leading-tight",
-          selected ? "text-[#6B21A8]" : "text-[#171717]",
+          selected ? "text-[#6B21A8]" : "text-foreground",
         )}>
           {classroom.name}
         </span>
@@ -689,11 +689,11 @@ function ClassroomToggle({
       <span className="flex items-center gap-1.5">
         <span className={cn(
           "rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide",
-          selected ? "bg-[#e9d5ff] text-[#6B21A8]" : "bg-[#f0f0f0] text-[#888]",
+          selected ? "bg-[#e9d5ff] text-[#6B21A8]" : "bg-[#f0f0f0] text-muted-foreground",
         )}>
           {classroom.type}
         </span>
-        <span className="text-[10px] text-[#bbb]">{classroom.capacity} pers.</span>
+        <span className="text-[10px] text-muted-foreground/60">{classroom.capacity} pers.</span>
       </span>
     </button>
   );
@@ -723,7 +723,7 @@ function ScheduleOptionRow({
     <div className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold text-[#171717]">Opción {index + 1}</span>
+          <span className="text-sm font-semibold text-foreground">Opción {index + 1}</span>
           <span
             className={cn(
               "rounded-full px-2.5 py-px text-[11px] font-medium ring-1",
@@ -735,7 +735,7 @@ function ScheduleOptionRow({
             {isConfirmed ? "Confirmado" : "Borrador"}
           </span>
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-[#888]">
+        <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-muted-foreground">
           <span>{option.offerCount} cursos</span>
           <span>·</span>
           <span>{option.slotCount} bloques</span>
@@ -751,7 +751,7 @@ function ScheduleOptionRow({
             aria-label="Eliminar borrador"
             onClick={onCancel}
             disabled={cancelling}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[#ccc] transition ring-1 ring-[#e5e5e5] hover:bg-rose-50 hover:text-rose-500 hover:ring-rose-200 disabled:opacity-50"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted-foreground/40 transition ring-1 ring-border hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-500 hover:ring-rose-200 disabled:opacity-50"
           >
             {cancelling
               ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -766,8 +766,8 @@ function ScheduleOptionRow({
           className={cn(
             "h-8 rounded-lg text-xs",
             isConfirmed
-              ? "bg-[#fafafa] text-[#aaa] ring-1 ring-[#e5e5e5]"
-              : "bg-[#171717] text-white hover:bg-[#333]",
+              ? "bg-muted text-muted-foreground ring-1 ring-border"
+              : "bg-foreground text-background hover:bg-foreground/80",
           )}
         >
           {confirming
@@ -779,7 +779,7 @@ function ScheduleOptionRow({
           type="button"
           aria-label="Ver detalle"
           onClick={onView}
-          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[#aaa] transition ring-1 ring-[#e5e5e5] hover:bg-[#fafafa] hover:text-[#555]"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition ring-1 ring-border hover:bg-muted hover:text-foreground"
         >
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
