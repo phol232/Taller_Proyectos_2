@@ -1,4 +1,4 @@
-# SPECS.md
+# modelado.md
 
 # Descripción General del Proyecto
 
