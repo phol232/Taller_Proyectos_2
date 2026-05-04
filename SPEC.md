@@ -21,7 +21,7 @@ Este documento define **cómo el equipo especifica los casos de uso** en el proy
 
 **Enfoque del equipo:**
 
-El equipo especifica los casos de uso mediante **especificaciones formales** que sirven como soporte conceptual antes de implementar. Cada caso de uso se documenta en `.kiro/specs/{feature-name}/` con tres componentes:
+El equipo especifica los casos de uso mediante **especificaciones formales** que sirven como soporte conceptual antes de implementar. Cada caso de uso se documenta en `docs/specs/{feature-name}/` con tres componentes:
 
 1. **requirements.md** - Define QUÉ debe hacer el sistema (requisitos funcionales, no funcionales, criterios de aceptación)
 2. **design.md** - Define CÓMO lo va a hacer técnicamente (arquitectura, modelo de datos, APIs)
@@ -35,7 +35,7 @@ Cada especificación incluye criterios de validación verificables:
 - **Estrategia de validación** con pruebas específicas por capa
 - **Checklists de completitud** antes, durante y después de implementar
 
-**Regla principal para agentes de IA:** Ningún agente puede escribir código de una funcionalidad nueva sin antes crear o leer su especificación en `.kiro/specs/{feature-name}/`.
+**Regla principal para agentes de IA:** Ningún agente puede escribir código de una funcionalidad nueva sin antes crear o leer su especificación en `docs/specs/{feature-name}/`.
 
 **Capas del sistema:**
 - **Frontend:** Next.js + React + TypeScript
@@ -220,7 +220,7 @@ Antes de marcar un caso de uso como completado, se verifica:
 
 ### Ejemplo completo: Caso de uso "Crear Horario"
 
-**Ubicación:** `.kiro/specs/create-schedule/`
+**Ubicación:** `docs/specs/create-schedule/`
 
 **requirements.md:**
 - RF-1: Crear horario con nombre, período y estado
@@ -253,7 +253,7 @@ Antes de marcar un caso de uso como completado, se verifica:
 
 Antes de implementar cualquier funcionalidad:
 
-1. **Busca si existe un spec:** Revisa `.kiro/specs/{feature-name}/`
+1. **Busca si existe un spec:** Revisa `docs/specs/{feature-name}/`
 2. **Si existe:** Lee `requirements.md`, `design.md` y `tasks.md` completos
 3. **Si no existe:** Crea el spec primero siguiendo las plantillas de este documento
 4. **Nunca asumas:** Si no hay spec, no inventes la solución
@@ -307,14 +307,14 @@ Después de escribir código:
 
 ## Estructura de especificaciones
 
-**Ubicación:** `.kiro/specs/{feature-name}/`
+**Ubicación:** `docs/specs/{feature-name}/`
 
 **Archivos obligatorios:**
 
 ```
-.kiro/specs/
+docs/specs/
 └── {feature-name}/
-    ├── .config.kiro       # Configuración (tipo: feature/bugfix, workflow)
+
     ├── requirements.md    # QUÉ debe hacer el sistema
     ├── design.md         # CÓMO lo va a hacer técnicamente
     └── tasks.md          # Plan de implementación paso a paso
@@ -341,8 +341,8 @@ Después de escribir código:
 **Paso 1: Verifica si existe el spec**
 
 ```bash
-# Busca en .kiro/specs/{nombre-funcionalidad}/
-ls .kiro/specs/
+# Busca en docs/specs/{nombre-funcionalidad}/
+ls docs/specs/
 ```
 
 **Paso 2a: Si NO existe el spec**
@@ -398,7 +398,7 @@ Actualiza `tasks.md` cambiando `- [ ]` a `- [x]` en las tareas terminadas.
 **Paso 1: Crea un bugfix spec**
 
 1. Identifica la condición del bug (qué está fallando)
-2. Crea `.kiro/specs/{bug-name}/requirements.md` describiendo:
+2. Crea `docs/specs/{bug-name}/requirements.md` describiendo:
    - Comportamiento actual (incorrecto)
    - Comportamiento esperado (correcto)
    - Pasos para reproducir
@@ -970,7 +970,7 @@ export default function NewSchedulePage() {
 
 Esta sección lista todas las especificaciones del proyecto.
 
-**Ubicación:** `.kiro/specs/`
+**Ubicación:** `docs/specs/`
 
 ### En Desarrollo
 [Ninguna actualmente]

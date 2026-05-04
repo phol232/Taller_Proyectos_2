@@ -145,22 +145,6 @@ Permite registrar y administrar cursos, docentes, estudiantes y aulas.
 
 ---
 
-# Enfoque Conceptual (Google Antigravity)
-
-El desarrollo del sistema adopta un enfoque de análisis previo basado en el principio de "Google Antigravity", el cual implica evaluar el problema desde múltiples perspectivas antes de su implementación.
-
-Se consideran los siguientes aspectos:
-
-* Identificación de conflictos entre docentes, aulas y estudiantes
-* Evaluación de escenarios con alta carga académica
-* Análisis de disponibilidad limitada de recursos
-* Consideración de casos donde no existe solución válida
-* Validación de restricciones antes de ejecutar el algoritmo
-
-Este enfoque permite definir criterios de validación más precisos y asegurar la consistencia del sistema.
-
----
-
 ## Administrador
 
 Como administrador, el sistema debe permitir:
