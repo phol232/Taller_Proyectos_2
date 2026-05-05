@@ -8,7 +8,7 @@ from uuid import UUID
 
 from app.core.events import bus
 from app.core.logging import get_logger
-from app.domain.models import Conflict, ConflictType
+from app.domain.models import Conflict, ConflictType, TeachingScheduleSolution
 from app.domain.solver_input import SolverInput
 from app.infrastructure.input_loader import SolverInputLoader
 from app.infrastructure.persistence import (
@@ -150,7 +150,7 @@ class SolverOrchestrator:
 
         self._emit(run_id, "projecting_demand")
         demand = DemandProjector().project(data)
-        self._force_phase1_section_count(demand)
+        self._apply_phase1_section_rules(data, demand)
         self._emit(run_id, "solving_phase1")
         solver = TeacherScheduleSolver(data, demand, seed=req.seed)
         solution, solver_diagnostics = solver.solve(time_limit_ms=req.time_limit_ms)
@@ -178,10 +178,7 @@ class SolverOrchestrator:
             keep_existing_drafts=req.keep_existing_drafts,
         )
         finish_solver_run(run_id, status="SUCCEEDED",
-                          summary=(
-                              f"phase1 generated {len(solution.offers)} offers (DRAFT); "
-                              f"{len(solver_diagnostics)} diagnostics"
-                          ),
+                          summary=self._phase1_summary(solution, solver_diagnostics),
                           teaching_schedule_id=schedule_id)
         self._emit(run_id, "finished", status="SUCCEEDED",
                    offers=len(solution.offers), conflict_count=len(solver_diagnostics))
@@ -267,24 +264,51 @@ class SolverOrchestrator:
 
         selected_classroom_ids = set(data.classrooms.keys())
 
-        data.classroom_courses = {
-            course_id: allowed & selected_classroom_ids
-            for course_id, allowed in data.classroom_courses.items()
-            if allowed & selected_classroom_ids
+        selected_component_ids = {
+            component_id
+            for component_id, allowed in data.classroom_course_components.items()
+            if component_id in data.course_components and allowed & selected_classroom_ids
         }
-        allowed_course_ids = set(data.classroom_courses.keys())
+        component_scoped_rooms_by_course: dict[UUID, set[UUID]] = {}
+        for component_id in selected_component_ids:
+            component = data.course_components[component_id]
+            component_scoped_rooms_by_course.setdefault(component.course_id, set()).update(
+                data.classroom_course_components.get(component_id, set()) & selected_classroom_ids
+            )
+
+        data.classroom_courses = {
+            course_id: (allowed & selected_classroom_ids)
+            - component_scoped_rooms_by_course.get(course_id, set())
+            for course_id, allowed in data.classroom_courses.items()
+        }
+        data.classroom_courses = {
+            course_id: allowed
+            for course_id, allowed in data.classroom_courses.items()
+            if allowed
+        }
+        general_course_ids = set(data.classroom_courses.keys())
+        component_scoped_courses = {
+            data.course_components[component_id].course_id
+            for component_id in selected_component_ids
+        }
+        allowed_course_ids = set(data.classroom_courses.keys()) | component_scoped_courses
 
         data.courses = {
             course_id: course
             for course_id, course in data.courses.items()
             if course_id in allowed_course_ids
         }
+        allowed_component_ids = {
+            component_id
+            for component_id, component in data.course_components.items()
+            if component_id in selected_component_ids
+            or component.course_id in general_course_ids
+        }
         data.course_components = {
             component_id: component
             for component_id, component in data.course_components.items()
-            if component.course_id in allowed_course_ids
+            if component_id in allowed_component_ids
         }
-        allowed_component_ids = set(data.course_components.keys())
 
         data.classroom_course_components = {
             component_id: allowed & selected_classroom_ids
@@ -324,6 +348,31 @@ class SolverOrchestrator:
         }
 
     @staticmethod
-    def _force_phase1_section_count(demand: dict[UUID, object]) -> None:
+    def _apply_phase1_section_rules(
+        data: SolverInput,
+        demand: dict[UUID, object],
+    ) -> None:
         for item in demand.values():
-            item.n_classrooms = PHASE1_SECTION_COUNT
+            rule = data.course_rules.get(item.course_id)
+            max_sections = rule.max_sections if rule is not None else PHASE1_SECTION_COUNT
+            item.n_classrooms = min(PHASE1_SECTION_COUNT, max_sections)
+
+    @staticmethod
+    def _phase1_summary(
+        solution: TeachingScheduleSolution,
+        diagnostics: list[Conflict],
+    ) -> str:
+        metrics = getattr(solution, "metrics", {}) or {}
+        return (
+            f"phase1 generated {len(solution.offers)} offers (DRAFT); "
+            f"{len(diagnostics)} diagnostics; "
+            f"quality_score={metrics.get('score', 0)}; "
+            f"duration_ms={metrics.get('duration_ms', 0)}; "
+            f"attempts={metrics.get('attempts', 1)}; "
+            f"candidates={metrics.get('candidates_evaluated', 0)}; "
+            f"backtracks={metrics.get('backtracks', 0)}; "
+            f"room_gaps={metrics.get('room_gap_count', 0)}; "
+            f"room_gap_minutes={metrics.get('room_gap_minutes', 0)}; "
+            f"weekend_blocks={metrics.get('weekend_blocks', 0)}; "
+            f"termination={metrics.get('termination_reason', 'UNKNOWN')}"
+        )
