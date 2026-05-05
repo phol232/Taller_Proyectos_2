@@ -209,8 +209,6 @@ _MAX_GAP_MIN = 10
 _BLOCK_LUNCH = True
 _LUNCH_START = time(13, 30)
 _LUNCH_END   = time(14,  0)
-_MAX_QUALITY_ATTEMPTS = 48
-
 
 def _minutes_between(end_a: time, start_b: time) -> int:
     """Minutos entre el fin de un bloque y el inicio del siguiente (ambos en el mismo día)."""
@@ -466,6 +464,8 @@ class TeacherScheduleSolver:
         best_score: tuple | None = None
         attempts = 0
         hit_deadline = False
+        no_improvement_streak = 0
+        _MAX_NO_IMPROVEMENT = 40
         aggregate_metrics = {
             "candidate_groups_considered": 0,
             "candidates_evaluated": 0,
@@ -473,7 +473,7 @@ class TeacherScheduleSolver:
             "backtracks": 0,
         }
 
-        while attempts < _MAX_QUALITY_ATTEMPTS:
+        while True:
             if attempts > 0 and _time.monotonic() >= self._deadline_ts:
                 hit_deadline = True
                 break
@@ -494,6 +494,11 @@ class TeacherScheduleSolver:
                 best_solution = solution
                 best_conflicts = conflicts
                 best_score = score
+                no_improvement_streak = 0
+            else:
+                no_improvement_streak += 1
+                if no_improvement_streak >= _MAX_NO_IMPROVEMENT:
+                    break
 
             if _time.monotonic() >= self._deadline_ts:
                 hit_deadline = True
