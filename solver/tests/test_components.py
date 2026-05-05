@@ -38,8 +38,10 @@ from app.domain.models import (
     Student,
     Teacher,
     TimeSlot,
+    CourseSchedulingRule,
 )
 from app.domain.solver_input import SolverInput
+from app.infrastructure.input_loader import SolverInputLoader
 from app.services.constraint_validator import ConstraintValidator
 from app.services.corequisite_grouper import CorequisiteGrouper
 from app.services.demand_projector import DemandProjector
@@ -135,6 +137,68 @@ def test_demand_projector_falls_back_to_one():
     # No students loaded -> fallback to 1.
     out = DemandProjector().project(data)
     assert out[component.id].n_classrooms == 1
+
+
+def test_orchestrator_applies_elective_max_sections_rule():
+    course_id = uuid4()
+    comp_id = uuid4()
+    data = SolverInput(academic_period_id=uuid4(), period_max_credits=22)
+    data.course_rules[course_id] = CourseSchedulingRule(
+        course_id=course_id,
+        scheduling_kind="ELECTIVE",
+        elective_group_code="ELECT ESP2",
+        max_sections=1,
+        priority=100,
+        placement_strategy="FILL_REMAINING",
+    )
+    demand = {comp_id: CourseDemand(course_id, comp_id, 0, 30, 3)}
+
+    SolverOrchestrator._apply_phase1_section_rules(data, demand)
+
+    assert demand[comp_id].n_classrooms == 1
+
+
+def test_teacher_solver_orders_elective_courses_last():
+    required_course_id = uuid4()
+    elective_course_id = uuid4()
+    required_comp_id = uuid4()
+    elective_comp_id = uuid4()
+    teacher_id = uuid4()
+    classroom_id = uuid4()
+    slot1_id = uuid4()
+    slot2_id = uuid4()
+    data = SolverInput(academic_period_id=uuid4(), period_max_credits=22)
+    data.courses[required_course_id] = Course(required_course_id, "REQ-1", "Requerido", 1, 4, 0, 1.5, "AULA")
+    data.courses[elective_course_id] = Course(elective_course_id, "ASUC00210", "Desarrollo de videojuegos", 10, 3, 0, 1.5, "AULA")
+    data.course_components[required_comp_id] = CourseComponent(required_comp_id, required_course_id, "THEORY", 1.5, "AULA", 1)
+    data.course_components[elective_comp_id] = CourseComponent(elective_comp_id, elective_course_id, "THEORY", 1.5, "AULA", 1)
+    data.teachers[teacher_id] = Teacher(teacher_id, "T-1", "Docente")
+    data.classrooms[classroom_id] = Classroom(classroom_id, "A101", "A101", 40, "AULA", "A")
+    data.time_slots[slot1_id] = TimeSlot(slot1_id, DayOfWeek.MONDAY, time(7, 0), time(8, 30), 420)
+    data.time_slots[slot2_id] = TimeSlot(slot2_id, DayOfWeek.MONDAY, time(8, 40), time(10, 10), 520)
+    data.teacher_course_components[required_comp_id] = {teacher_id}
+    data.teacher_course_components[elective_comp_id] = {teacher_id}
+    data.classroom_course_components[required_comp_id] = {classroom_id}
+    data.classroom_course_components[elective_comp_id] = {classroom_id}
+    data.teacher_availability[teacher_id] = {slot1_id, slot2_id}
+    data.classroom_availability[classroom_id] = {slot1_id, slot2_id}
+    data.course_rules[elective_course_id] = CourseSchedulingRule(
+        course_id=elective_course_id,
+        scheduling_kind="ELECTIVE",
+        elective_group_code="ELECT ESP2",
+        max_sections=1,
+        priority=100,
+        placement_strategy="FILL_REMAINING",
+    )
+    demand = {
+        elective_comp_id: CourseDemand(elective_course_id, elective_comp_id, 0, 40, 1),
+        required_comp_id: CourseDemand(required_course_id, required_comp_id, 0, 40, 1),
+    }
+
+    solution, conflicts = TeacherScheduleSolver(data, demand, seed=7).solve(time_limit_ms=5_000)
+
+    assert conflicts == []
+    assert [offer.course_id for offer in solution.offers] == [required_course_id, elective_course_id]
 
 
 def _make_classroom_scope_data():
@@ -235,8 +299,7 @@ def test_restrict_classrooms_filters_courses_components_and_relations():
     assert set(data.classrooms.keys()) == {ids["selected_classroom_id"]}
     assert set(data.courses.keys()) == {ids["selected_course_id"]}
     assert set(data.course_components.keys()) == {ids["selected_component_id"]}
-    assert set(data.classroom_courses.keys()) == {ids["selected_course_id"]}
-    assert data.classroom_courses[ids["selected_course_id"]] == {ids["selected_classroom_id"]}
+    assert ids["selected_course_id"] not in data.classroom_courses
     assert set(data.classroom_course_components.keys()) == {ids["selected_component_id"]}
     assert set(data.teacher_courses.keys()) == {ids["selected_course_id"]}
     assert set(data.teacher_course_components.keys()) == {ids["selected_component_id"]}
@@ -256,6 +319,67 @@ def test_selected_classroom_scope_ignores_external_unassignable_course():
     assert [offer.course_id for offer in solution.offers] == [ids["selected_course_id"]]
     assert not conflicts
     assert ids["external_component_id"] not in demand
+
+
+def test_selected_classroom_scope_keeps_only_explicit_components_when_parent_row_exists():
+    """Una fila padre sincronizada para UI no debe arrastrar componentes no marcados."""
+    period_id = uuid4()
+    course_id = uuid4()
+    theory_id = uuid4()
+    practice_id = uuid4()
+    classroom_id = uuid4()
+    teacher_id = uuid4()
+    slot_id = uuid4()
+
+    data = SolverInput(academic_period_id=period_id, period_max_credits=22)
+    data.courses[course_id] = Course(course_id, "WEB-101", "Ingenieria Web", 1, 4, 0, 3.0, "AULA")
+    data.course_components[theory_id] = CourseComponent(theory_id, course_id, "THEORY", 1.5, "AULA", 1)
+    data.course_components[practice_id] = CourseComponent(practice_id, course_id, "PRACTICE", 1.5, "LAB", 2)
+    data.teachers[teacher_id] = Teacher(teacher_id, "T-WEB", "Docente Web")
+    data.classrooms[classroom_id] = Classroom(classroom_id, "A101", "A101", 40, "AULA", "A")
+    data.time_slots[slot_id] = TimeSlot(slot_id, DayOfWeek.MONDAY, time(7, 0), time(8, 30), 420)
+    data.teacher_courses[course_id] = {teacher_id}
+    data.teacher_course_components[theory_id] = {teacher_id}
+    data.teacher_course_components[practice_id] = {teacher_id}
+    # classroom_courses puede existir por sincronizacion del modal.
+    data.classroom_courses[course_id] = {classroom_id}
+    data.classroom_course_components[theory_id] = {classroom_id}
+    data.teacher_availability[teacher_id] = {slot_id}
+    data.classroom_availability[classroom_id] = {slot_id}
+
+    SolverOrchestrator._restrict_classrooms(data, {classroom_id})
+
+    assert set(data.courses.keys()) == {course_id}
+    assert set(data.course_components.keys()) == {theory_id}
+    assert course_id not in data.classroom_courses
+    assert data.classroom_course_components[theory_id] == {classroom_id}
+    assert practice_id not in data.teacher_course_components
+
+
+def test_component_scoped_room_does_not_authorize_sibling_component():
+    """Marcar teoria en un aula no autoriza automaticamente practica en esa misma aula."""
+    period_id = uuid4()
+    course_id = uuid4()
+    theory_id = uuid4()
+    practice_id = uuid4()
+    scoped_room_id = uuid4()
+    fallback_room_id = uuid4()
+
+    data = SolverInput(academic_period_id=period_id, period_max_credits=22)
+    data.courses[course_id] = Course(course_id, "WEB-102", "Web", 1, 4, 0, 3.0, "AULA")
+    data.course_components[theory_id] = CourseComponent(theory_id, course_id, "THEORY", 1.5, "AULA", 1)
+    data.course_components[practice_id] = CourseComponent(practice_id, course_id, "PRACTICE", 1.5, "AULA", 2)
+    data.classrooms[scoped_room_id] = Classroom(scoped_room_id, "A101", "A101", 40, "AULA", "A")
+    data.classrooms[fallback_room_id] = Classroom(fallback_room_id, "B201", "B201", 40, "AULA", "B")
+    # Fila padre contaminada por sincronizacion UI.
+    data.classroom_courses[course_id] = {scoped_room_id}
+    data.classroom_course_components[theory_id] = {scoped_room_id}
+
+    SolverInputLoader()._normalize_classroom_course_scope(data)
+    solver = TeacherScheduleSolver(data, {practice_id: CourseDemand(course_id, practice_id, 0, 40, 1)})
+
+    assert solver._eligible_classrooms_for_component(theory_id) == {scoped_room_id}
+    assert solver._eligible_classrooms_for_component(practice_id) == {fallback_room_id}
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -1021,6 +1145,206 @@ def test_teacher_solver_finds_valid_assignment():
         (time(7, 0), time(8, 30)),
         (time(8, 40), time(10, 10)),
     ]
+    assert solution.metrics["attempts"] >= 1
+    assert "score" in solution.metrics
+
+
+def test_teacher_solver_respects_single_compatible_classroom_for_any_room_code():
+    """Un componente con una sola aula compatible debe usar esa aula, sin hardcodear códigos."""
+    data, demand, comp_id = _make_minimal_solver_data()
+    only_room_id = uuid4()
+    course_id = data.course_components[comp_id].course_id
+    original_room_id = next(iter(data.classroom_courses[course_id]))
+    data.classrooms.pop(original_room_id)
+    data.classroom_courses[course_id] = {only_room_id}
+    data.classrooms[only_room_id] = Classroom(
+        only_room_id,
+        "ZX-909",
+        "Laboratorio restringido",
+        30,
+        "AULA",
+        "Z",
+    )
+    data.classroom_course_components[comp_id] = {only_room_id}
+    data.classroom_availability = {only_room_id: set(data.time_slots.keys())}
+
+    solution, conflicts = TeacherScheduleSolver(data, demand, seed=3).solve(time_limit_ms=5_000)
+
+    assert conflicts == []
+    assert len(solution.offers) == 1
+    assert solution.offers[0].classroom_id == only_room_id
+
+
+def test_teacher_solver_respects_component_specific_classrooms():
+    """Teoría y práctica pueden estar restringidas a aulas distintas."""
+    period_id = uuid4()
+    course_id = uuid4()
+    theory_id = uuid4()
+    practice_id = uuid4()
+    teacher_id = uuid4()
+    theory_room_id = uuid4()
+    practice_room_id = uuid4()
+    slot1_id = uuid4()
+    slot2_id = uuid4()
+
+    data = SolverInput(academic_period_id=period_id, period_max_credits=22)
+    data.courses[course_id] = Course(course_id, "NET-201", "Redes", 1, 4, 0, 3.0, "AULA")
+    data.course_components[theory_id] = CourseComponent(theory_id, course_id, "THEORY", 1.5, "AULA", 1)
+    data.course_components[practice_id] = CourseComponent(practice_id, course_id, "PRACTICE", 1.5, "LAB", 2)
+    data.teachers[teacher_id] = Teacher(teacher_id, "T-NET", "Docente Redes")
+    data.classrooms[theory_room_id] = Classroom(theory_room_id, "A-10", "Aula A", 35, "AULA", "A")
+    data.classrooms[practice_room_id] = Classroom(practice_room_id, "L-20", "Lab L", 25, "LAB", "L")
+    data.time_slots[slot1_id] = TimeSlot(slot1_id, DayOfWeek.MONDAY, time(7, 0), time(8, 30), 420)
+    data.time_slots[slot2_id] = TimeSlot(slot2_id, DayOfWeek.MONDAY, time(8, 40), time(10, 10), 520)
+    data.teacher_course_components[theory_id] = {teacher_id}
+    data.teacher_course_components[practice_id] = {teacher_id}
+    data.classroom_courses[course_id] = {theory_room_id, practice_room_id}
+    data.classroom_course_components[theory_id] = {theory_room_id}
+    data.classroom_course_components[practice_id] = {practice_room_id}
+    data.teacher_availability[teacher_id] = {slot1_id, slot2_id}
+    data.classroom_availability[theory_room_id] = {slot1_id, slot2_id}
+    data.classroom_availability[practice_room_id] = {slot1_id, slot2_id}
+    demand = {
+        theory_id: CourseDemand(course_id, theory_id, 0, 35, 1),
+        practice_id: CourseDemand(course_id, practice_id, 0, 25, 1),
+    }
+
+    solution, conflicts = TeacherScheduleSolver(data, demand, seed=5).solve(time_limit_ms=5_000)
+    by_component = {offer.course_component_id: offer for offer in solution.offers}
+
+    assert conflicts == []
+    assert by_component[theory_id].classroom_id == theory_room_id
+    assert by_component[practice_id].classroom_id == practice_room_id
+
+
+def test_teacher_solver_practice_follows_own_section_theory_not_latest_course_theory():
+    """Una teoría de otra sección en sábado no debe empujar todas las prácticas al sábado."""
+    period_id = uuid4()
+    course_id = uuid4()
+    practice_id = uuid4()
+    teacher_id = uuid4()
+    classroom_id = uuid4()
+    monday_slot_id = uuid4()
+    saturday_slot_id = uuid4()
+
+    data = SolverInput(academic_period_id=period_id, period_max_credits=22)
+    data.courses[course_id] = Course(course_id, "NET-202", "Redes avanzadas", 1, 4, 0, 1.5, "LAB")
+    data.course_components[practice_id] = CourseComponent(practice_id, course_id, "PRACTICE", 1.5, "LAB", 2)
+    data.teachers[teacher_id] = Teacher(teacher_id, "T-NET", "Docente Redes")
+    data.classrooms[classroom_id] = Classroom(classroom_id, "LAB-X", "Lab X", 25, "LAB", "L")
+    data.time_slots[monday_slot_id] = TimeSlot(monday_slot_id, DayOfWeek.MONDAY, time(8, 40), time(10, 10), 520)
+    data.time_slots[saturday_slot_id] = TimeSlot(saturday_slot_id, DayOfWeek.SATURDAY, time(10, 20), time(11, 50), 620)
+    data.teacher_course_components[practice_id] = {teacher_id}
+    data.classroom_courses[course_id] = {classroom_id}
+    data.classroom_course_components[practice_id] = {classroom_id}
+    data.teacher_availability[teacher_id] = {monday_slot_id, saturday_slot_id}
+    data.classroom_availability[classroom_id] = {monday_slot_id, saturday_slot_id}
+
+    solver = TeacherScheduleSolver(data, {practice_id: CourseDemand(course_id, practice_id, 0, 25, 1)}, seed=2)
+    solver._reset_search_state()
+    solver._course_theory_ends[course_id] = [(5, time(10, 10))]
+    solver._section_theory_end[(course_id, 0)] = (0, time(8, 30))
+
+    offer = next(solver._candidates(practice_id, 0))
+
+    assert offer.blocks[0].day == DayOfWeek.MONDAY
+
+
+def test_teacher_solver_keeps_flexible_course_out_of_critical_room_when_possible():
+    """Un curso flexible no debe ocupar primero un aula única necesaria para otro curso."""
+    data, demand, restricted_comp_id = _make_minimal_solver_data()
+    restricted_course_id = data.course_components[restricted_comp_id].course_id
+    critical_room_id = next(iter(data.classroom_courses[restricted_course_id]))
+    flexible_course_id = uuid4()
+    flexible_comp_id = uuid4()
+    flexible_teacher_id = uuid4()
+    flexible_room_id = uuid4()
+
+    data.courses[flexible_course_id] = Course(flexible_course_id, "FLEX-1", "Flexible", 1, 4, 0, 1.5, "AULA")
+    data.course_components[flexible_comp_id] = CourseComponent(flexible_comp_id, flexible_course_id, "GENERAL", 1.5, "AULA", 1)
+    data.teachers[flexible_teacher_id] = Teacher(flexible_teacher_id, "T-FLEX", "Docente Flexible")
+    data.classrooms[flexible_room_id] = Classroom(flexible_room_id, "B-200", "Aula flexible", 30, "AULA", "B")
+    data.teacher_course_components[flexible_comp_id] = {flexible_teacher_id}
+    data.classroom_courses[flexible_course_id] = {critical_room_id, flexible_room_id}
+    data.teacher_availability[flexible_teacher_id] = set(data.time_slots.keys())
+    data.classroom_availability[flexible_room_id] = set(data.time_slots.keys())
+    data.classroom_course_components[restricted_comp_id] = {critical_room_id}
+    demand[flexible_comp_id] = CourseDemand(flexible_course_id, flexible_comp_id, 0, 30, 1)
+
+    solution, conflicts = TeacherScheduleSolver(data, demand, seed=8).solve(time_limit_ms=5_000)
+    by_component = {offer.course_component_id: offer for offer in solution.offers}
+
+    assert conflicts == []
+    assert by_component[restricted_comp_id].classroom_id == critical_room_id
+    assert by_component[flexible_comp_id].classroom_id == flexible_room_id
+
+
+def test_teacher_solver_prefers_underused_room_with_more_authorized_components():
+    """Un aula con muchos componentes autorizados no debe quedar vacía por balance local simple."""
+    data, demand, comp_id = _make_minimal_solver_data()
+    course_id = data.course_components[comp_id].course_id
+    room_a_id = next(iter(data.classroom_courses[course_id]))
+    room_b_id = uuid4()
+
+    data.classrooms[room_b_id] = Classroom(room_b_id, "B-404", "Aula B", 30, "AULA", "B")
+    data.classroom_availability[room_b_id] = set(data.time_slots.keys())
+    data.classroom_courses.pop(course_id, None)
+    data.classroom_course_components[comp_id] = {room_a_id, room_b_id}
+
+    for idx in range(3):
+        dummy_course_id = uuid4()
+        dummy_comp_id = uuid4()
+        data.courses[dummy_course_id] = Course(
+            dummy_course_id,
+            f"DUMMY-{idx}",
+            "Dummy",
+            1,
+            4,
+            0,
+            1.5,
+            "AULA",
+        )
+        data.course_components[dummy_comp_id] = CourseComponent(
+            dummy_comp_id,
+            dummy_course_id,
+            "THEORY",
+            1.5,
+            "AULA",
+            1,
+        )
+        data.classroom_course_components[dummy_comp_id] = {room_a_id}
+
+    solver = TeacherScheduleSolver(data, demand, seed=4)
+    solver._reset_search_state()
+    existing = (DayOfWeek.TUESDAY, time(7, 0), time(8, 30))
+    solver._classroom_blocks[room_a_id].append(existing)
+    solver._classroom_blocks[room_b_id].append(existing)
+
+    offer = next(solver._candidates(comp_id, 0))
+
+    assert offer.classroom_id == room_a_id
+
+
+def test_teacher_solver_candidate_score_prefers_smaller_classroom_gap():
+    """Entre candidatos válidos para un aula, debe preferir el bloque que deja menos hueco."""
+    data, _, comp_id = _make_minimal_solver_data()
+    course_id = data.course_components[comp_id].course_id
+    classroom_id = next(iter(data.classroom_courses[course_id]))
+    teacher_id = next(iter(data.teacher_course_components[comp_id]))
+    third_slot_id = uuid4()
+    data.course_components[comp_id] = CourseComponent(comp_id, course_id, "GENERAL", 1.5, "AULA", 1)
+    data.time_slots[third_slot_id] = TimeSlot(third_slot_id, DayOfWeek.MONDAY, time(10, 20), time(11, 50), 620)
+    data.teacher_availability[teacher_id].add(third_slot_id)
+    data.classroom_availability[classroom_id].add(third_slot_id)
+
+    solver = TeacherScheduleSolver(data, {comp_id: CourseDemand(course_id, comp_id, 0, 30, 1)}, seed=1)
+    solver._reset_search_state()
+    first_slot = data.time_slots[next(sid for sid, slot in data.time_slots.items() if slot.start_time == time(7, 0))]
+    solver._classroom_blocks[classroom_id].append((first_slot.day_of_week, first_slot.start_time, first_slot.end_time))
+
+    offer = next(solver._candidates(comp_id, 0))
+
+    assert offer.blocks[0].start_time == time(8, 40)
 
 
 def test_teacher_solver_seed_varies_tied_candidates():
