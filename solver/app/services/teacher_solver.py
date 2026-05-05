@@ -209,6 +209,7 @@ _MAX_GAP_MIN = 10
 _BLOCK_LUNCH = True
 _LUNCH_START = time(13, 30)
 _LUNCH_END   = time(14,  0)
+_MAX_QUALITY_ATTEMPTS = 48
 
 
 def _minutes_between(end_a: time, start_b: time) -> int:
@@ -248,9 +249,11 @@ class TeacherScheduleSolver:
         # Se usa como soft constraint para distribuir secciones entre distintos días.
         self._course_day_sections: dict[tuple[UUID, DayOfWeek], int] = defaultdict(int)
 
-        # H8: registra TODOS los fines de THEORY ya asignados por curso → (day_idx, end_time)
-        # PRACTICE/GENERAL deben ir después del MAX de estos.
+        # Diagnóstico por curso; la precedencia real se aplica por sección.
         self._course_theory_ends: dict[UUID, list[tuple[int, time]]] = defaultdict(list)
+        # H8 por sección: la práctica de una sección sigue a su propia teoría,
+        # no a la última teoría global del curso.
+        self._section_theory_end: dict[tuple[UUID, int], tuple[int, time]] = {}
 
         # Consistencia docente: docente que ya tiene asignada la THEORY de
         # (course_id, section_idx). Cuando se busca PRACTICE/GENERAL para esa
@@ -263,7 +266,11 @@ class TeacherScheduleSolver:
 
         # Cache: classroom_id → set de course_id autorizados (inverso de classroom_courses)
         self._classroom_courses_cache: dict[UUID, set[UUID]] | None = None
+        self._classroom_criticality_cache: dict[UUID, int] | None = None
         self._master_blocks_cache: dict[DayOfWeek, list[ScheduledBlock]] | None = None
+        self._component_scoped_room_cache: dict[UUID, set[UUID]] | None = None
+        self._classroom_authorized_component_cache: dict[UUID, int] | None = None
+        self._metrics: dict[str, int | float | str] = {}
 
         self._deadline_ts: float | None = None
 
@@ -275,6 +282,99 @@ class TeacherScheduleSolver:
                     cache[classroom_id].add(course_id)
             self._classroom_courses_cache = dict(cache)
         return self._classroom_courses_cache
+
+    def _component_scoped_rooms_by_course(self) -> dict[UUID, set[UUID]]:
+        if self._component_scoped_room_cache is None:
+            cache: dict[UUID, set[UUID]] = defaultdict(set)
+            for component_id, classroom_ids in self._data.classroom_course_components.items():
+                component = self._data.course_components.get(component_id)
+                if component is None:
+                    continue
+                cache[component.course_id].update(classroom_ids)
+            self._component_scoped_room_cache = dict(cache)
+        return self._component_scoped_room_cache
+
+    def _classroom_authorized_component_count(self) -> dict[UUID, int]:
+        if self._classroom_authorized_component_cache is None:
+            by_room: dict[UUID, set[UUID]] = defaultdict(set)
+            for component_id, classroom_ids in self._data.classroom_course_components.items():
+                if component_id not in self._data.course_components:
+                    continue
+                for classroom_id in classroom_ids:
+                    by_room[classroom_id].add(component_id)
+
+            components_by_course: dict[UUID, set[UUID]] = defaultdict(set)
+            for component_id, component in self._data.course_components.items():
+                components_by_course[component.course_id].add(component_id)
+
+            component_scoped_rooms = self._component_scoped_rooms_by_course()
+            for course_id, classroom_ids in self._data.classroom_courses.items():
+                for classroom_id in classroom_ids:
+                    if classroom_id in component_scoped_rooms.get(course_id, set()):
+                        continue
+                    by_room[classroom_id].update(components_by_course.get(course_id, set()))
+
+            self._classroom_authorized_component_cache = {
+                classroom_id: len(component_ids)
+                for classroom_id, component_ids in by_room.items()
+            }
+        return self._classroom_authorized_component_cache
+
+    def _classroom_relative_load_penalty(
+        self,
+        classroom_id: UUID,
+        extra_blocks: int = 0,
+    ) -> int:
+        authorized_count = max(
+            1,
+            self._classroom_authorized_component_count().get(classroom_id, 0),
+        )
+        predicted_load = len(self._classroom_blocks[classroom_id]) + extra_blocks
+        return (predicted_load * 100) // authorized_count
+
+    def _eligible_classrooms_for_component(self, component_id: UUID) -> set[UUID]:
+        component = self._data.course_components[component_id]
+        course_classrooms = set(self._data.classroom_courses.get(component.course_id, set()))
+        component_classrooms = self._data.classroom_course_components.get(component_id)
+        component_scoped_rooms = self._component_scoped_rooms_by_course().get(component.course_id, set())
+
+        def fallback_classrooms() -> set[UUID]:
+            # Sin catálogo explícito: solo aulas libres o que ya incluyan el curso.
+            # Si el aula ya tiene componentes explícitos del curso, no se usa
+            # como fallback para componentes no marcados en esa aula.
+            fallback = set()
+            for cid in self._data.classrooms:
+                if cid in component_scoped_rooms:
+                    continue
+                allowed_courses = self._classroom_to_courses().get(cid, set())
+                if not allowed_courses or component.course_id in allowed_courses:
+                    fallback.add(cid)
+            return fallback
+
+        if component_classrooms:
+            eligible = set(component_classrooms)
+        elif course_classrooms:
+            eligible = course_classrooms - component_scoped_rooms
+            if not eligible:
+                eligible = fallback_classrooms()
+        else:
+            eligible = fallback_classrooms()
+
+        return {
+            cid for cid in eligible
+            if cid in self._data.classrooms
+            and self._data.classrooms[cid].room_type == component.required_room_type
+        }
+
+    def _classroom_criticality(self) -> dict[UUID, int]:
+        if self._classroom_criticality_cache is None:
+            criticality: dict[UUID, int] = defaultdict(int)
+            for component_id in self._data.course_components:
+                eligible = self._eligible_classrooms_for_component(component_id)
+                if len(eligible) == 1:
+                    criticality[next(iter(eligible))] += 1
+            self._classroom_criticality_cache = dict(criticality)
+        return self._classroom_criticality_cache
 
     def _master_blocks_by_day(self) -> dict[DayOfWeek, list[ScheduledBlock]]:
         if self._master_blocks_cache is not None:
@@ -358,58 +458,170 @@ class TeacherScheduleSolver:
 
     # ------------------------------------------------------------------
     def solve(self, *, time_limit_ms: int) -> tuple[TeachingScheduleSolution, list[Conflict]]:
-        self._deadline_ts = _time.monotonic() + time_limit_ms / 1000.0
+        start_ts = _time.monotonic()
+        self._deadline_ts = start_ts + time_limit_ms / 1000.0
+
+        best_solution: TeachingScheduleSolution | None = None
+        best_conflicts: list[Conflict] = []
+        best_score: tuple | None = None
+        attempts = 0
+        hit_deadline = False
+        aggregate_metrics = {
+            "candidate_groups_considered": 0,
+            "candidates_evaluated": 0,
+            "candidates_discarded": 0,
+            "backtracks": 0,
+        }
+
+        while attempts < _MAX_QUALITY_ATTEMPTS:
+            if attempts > 0 and _time.monotonic() >= self._deadline_ts:
+                hit_deadline = True
+                break
+
+            self._reset_search_state()
+            attempts += 1
+            try:
+                solution, conflicts, unassigned, _total = self._solve_once()
+            except TimeBudgetExceeded:
+                hit_deadline = True
+                break
+
+            for key in aggregate_metrics:
+                aggregate_metrics[key] += int(self._metrics.get(key, 0))
+
+            score = self._solution_quality_score(solution, unassigned)
+            if best_score is None or score < best_score:
+                best_solution = solution
+                best_conflicts = conflicts
+                best_score = score
+
+            if _time.monotonic() >= self._deadline_ts:
+                hit_deadline = True
+                break
+
+        if best_solution is None:
+            elapsed_ms = round((_time.monotonic() - start_ts) * 1000)
+            failed = TeachingScheduleSolution(metrics={
+                "attempts": attempts,
+                "duration_ms": elapsed_ms,
+                "termination_reason": "TIME_LIMIT_REACHED",
+                "score": 0,
+                **aggregate_metrics,
+            })
+            return failed, [Conflict(
+                ConflictType.TIME_LIMIT_EXCEEDED,
+                "solver Phase 1 time budget exceeded",
+            )]
+
+        elapsed_ms = round((_time.monotonic() - start_ts) * 1000)
+        best_solution.metrics = {
+            "attempts": attempts,
+            "duration_ms": elapsed_ms,
+            "termination_reason": "TIME_LIMIT_REACHED" if hit_deadline else "LOCAL_SEARCH_COMPLETE",
+            "score": int(best_score[0]) if best_score else 0,
+            "room_gap_count": int(best_score[1]) if best_score else 0,
+            "room_gap_minutes": int(best_score[2]) if best_score else 0,
+            "used_days": int(best_score[3]) if best_score else 0,
+            "unassigned_variables": int(best_score[4]) if best_score else 0,
+            "weekend_blocks": int(best_score[6]) if best_score else 0,
+            **aggregate_metrics,
+        }
+
+        log.info(
+            "[Phase 1] %d attempts | %d offers | score=%s | reason=%s | duration=%dms",
+            attempts,
+            len(best_solution.offers),
+            best_solution.metrics["score"],
+            best_solution.metrics["termination_reason"],
+            elapsed_ms,
+        )
+
+        return best_solution, best_conflicts
+
+    def _reset_search_state(self) -> None:
+        self._teacher_blocks = defaultdict(list)
+        self._classroom_blocks = defaultdict(list)
+        self._course_used_classrooms = defaultdict(set)
+        self._classroom_day_course_count = defaultdict(lambda: defaultdict(int))
+        self._course_day_sections = defaultdict(int)
+        self._course_theory_ends = defaultdict(list)
+        self._section_theory_end = {}
+        self._section_teacher = {}
+        self._course_used_teachers = defaultdict(set)
+        self._metrics = {
+            "candidate_groups_considered": 0,
+            "candidates_evaluated": 0,
+            "candidates_discarded": 0,
+            "backtracks": 0,
+        }
+
+    def _solve_once(self) -> tuple[TeachingScheduleSolution, list[Conflict], int, int]:
         conflicts: list[Conflict] = []
 
-        # Agrupa variables por curso (todas las repeticiones de todos los componentes del curso)
-        # Atomicidad: o se asignan TODOS los componentes del curso o ninguno (rollback)
         course_to_vars: dict[UUID, list[tuple[UUID, int]]] = defaultdict(list)
         for component_id, dem in self._demand.items():
             component = self._data.course_components[component_id]
             for i in range(dem.n_classrooms):
                 course_to_vars[component.course_id].append((component_id, i))
 
-        # Dentro de cada curso, THEORY primero (H8); MRV entre cursos
         def comp_order(v: tuple[UUID, int]) -> tuple:
             cid, _ = v
             comp = self._data.course_components[cid]
             type_order = 0 if comp.component_type.upper() == "THEORY" else 1
-            return (type_order, -comp.weekly_hours)
+            eligible_count = len(self._eligible_classrooms_for_component(cid))
+            teacher_count = len(self._data.teacher_course_components.get(cid, set()))
+            return (eligible_count, teacher_count, type_order, -comp.weekly_hours)
 
         for vars_in_course in course_to_vars.values():
             vars_in_course.sort(key=comp_order)
 
-        # MRV entre cursos: cursos más restringidos primero
-        def course_key(course_id: UUID) -> tuple:
-            n_classrooms = len(self._data.classroom_courses.get(course_id, set()))
-            comps = [
-                self._data.course_components[cid]
-                for cid, _ in course_to_vars[course_id]
-            ]
-            # Docente más restringido del curso (menos opciones de docente = más crítico)
-            n_teachers_min = min(
-                (len(self._data.teacher_course_components.get(c.id, set())) for c in comps),
-                default=0,
-            )
-            # Minutos disponibles del docente individual más restringido del curso
-            all_slot_ids_mrv = set(self._data.time_slots.keys())
-            def _tid_minutes(tid: UUID) -> int:
+        def teacher_minutes(component_id: UUID) -> int:
+            all_slot_ids = set(self._data.time_slots.keys())
+
+            def tid_minutes(tid: UUID) -> int:
                 avail = self._data.teacher_availability.get(tid, set())
-                slots = avail if avail else all_slot_ids_mrv
+                slots = avail if avail else all_slot_ids
                 return sum(
-                    (self._data.time_slots[sid].end_time.hour * 60 + self._data.time_slots[sid].end_time.minute
-                     - self._data.time_slots[sid].start_time.hour * 60 - self._data.time_slots[sid].start_time.minute)
+                    _duration_minutes(
+                        self._data.time_slots[sid].start_time,
+                        self._data.time_slots[sid].end_time,
+                    )
                     for sid in slots if sid in self._data.time_slots
                 )
-            min_teacher_minutes = min(
+
+            return min(
                 (
-                    _tid_minutes(tid)
-                    for c in comps
-                    for tid in self._data.teacher_course_components.get(c.id, set())
+                    tid_minutes(tid)
+                    for tid in self._data.teacher_course_components.get(component_id, set())
                 ),
                 default=0,
             )
-            return (n_classrooms, n_teachers_min, min_teacher_minutes)
+
+        def course_key(course_id: UUID) -> tuple:
+            component_ids = [cid for cid, _ in course_to_vars[course_id]]
+            classroom_counts = [
+                len(self._eligible_classrooms_for_component(cid))
+                for cid in component_ids
+            ]
+            teacher_counts = [
+                len(self._data.teacher_course_components.get(cid, set()))
+                for cid in component_ids
+            ]
+            rule = self._data.course_rules.get(course_id)
+            priority = rule.priority if rule is not None else 0
+            fill_remaining = (
+                1 if rule is not None
+                and rule.placement_strategy.upper() == "FILL_REMAINING"
+                else 0
+            )
+            return (
+                priority,
+                fill_remaining,
+                min(classroom_counts, default=0),
+                min(teacher_counts, default=0),
+                min((teacher_minutes(cid) for cid in component_ids), default=0),
+                -len(component_ids),
+            )
 
         ordered_courses = sorted(
             course_to_vars.keys(),
@@ -420,15 +632,7 @@ class TeacherScheduleSolver:
         unassigned = 0
 
         for course_id in ordered_courses:
-            try:
-                self._check_deadline()
-            except TimeBudgetExceeded:
-                conflicts.append(Conflict(
-                    ConflictType.TIME_LIMIT_EXCEEDED,
-                    "solver Phase 1 time budget exceeded",
-                ))
-                break
-
+            self._check_deadline()
             vars_in_course = course_to_vars[course_id]
             placed_offers: list[CourseOffer] = []
             success = True
@@ -438,30 +642,21 @@ class TeacherScheduleSolver:
                 if offer is None:
                     success = False
                     break
-                # Asignar número de sección (1-based) antes de persistir
                 offer.section_number = section_idx + 1
-                # Aplica la asignación tentativamente
                 self._apply_offer(offer, placed_offers, section_idx)
 
             if success:
                 solution.offers.extend(placed_offers)
             else:
-                # Rollback: deshacer todas las asignaciones del curso
                 for offer in placed_offers:
                     self._revert_offer(offer)
+                self._metrics["backtracks"] = int(self._metrics["backtracks"]) + 1
                 unassigned += len(vars_in_course)
 
-        assigned_count = len(solution.offers)
         total = sum(len(v) for v in course_to_vars.values())
-        log.info(
-            "[Phase 1] %d/%d variables asignadas | sin_asignar=%d | time_limit_hit=False",
-            assigned_count, total, unassigned,
-        )
-
         if unassigned > 0:
             conflicts.extend(self._diagnose_failures())
-
-        return solution, conflicts
+        return solution, conflicts, unassigned, total
 
     # ------------------------------------------------------------------
     def _apply_offer(self, offer: CourseOffer, placed: list[CourseOffer], section_idx: int) -> None:
@@ -490,6 +685,10 @@ class TeacherScheduleSolver:
             )
             # Consistencia docente: anclar el docente a esta (curso, sección)
             self._section_teacher[(offer.course_id, section_idx)] = offer.teacher_id
+            self._section_theory_end[(offer.course_id, section_idx)] = (
+                _DAY_ORDER.get(last_block.day, 9),
+                last_block.end_time,
+            )
         placed.append(offer)
 
     def _revert_offer(self, offer: CourseOffer) -> None:
@@ -533,6 +732,7 @@ class TeacherScheduleSolver:
                     self._course_theory_ends.pop(offer.course_id, None)
             # Liberar el ancla docente para esa sección
             self._section_teacher.pop((offer.course_id, offer.section_number - 1), None)
+            self._section_theory_end.pop((offer.course_id, offer.section_number - 1), None)
 
     # ------------------------------------------------------------------
     def _candidates(self, component_id: UUID, section_idx: int = 0):
@@ -549,30 +749,11 @@ class TeacherScheduleSolver:
             key=lambda tid: str(tid),
         )
 
-        # Aulas elegibles (course-level + component-level + room_type)
-        course_classrooms = self._data.classroom_courses.get(component.course_id, set())
-        component_classrooms = self._data.classroom_course_components.get(component_id)
-        if component_classrooms:
-            eligible = course_classrooms & component_classrooms
-        elif course_classrooms:
-            eligible = course_classrooms
-        else:
-            # Fallback: el curso no tiene aulas asignadas explícitamente.
-            # Solo es elegible un aula si:
-            #   - el aula tampoco tiene cursos asignados (aula libre), o
-            #   - el curso ya estaba en la lista de cursos del aula
-            # Esto evita meter cursos en aulas que ya tienen su catálogo restringido.
-            eligible = set()
-            for cid, classroom in self._data.classrooms.items():
-                allowed_courses = self._classroom_to_courses().get(cid, set())
-                if not allowed_courses or component.course_id in allowed_courses:
-                    eligible.add(cid)
-
-        classroom_ids = sorted([
-            cid for cid in eligible
-            if cid in self._data.classrooms
-            and self._data.classrooms[cid].room_type == component.required_room_type
-        ], key=lambda cid: str(cid))
+        classroom_ids = sorted(
+            self._eligible_classrooms_for_component(component_id),
+            key=lambda cid: str(cid),
+        )
+        component_is_room_restricted = len(classroom_ids) == 1
 
         is_theory = component.component_type.upper() == "THEORY"
 
@@ -601,9 +782,11 @@ class TeacherScheduleSolver:
                 min_day_idx = None
                 min_start = None
                 if component.component_type.upper() in ("PRACTICE", "GENERAL"):
-                    theory_ends = self._course_theory_ends.get(component.course_id)
-                    if theory_ends:
-                        min_day_idx, min_start = max(theory_ends)
+                    section_theory_end = self._section_theory_end.get(
+                        (component.course_id, section_idx)
+                    )
+                    if section_theory_end:
+                        min_day_idx, min_start = section_theory_end
 
                 eligible_blocks = self._blocks_inside_availability(
                     teacher_id=teacher_id,
@@ -618,11 +801,17 @@ class TeacherScheduleSolver:
                     ]
 
                 for block_group in _compact_block_groups(eligible_blocks, required_blocks):
+                    self._metrics["candidate_groups_considered"] = (
+                        int(self._metrics["candidate_groups_considered"]) + 1
+                    )
                     # H10 (hard): no se asigna ningún bloque que cruce almuerzo.
                     if any(
                         _BLOCK_LUNCH and block.start_time < _LUNCH_END and block.end_time > _LUNCH_START
                         for block in block_group
                     ):
+                        self._metrics["candidates_discarded"] = (
+                            int(self._metrics["candidates_discarded"]) + 1
+                        )
                         continue
 
                     if any(
@@ -632,6 +821,9 @@ class TeacherScheduleSolver:
                         )
                         for block in block_group
                     ):
+                        self._metrics["candidates_discarded"] = (
+                            int(self._metrics["candidates_discarded"]) + 1
+                        )
                         continue
                     if any(
                         any(
@@ -640,6 +832,9 @@ class TeacherScheduleSolver:
                         )
                         for block in block_group
                     ):
+                        self._metrics["candidates_discarded"] = (
+                            int(self._metrics["candidates_discarded"]) + 1
+                        )
                         continue
 
                     shift_s = sum(_shift_score(block.start_time, section_idx) for block in block_group)
@@ -704,9 +899,20 @@ class TeacherScheduleSolver:
                         if skip_candidate:
                             break
                     if skip_candidate:
+                        self._metrics["candidates_discarded"] = (
+                            int(self._metrics["candidates_discarded"]) + 1
+                        )
                         continue
 
-                    day_has_no_course_sections = 1 if course_sections_this_day == 0 else 0
+                    same_course_day_penalty = course_sections_this_day
+                    gap_count, gap_minutes = self._classroom_gap_score(classroom_id, block_group)
+                    relative_room_load = self._classroom_relative_load_penalty(
+                        classroom_id,
+                        extra_blocks=len(block_group),
+                    )
+                    critical_room_penalty = 0
+                    if not component_is_room_restricted:
+                        critical_room_penalty = self._classroom_criticality().get(classroom_id, 0)
                     first_block = min(
                         block_group,
                         key=lambda block: (_DAY_ORDER.get(block.day, 9), block.start_time),
@@ -714,19 +920,26 @@ class TeacherScheduleSolver:
 
                     if is_theory:
                         score = (
-                            shift_s, is_weekend, heavy_day, teacher_no_rest,
-                            long_theory, day_has_no_course_sections, daily_load,
-                            teacher_big_gap, same_course_in_room_day, day_idx,
-                            total_load, teacher_already_in_course,
+                            is_weekend, relative_room_load, critical_room_penalty,
+                            daily_load, heavy_day, gap_count, gap_minutes, shift_s,
+                            teacher_no_rest, long_theory, same_course_day_penalty,
+                            teacher_big_gap,
+                            same_course_in_room_day, day_idx, total_load,
+                            teacher_already_in_course,
                         )
                     else:
                         score = (
-                            shift_s, teacher_mismatch, is_weekend, heavy_day,
-                            teacher_no_rest, day_has_no_course_sections, daily_load,
-                            teacher_big_gap, same_course_in_room_day, day_idx,
-                            total_load, teacher_already_in_course,
+                            is_weekend, teacher_mismatch, relative_room_load,
+                            critical_room_penalty, daily_load, heavy_day, gap_count,
+                            gap_minutes, shift_s, teacher_no_rest,
+                            same_course_day_penalty, teacher_big_gap,
+                            same_course_in_room_day, day_idx, total_load,
+                            teacher_already_in_course,
                         )
 
+                    self._metrics["candidates_evaluated"] = (
+                        int(self._metrics["candidates_evaluated"]) + 1
+                    )
                     candidates.append((
                         (*score, self._rng.random()),
                         CourseOffer(
@@ -748,6 +961,89 @@ class TeacherScheduleSolver:
             yield offer
 
     # ------------------------------------------------------------------
+    def _classroom_gap_score(
+        self,
+        classroom_id: UUID,
+        block_group: tuple[ScheduledBlock, ...],
+    ) -> tuple[int, int]:
+        by_day: dict[DayOfWeek, list[tuple[time, time]]] = defaultdict(list)
+        for day, start, end in self._classroom_blocks[classroom_id]:
+            by_day[day].append((start, end))
+        for block in block_group:
+            by_day[block.day].append((block.start_time, block.end_time))
+
+        gap_count = 0
+        gap_minutes = 0
+        for day_blocks in by_day.values():
+            day_blocks.sort(key=lambda item: item[0])
+            for (_, prev_end), (next_start, _) in zip(day_blocks, day_blocks[1:]):
+                expected_gap = 30 if prev_end == _LUNCH_RECESS_START else _TRAVEL_GAP_MINUTES
+                gap = _minutes_between(prev_end, next_start)
+                if gap > expected_gap:
+                    gap_count += 1
+                    gap_minutes += gap - expected_gap
+        return gap_count, gap_minutes
+
+    def _solution_quality_score(
+        self,
+        solution: TeachingScheduleSolution,
+        unassigned: int,
+    ) -> tuple[int, int, int, int, int, int]:
+        by_room_day: dict[tuple[UUID, DayOfWeek], list[ScheduledBlock]] = defaultdict(list)
+        room_load: dict[UUID, int] = defaultdict(int)
+        restricted_misses = 0
+        for offer in solution.offers:
+            component_eligible = self._eligible_classrooms_for_component(offer.course_component_id)
+            if len(component_eligible) == 1 and offer.classroom_id not in component_eligible:
+                restricted_misses += 1
+            for block in offer.blocks:
+                by_room_day[(offer.classroom_id, block.day)].append(block)
+                room_load[offer.classroom_id] += 1
+
+        gap_count = 0
+        gap_minutes = 0
+        weekend_blocks = 0
+        used_days = len({day for _, day in by_room_day})
+        daily_overload = 0
+        total_room_blocks = sum(room_load.values())
+        authorized_counts = {
+            classroom_id: count
+            for classroom_id, count in self._classroom_authorized_component_count().items()
+            if classroom_id in self._data.classrooms and count > 0
+        }
+        total_authorized = sum(authorized_counts.values())
+        authorization_underuse = 0
+        if total_room_blocks > 0 and total_authorized > 0:
+            for classroom_id, authorized_count in authorized_counts.items():
+                expected = (total_room_blocks * authorized_count) / total_authorized
+                actual = room_load.get(classroom_id, 0)
+                if actual < expected:
+                    authorization_underuse += round((expected - actual) * 100)
+        for (_room_id, day), blocks in by_room_day.items():
+            if day in _WEEKEND_DAYS:
+                weekend_blocks += len(blocks)
+            blocks.sort(key=lambda block: block.start_time)
+            daily_overload += max(0, len(blocks) - 3)
+            for prev, nxt in zip(blocks, blocks[1:]):
+                expected_gap = 30 if prev.end_time == _LUNCH_RECESS_START else _TRAVEL_GAP_MINUTES
+                gap = _minutes_between(prev.end_time, nxt.start_time)
+                if gap > expected_gap:
+                    gap_count += 1
+                    gap_minutes += gap - expected_gap
+
+        score = (
+            unassigned * 100_000
+            + restricted_misses * 50_000
+            + weekend_blocks * 10_000
+            + gap_count * 1_000
+            + gap_minutes * 10
+            + daily_overload * 1_000
+            + authorization_underuse * 5
+            + max(room_load.values(), default=0)
+        )
+        return (score, gap_count, gap_minutes, used_days, unassigned, restricted_misses, weekend_blocks)
+
+    # ------------------------------------------------------------------
     def _check_deadline(self) -> None:
         if self._deadline_ts is not None and _time.monotonic() > self._deadline_ts:
             raise TimeBudgetExceeded()
@@ -757,11 +1053,7 @@ class TeacherScheduleSolver:
         for component_id, component in self._data.course_components.items():
             course = self._data.courses[component.course_id]
             teachers = self._data.teacher_course_components.get(component_id, set())
-            classrooms = [
-                rid for rid in self._data.classroom_courses.get(component.course_id, set())
-                if rid in self._data.classrooms
-                and self._data.classrooms[rid].room_type == component.required_room_type
-            ]
+            classrooms = self._eligible_classrooms_for_component(component_id)
             if not teachers or not classrooms:
                 conflicts.append(Conflict(
                     ConflictType.NO_ASSIGNMENT_POSSIBLE,
