@@ -10,6 +10,7 @@ from app.domain.models import (
     Classroom,
     Course,
     CourseComponent,
+    CourseSchedulingRule,
     DayOfWeek,
     Shift,
     Student,
@@ -39,6 +40,7 @@ class SolverInputLoader:
             )
 
             self._load_courses(cur, data)
+            self._load_course_rules(cur, data)
             self._load_course_components(cur, data)
             self._load_teachers(cur, data)
             self._load_classrooms(cur, data)
@@ -47,6 +49,7 @@ class SolverInputLoader:
             self._load_teacher_course_components(cur, data)
             self._load_classroom_courses(cur, data)
             self._load_classroom_course_components(cur, data)
+            self._normalize_classroom_course_scope(data)
             self._load_teacher_availability(cur, data)
             self._load_classroom_availability(cur, data)
             self._load_course_prerequisites(cur, data)
@@ -92,6 +95,18 @@ class SolverInputLoader:
                 weekly_hours=r["weekly_hours"],
                 required_room_type=r["required_room_type"],
                 sort_order=r["sort_order"],
+            )
+
+    def _load_course_rules(self, cur, data: SolverInput) -> None:
+        cur.execute("SELECT * FROM fn_solver_list_course_rules()")
+        for r in cur.fetchall():
+            data.course_rules[r["course_id"]] = CourseSchedulingRule(
+                course_id=r["course_id"],
+                scheduling_kind=r["scheduling_kind"],
+                elective_group_code=r["elective_group_code"],
+                max_sections=r["max_sections"],
+                priority=r["priority"],
+                placement_strategy=r["placement_strategy"],
             )
 
     def _load_teachers(self, cur, data: SolverInput) -> None:
@@ -143,6 +158,30 @@ class SolverInputLoader:
         cur.execute("SELECT * FROM fn_solver_list_classroom_course_components()")
         for r in cur.fetchall():
             data.classroom_course_components[r["course_component_id"]].add(r["classroom_id"])
+
+    def _normalize_classroom_course_scope(self, data: SolverInput) -> None:
+        """Evita que filas padre usadas por UI se lean como restricción global.
+
+        Cuando un aula tiene componentes explícitos de un curso, esa relación
+        por componente es la fuente precisa. La fila en classroom_courses puede
+        existir solo para listar el curso en la UI y no debe autorizar todos sus
+        componentes dentro de esa misma aula.
+        """
+        scoped_by_course: dict[UUID, set[UUID]] = defaultdict(set)
+        for component_id, classroom_ids in data.classroom_course_components.items():
+            component = data.course_components.get(component_id)
+            if component is None:
+                continue
+            scoped_by_course[component.course_id].update(classroom_ids)
+
+        for course_id, scoped_classroom_ids in scoped_by_course.items():
+            if course_id not in data.classroom_courses:
+                continue
+            remaining = data.classroom_courses[course_id] - scoped_classroom_ids
+            if remaining:
+                data.classroom_courses[course_id] = remaining
+            else:
+                data.classroom_courses.pop(course_id, None)
 
     def _load_teacher_availability(self, cur, data: SolverInput) -> None:
         cur.execute("SELECT * FROM fn_solver_list_teacher_availability()")
