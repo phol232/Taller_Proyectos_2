@@ -5,7 +5,15 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from app.domain.models import Classroom, Course, CourseComponent, Student, Teacher, TimeSlot
+from app.domain.models import (
+    Classroom,
+    Course,
+    CourseComponent,
+    CourseSchedulingRule,
+    Student,
+    Teacher,
+    TimeSlot,
+)
 
 
 @dataclass
@@ -20,6 +28,7 @@ class SolverInput:
     teachers: dict[UUID, Teacher] = field(default_factory=dict)
     classrooms: dict[UUID, Classroom] = field(default_factory=dict)
     time_slots: dict[UUID, TimeSlot] = field(default_factory=dict)
+    course_rules: dict[UUID, CourseSchedulingRule] = field(default_factory=dict)
 
     teacher_courses: dict[UUID, set[UUID]] = field(default_factory=lambda: defaultdict(set))
     teacher_course_components: dict[UUID, set[UUID]] = field(default_factory=lambda: defaultdict(set))
