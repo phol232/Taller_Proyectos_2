@@ -34,7 +34,7 @@ import { cn, toastError, toastSuccess } from "@/lib/utils";
 import type { AcademicPeriodAdmin, ClassroomAdmin } from "@/types/admin";
 import type { ScheduleGenerationRun, ScheduleOption } from "@/types/schedule";
 
-const DEFAULT_TIME_LIMIT_MS = 30_000;
+const DEFAULT_TIME_LIMIT_MS = 20_000;
 const RUN_POLL_INTERVAL_MS = 1_000;
 const RUN_STATUS_TIMEOUT_BUFFER_MS = 10_000;
 const TERMINAL_RUN_STATUSES = new Set<ScheduleGenerationRun["status"]>([
@@ -396,7 +396,7 @@ export default function AdminGenerateSchedulePage() {
                 <div className="space-y-2">
                   <label className="block text-xs font-semibold text-foreground">Tiempo máximo del solver</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {[30_000, 60_000, 120_000].map((val) => (
+                    {[10_000, 20_000, 30_000].map((val) => (
                       <button
                         key={val}
                         type="button"

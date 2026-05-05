@@ -38,11 +38,14 @@ class SolverRunRequest:
     run_type: str  # 'TEACHER' | 'STUDENT'
     student_id: UUID | None = None
     requested_by: UUID | None = None
-    time_limit_ms: int = 30_000
+    time_limit_ms: int = 20_000
     seed: int | None = None
     keep_existing_drafts: bool = False
     rate_limit_reservation_id: UUID | None = None
     classroom_ids: list[UUID] | None = None
+
+
+_SOLVER_OVERHEAD_BUFFER_MS = 500
 
 
 @dataclass
@@ -153,7 +156,7 @@ class SolverOrchestrator:
         self._apply_phase1_section_rules(data, demand)
         self._emit(run_id, "solving_phase1")
         solver = TeacherScheduleSolver(data, demand, seed=req.seed)
-        solution, solver_diagnostics = solver.solve(time_limit_ms=req.time_limit_ms)
+        solution, solver_diagnostics = solver.solve(time_limit_ms=max(1_000, req.time_limit_ms - _SOLVER_OVERHEAD_BUFFER_MS))
 
         # Final validation.
         validator = ConstraintValidator(data)
@@ -213,7 +216,7 @@ class SolverOrchestrator:
         offers = load_offer_vacancies(data.confirmed_teaching_schedule_id)
         vacancy = VacancyTracker(offers)
         solver = StudentScheduleSolver(data, offers, vacancy)
-        solutions, conflicts = solver.solve_batch(time_limit_ms=req.time_limit_ms)
+        solutions, conflicts = solver.solve_batch(time_limit_ms=max(1_000, req.time_limit_ms - _SOLVER_OVERHEAD_BUFFER_MS))
 
         self._emit(run_id, "persisting",
                    placed=sum(1 for s in solutions if s.items))
