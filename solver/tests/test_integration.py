@@ -314,6 +314,10 @@ def test_constraint_validator_acepta_asignacion_valida(loaded_data):
             cid for cid in loaded_data.classroom_courses.get(comp.course_id, set())
             if cid in loaded_data.classrooms
             and loaded_data.classrooms[cid].room_type == comp.required_room_type
+            and (
+                not loaded_data.classroom_course_components.get(comp.id)
+                or cid in loaded_data.classroom_course_components.get(comp.id, set())
+            )
         ]
         if not t_ids or not cls_ids:
             continue
@@ -471,7 +475,12 @@ def test_teacher_solver_offers_respetan_h5(loaded_data):
         comp = loaded_data.course_components[offer.course_component_id]
         cls = loaded_data.classrooms[offer.classroom_id]
         autorizadas = loaded_data.classroom_courses.get(offer.course_id, set())
-        if autorizadas:
+        autorizadas_comp = loaded_data.classroom_course_components.get(offer.course_component_id, set())
+        if autorizadas_comp:
+            assert offer.classroom_id in autorizadas_comp, (
+                f"H5 violado: aula {offer.classroom_id} no autorizada para componente {offer.course_component_id}"
+            )
+        elif autorizadas:
             assert offer.classroom_id in autorizadas, (
                 f"H5 violado: aula {offer.classroom_id} no autorizada para curso {offer.course_id}"
             )
