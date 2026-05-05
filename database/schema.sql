@@ -258,6 +258,27 @@ CREATE TABLE course_components (
     CONSTRAINT uq_course_components_sort UNIQUE (course_id, sort_order)
 );
 
+CREATE TABLE solver_course_rules (
+    id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id           UUID         NOT NULL,
+    scheduling_kind     VARCHAR(30)  NOT NULL DEFAULT 'REGULAR',
+    elective_group_code VARCHAR(50),
+    max_sections        INTEGER      NOT NULL DEFAULT 3 CHECK (max_sections BETWEEN 1 AND 10),
+    priority            INTEGER      NOT NULL DEFAULT 0 CHECK (priority >= 0),
+    placement_strategy  VARCHAR(30)  NOT NULL DEFAULT 'NORMAL',
+    is_active           BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_solver_course_rules_course
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT uq_solver_course_rules_course UNIQUE (course_id),
+    CONSTRAINT chk_solver_course_rules_kind
+        CHECK (scheduling_kind IN ('REGULAR', 'ELECTIVE')),
+    CONSTRAINT chk_solver_course_rules_strategy
+        CHECK (placement_strategy IN ('NORMAL', 'FILL_REMAINING'))
+);
+
 CREATE TABLE teacher_courses (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     teacher_id  UUID        NOT NULL,
@@ -298,6 +319,20 @@ CREATE TABLE classroom_courses (
     CONSTRAINT fk_classroom_courses_course
         FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
     CONSTRAINT uq_classroom_courses UNIQUE (classroom_id, course_id)
+);
+
+CREATE TABLE classroom_course_components (
+    id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    classroom_id        UUID        NOT NULL,
+    course_component_id UUID        NOT NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_ccc_classroom
+        FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ccc_component
+        FOREIGN KEY (course_component_id) REFERENCES course_components(id) ON DELETE CASCADE,
+    CONSTRAINT uq_classroom_course_components UNIQUE (classroom_id, course_component_id)
 );
 
 CREATE TABLE students (
@@ -778,6 +813,8 @@ CREATE INDEX idx_teachers_active ON teachers(is_active) WHERE is_active = TRUE;
 CREATE INDEX idx_classrooms_active ON classrooms(is_active) WHERE is_active = TRUE;
 
 CREATE INDEX idx_courses_active ON courses(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_solver_course_rules_course_id ON solver_course_rules(course_id);
+CREATE INDEX idx_solver_course_rules_active ON solver_course_rules(is_active) WHERE is_active = TRUE;
 CREATE INDEX idx_course_components_course_id ON course_components(course_id);
 CREATE INDEX idx_course_components_active ON course_components(course_id, sort_order) WHERE is_active = TRUE;
 
@@ -788,6 +825,8 @@ CREATE INDEX idx_teacher_course_components_component_id ON teacher_course_compon
 
 CREATE INDEX idx_classroom_courses_classroom_id ON classroom_courses(classroom_id);
 CREATE INDEX idx_classroom_courses_course_id   ON classroom_courses(course_id);
+CREATE INDEX idx_classroom_course_components_classroom_id ON classroom_course_components(classroom_id);
+CREATE INDEX idx_classroom_course_components_component_id ON classroom_course_components(course_component_id);
 
 CREATE INDEX idx_students_user_id ON students(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_students_active ON students(is_active) WHERE is_active = TRUE;
