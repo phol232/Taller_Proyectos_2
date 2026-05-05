@@ -55,6 +55,16 @@ class Course:
 
 
 @dataclass(frozen=True)
+class CourseSchedulingRule:
+    course_id: UUID
+    scheduling_kind: str
+    elective_group_code: str | None
+    max_sections: int
+    priority: int
+    placement_strategy: str
+
+
+@dataclass(frozen=True)
 class CourseComponent:
     id: UUID
     course_id: UUID
@@ -169,6 +179,7 @@ class CourseOffer:
 class TeachingScheduleSolution:
     teaching_schedule_id: UUID | None = None
     offers: list[CourseOffer] = field(default_factory=list)
+    metrics: dict[str, int | float | str] = field(default_factory=dict)
 
 
 @dataclass
