@@ -1,4 +1,4 @@
-# Testing — Documentación Completa de Pruebas
+# Testing — Documentación de Pruebas
 
 Este documento describe todas las pruebas implementadas en el proyecto, organizadas por capa: **Frontend**, **Backend** y **Solver**. Incluye el framework utilizado, qué cubre cada archivo, los casos de prueba individuales y cómo ejecutar las suites.
 

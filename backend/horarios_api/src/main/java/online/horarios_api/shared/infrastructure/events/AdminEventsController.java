@@ -24,7 +24,6 @@ public class AdminEventsController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Stream SSE con eventos de cambio en recursos admin")
     public SseEmitter stream(HttpServletResponse response) {
-        // Required by the SSE spec; without it browsers and proxies may buffer the stream.
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
         response.setHeader(HttpHeaders.CONNECTION, "keep-alive");
         return publisher.subscribe();
