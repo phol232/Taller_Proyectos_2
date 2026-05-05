@@ -6,13 +6,16 @@ import useSWR from "swr";
 import {
   AlertCircle,
   ArrowRight,
-  Building2,
   CheckCircle2,
+  Clock,
+  Hash,
+  Layers,
   Loader2,
   RefreshCcw,
   Search,
   Sparkles,
   Trash2,
+  Zap,
 } from "lucide-react";
 import PageShell from "@/components/layout/PageShell";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
@@ -41,6 +44,16 @@ const TERMINAL_RUN_STATUSES = new Set<ScheduleGenerationRun["status"]>([
   "CANCELLED",
 ]);
 
+type SolverSummaryMetrics = {
+  durationMs: number | null;
+  attempts: number | null;
+  candidates: number | null;
+  roomGaps: number | null;
+  roomGapMinutes: number | null;
+  weekendBlocks: number | null;
+  termination: string | null;
+};
+
 type RateLimitError = {
   response?: {
     status?: number;
@@ -66,6 +79,39 @@ function getPeriodLabel(period: AcademicPeriodAdmin) {
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseSolverSummary(summary: string | null): SolverSummaryMetrics {
+  const metrics: SolverSummaryMetrics = {
+    durationMs: null,
+    attempts: null,
+    candidates: null,
+    roomGaps: null,
+    roomGapMinutes: null,
+    weekendBlocks: null,
+    termination: null,
+  };
+  if (!summary) return metrics;
+  for (const part of summary.split(";")) {
+    const [rawKey, rawValue] = part.trim().split("=");
+    if (!rawKey || rawValue === undefined) continue;
+    const key = rawKey.trim();
+    const value = rawValue.trim();
+    if (key === "duration_ms") metrics.durationMs = Number(value);
+    if (key === "attempts") metrics.attempts = Number(value);
+    if (key === "candidates") metrics.candidates = Number(value);
+    if (key === "room_gaps") metrics.roomGaps = Number(value);
+    if (key === "room_gap_minutes") metrics.roomGapMinutes = Number(value);
+    if (key === "weekend_blocks") metrics.weekendBlocks = Number(value);
+    if (key === "termination") metrics.termination = value;
+  }
+  return metrics;
+}
+
+function formatTermination(value: string | null): { label: string; sub: string } {
+  if (value === "TIME_LIMIT_REACHED") return { label: "Tiempo agotado", sub: "El solver usó todo el tiempo disponible" };
+  if (value === "LOCAL_SEARCH_COMPLETE") return { label: "Solución encontrada", sub: "El solver halló la mejor distribución posible" };
+  return { label: "Finalizado", sub: "El solver terminó su ejecución" };
 }
 
 async function waitForGenerationRun(
@@ -102,6 +148,8 @@ export default function GenerateSchedulePage() {
   const [pendingCancelOption, setPendingCancelOption] = useState<ScheduleOption | null>(null);
   const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
   const [lastSlotCount, setLastSlotCount] = useState<number | null>(null);
+  const [lastSolverSummary, setLastSolverSummary] = useState<SolverSummaryMetrics | null>(null);
+  const [solverModalOpen, setSolverModalOpen] = useState(false);
 
   const periodsKey = "/api/academic-periods";
   const classroomsKey = "/api/classrooms?page=1&pageSize=200";
@@ -208,7 +256,10 @@ export default function GenerateSchedulePage() {
         timeLimitMs + RUN_STATUS_TIMEOUT_BUFFER_MS,
       );
       const updated = await refreshOptions();
+      const summary = parseSolverSummary(run.summary);
+      setLastSolverSummary(summary);
       if (run.status === "SUCCEEDED") {
+        setSolverModalOpen(true);
         const generatedOption = updated?.find((option) =>
           option.solverRunId === run.solverRunId ||
           (run.teachingScheduleId !== null && option.id === run.teachingScheduleId),
@@ -628,6 +679,118 @@ export default function GenerateSchedulePage() {
             )}
         </div>
       </section>
+
+      {/* ── Solver summary modal ── */}
+      {solverModalOpen && lastSolverSummary !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setSolverModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl bg-card p-6 shadow-xl ring-1 ring-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* X */}
+            <button
+              type="button"
+              onClick={() => setSolverModalOpen(false)}
+              className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+
+            <div className="mb-5 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="font-semibold text-foreground">Borrador generado</p>
+                <p className="text-xs text-muted-foreground">Resumen de la ejecución del solver</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {/* Duración */}
+              <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+                  <Clock className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">Duración</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {lastSolverSummary.durationMs !== null ? `${lastSolverSummary.durationMs} ms` : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Terminación */}
+              {(() => {
+                const term = formatTermination(lastSolverSummary.termination);
+                return (
+                  <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                      <Zap className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-muted-foreground">Estado de terminación</p>
+                      <p className="text-sm font-semibold text-foreground">{term.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{term.sub}</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Iteraciones + Candidatos */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                    <Hash className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Iteraciones</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {lastSolverSummary.attempts !== null ? lastSolverSummary.attempts : "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
+                    <Layers className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Candidatos</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {lastSolverSummary.candidates !== null ? lastSolverSummary.candidates.toLocaleString() : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloques totales */}
+              <div className="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-emerald-700">Bloques asignados</p>
+                  <p className="text-sm font-semibold text-emerald-800">
+                    {lastSlotCount !== null ? `${lastSlotCount} bloques` : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => setSolverModalOpen(false)}
+              className="mt-5 w-full rounded-xl bg-[#6B21A8] py-2.5 text-sm font-semibold text-white hover:bg-[#581C87]"
+            >
+              Aceptar
+            </Button>
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog
         open={pendingCancelOption !== null}
