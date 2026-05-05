@@ -43,7 +43,18 @@ class ConstraintValidator:
                 continue
 
             # H5 compatibility
-            if offer.classroom_id not in self._data.classroom_courses.get(offer.course_id, set()):
+            component_classrooms = self._data.classroom_course_components.get(offer.course_component_id)
+            if component_classrooms and offer.classroom_id not in component_classrooms:
+                conflicts.append(self._mk(
+                    ConflictType.NO_ASSIGNMENT_POSSIBLE, offer.course_id,
+                    "classroom not authorised for course component",
+                    resource_type="classroom", resource_id=offer.classroom_id))
+            course_classrooms = self._data.classroom_courses.get(offer.course_id, set())
+            if (
+                not component_classrooms
+                and course_classrooms
+                and offer.classroom_id not in course_classrooms
+            ):
                 conflicts.append(self._mk(
                     ConflictType.NO_ASSIGNMENT_POSSIBLE, offer.course_id,
                     "classroom not authorised for course",

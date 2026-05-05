@@ -35,7 +35,12 @@ class DemandProjector:
         for component in data.course_components.values():
             course = data.courses[component.course_id]
             eligible = self._count_eligible_students(data, course.id, course.cycle)
-            avg_cap = self._avg_classroom_capacity(data, course.id, component.required_room_type)
+            avg_cap = self._avg_classroom_capacity(
+                data,
+                course.id,
+                component.id,
+                component.required_room_type,
+            )
             if avg_cap <= 0:
                 n = 1
             else:
@@ -69,9 +74,18 @@ class DemandProjector:
         return count
 
     def _avg_classroom_capacity(
-        self, data: SolverInput, course_id: UUID, required_room_type: str
+        self,
+        data: SolverInput,
+        course_id: UUID,
+        component_id: UUID,
+        required_room_type: str,
     ) -> int:
-        compatible_ids = data.classroom_courses.get(course_id, set())
+        component_ids = data.classroom_course_components.get(component_id)
+        compatible_ids = (
+            data.classroom_courses.get(course_id, set()) & component_ids
+            if component_ids
+            else data.classroom_courses.get(course_id, set())
+        )
         if not compatible_ids:
             return 0
         capacities = [
