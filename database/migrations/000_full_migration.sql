@@ -9,3 +9,6 @@
 \i migrations/202605_sync_course_weekly_hours_contract.sql
 \i migrations/202605_solver_master_blocks.sql
 \i migrations/202605_schedule_generation_options.sql
+
+\i migrations/202605_solver_classroom_component_quality.sql
+\i migrations/202605_solver_elective_course_rules.sql

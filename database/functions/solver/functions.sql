@@ -62,6 +62,40 @@ END;
 $$;
 
 -- -----------------------------------------------------------
+-- fn_solver_list_course_rules
+-- Reglas de calidad/capacidad usadas solo por el solver.
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_course_rules();
+
+CREATE OR REPLACE FUNCTION fn_solver_list_course_rules()
+RETURNS TABLE (
+    course_id           UUID,
+    scheduling_kind     VARCHAR,
+    elective_group_code VARCHAR,
+    max_sections        INTEGER,
+    priority            INTEGER,
+    placement_strategy  VARCHAR
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT scr.course_id,
+           scr.scheduling_kind,
+           scr.elective_group_code,
+           scr.max_sections,
+           scr.priority,
+           scr.placement_strategy
+      FROM solver_course_rules scr
+      JOIN courses c ON c.id = scr.course_id
+     WHERE scr.is_active = TRUE
+       AND c.is_active = TRUE;
+END;
+$$;
+
+-- -----------------------------------------------------------
 -- fn_solver_list_active_course_components
 -- Componentes horarios activos. Son la unidad asignable de Fase 1.
 -- -----------------------------------------------------------
@@ -230,7 +264,49 @@ STABLE
 SECURITY INVOKER
 AS $$
 BEGIN
-    RETURN QUERY SELECT cc.classroom_id, cc.course_id FROM classroom_courses cc;
+    RETURN QUERY
+    SELECT cc.classroom_id, cc.course_id
+      FROM classroom_courses cc
+      JOIN classrooms cl ON cl.id = cc.classroom_id
+      JOIN courses c ON c.id = cc.course_id
+     WHERE cl.is_active = TRUE
+       AND c.is_active = TRUE
+       AND NOT EXISTS (
+           SELECT 1
+             FROM classroom_course_components ccc
+             JOIN course_components comp ON comp.id = ccc.course_component_id
+            WHERE ccc.classroom_id = cc.classroom_id
+              AND comp.course_id = cc.course_id
+              AND comp.is_active = TRUE
+       );
+END;
+$$;
+
+-- -----------------------------------------------------------
+-- fn_solver_list_classroom_course_components
+-- Compatibilidad precisa aula-componente para el solver.
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS fn_solver_list_classroom_course_components();
+
+CREATE OR REPLACE FUNCTION fn_solver_list_classroom_course_components()
+RETURNS TABLE (
+    classroom_id         UUID,
+    course_component_id  UUID
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT ccc.classroom_id, ccc.course_component_id
+      FROM classroom_course_components ccc
+      JOIN classrooms cl ON cl.id = ccc.classroom_id
+      JOIN course_components comp ON comp.id = ccc.course_component_id
+      JOIN courses c ON c.id = comp.course_id
+     WHERE cl.is_active = TRUE
+       AND comp.is_active = TRUE
+       AND c.is_active = TRUE;
 END;
 $$;
 
