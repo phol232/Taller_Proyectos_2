@@ -1,1006 +1,271 @@
-# Especificación y Enfoque de Desarrollo - Planner UC
----
+# Spec.md — Sistema de Generación Óptima de Horarios Académicos (Planner UC)
 
-## Tabla de Contenidos
-
-1. [Para qué sirve este documento](#para-qué-sirve-este-documento)
-2. [Cómo se especifican los casos de uso](#cómo-se-especifican-los-casos-de-uso)
-3. [Reglas para agentes de IA](#reglas-para-agentes-de-ia)
-4. [Estructura de especificaciones](#estructura-de-especificaciones)
-5. [Flujo de trabajo obligatorio](#flujo-de-trabajo-obligatorio)
-6. [Criterios de validación](#criterios-de-validación)
-7. [Aplicación por capa](#aplicación-por-capa)
-8. [Plantillas](#plantillas)
-9. [Especificaciones activas](#especificaciones-activas)
+**Versión:** 1.0  
+**Fecha:** Mayo 2026  
+**Proyecto:** Planner UC  
+**Curso:** Taller de Proyectos 2
 
 ---
 
-## Para qué sirve este documento
+## 1. Propósito de este documento
 
-Este documento define **cómo el equipo especifica los casos de uso** en el proyecto Planner UC mediante un enfoque estructurado que garantiza claridad en los criterios de validación.
+Este documento formaliza el comportamiento del sistema Planner UC **antes de su implementación**. Su objetivo es:
 
-**Enfoque del equipo:**
+- Eliminar ambigüedad en los requerimientos funcionales.
+- Definir qué entra al sistema, qué produce y bajo qué reglas opera.
+- Anticipar conflictos conocidos del dominio (solapamientos, restricciones imposibles, casos límite).
+- Servir como referencia para que cualquier miembro del equipo implemente sin necesidad de suponer.
 
-El equipo especifica los casos de uso mediante **especificaciones formales** que sirven como soporte conceptual antes de implementar. Cada caso de uso se documenta en `docs/specs/{feature-name}/` con tres componentes:
-
-1. **requirements.md** - Define QUÉ debe hacer el sistema (requisitos funcionales, no funcionales, criterios de aceptación)
-2. **design.md** - Define CÓMO lo va a hacer técnicamente (arquitectura, modelo de datos, APIs)
-3. **tasks.md** - Define el plan de implementación paso a paso
-
-**Garantía de claridad en criterios de validación:**
-
-Cada especificación incluye criterios de validación verificables:
-- **Criterios de aceptación** con checkboxes verificables
-- **Propiedades de corrección** que el sistema debe mantener siempre
-- **Estrategia de validación** con pruebas específicas por capa
-- **Checklists de completitud** antes, durante y después de implementar
-
-**Regla principal para agentes de IA:** Ningún agente puede escribir código de una funcionalidad nueva sin antes crear o leer su especificación en `docs/specs/{feature-name}/`.
-
-**Capas del sistema:**
-- **Frontend:** Next.js + React + TypeScript
-- **Backend:** Java + Spring Boot + Arquitectura Hexagonal
-- **Base de datos:** PostgreSQL + PL/pgSQL
-- **Solver CSP:** FastAPI + Python (solo diseño, no implementado)
+Todo módulo del sistema (frontend, backend, solver CSP) debe ser coherente con lo aquí descrito. Si la implementación difiere, este documento debe actualizarse antes de cerrar la historia de usuario correspondiente.
 
 ---
 
-## Cómo se especifican los casos de uso
+## 2. Alcance del sistema
 
-El equipo especifica cada caso de uso mediante un proceso estructurado que garantiza claridad y validación sistemática.
+Planner UC genera horarios académicos automáticamente en dos fases:
 
-### Proceso de especificación
+| Fase | Qué hace | Quién lo activa |
+|---|---|---|
+| **Fase 1 — Horario institucional** | Asigna cada componente de curso a un docente, un aula y una franja horaria sin solapamientos | Coordinador Académico |
+| **Fase 2 — Horario del estudiante** | Selecciona las ofertas de componentes disponibles para cada estudiante, respetando prerrequisitos, créditos, vacantes y turno | Estudiante o Coordinador |
 
-#### 1. Identificación del caso de uso
+**Límites del PMV:** hasta 50 estudiantes, 20 docentes, 30 cursos, 20 aulas.
 
-Antes de especificar, se identifica:
-- **Tipo:** ¿Es una funcionalidad nueva (Feature) o corrección de bug (Bugfix)?
-- **Alcance:** ¿Qué capas del sistema afecta? (Frontend, Backend, Base de datos)
-- **Prioridad:** ¿Es crítico, importante u opcional?
-- **Dependencias:** ¿Qué otros casos de uso o módulos requiere?
-
-#### 2. Definición de requisitos (requirements.md)
-
-Se documenta **QUÉ** debe hacer el sistema:
-
-**Requisitos funcionales:**
-- Capacidades específicas que el sistema debe proveer
-- Cada requisito tiene criterios de aceptación verificables
-- Formato: "El sistema debe permitir [acción] para [usuario] con [condiciones]"
-
-**Ejemplo:**
-```markdown
-### RF-1: Crear horario académico
-**Descripción:** El sistema debe permitir a un administrador crear un nuevo 
-horario académico para un período académico específico.
-
-**Criterios de aceptación:**
-- [ ] El horario se crea con nombre, período académico y estado inicial "borrador"
-- [ ] El sistema valida que el período académico existe
-- [ ] El sistema genera un UUID único para el horario
-- [ ] El horario se persiste en la base de datos
-- [ ] El sistema retorna el ID del horario creado
-```
-
-**Requisitos no funcionales:**
-- Rendimiento, seguridad, usabilidad, escalabilidad
-- Cada requisito tiene métrica y criterio medible
-- Formato: "[Categoría]: El sistema debe [característica] medido por [métrica] con criterio [valor]"
-
-**Ejemplo:**
-```markdown
-### RNF-1: Tiempo de respuesta
-**Categoría:** Rendimiento
-**Descripción:** La creación de un horario debe ser rápida
-**Métrica:** Tiempo de respuesta del endpoint POST /api/schedules
-**Criterio:** < 200ms en el percentil 95
-```
-
-**Propiedades de corrección:**
-- Invariantes que el sistema SIEMPRE debe cumplir
-- Se expresan como condiciones lógicas verificables
-- Se validan mediante Property-Based Testing o constraints de BD
-
-**Ejemplo:**
-```markdown
-### Propiedad 1: Unicidad de nombre por período
-**Descripción:** No pueden existir dos horarios con el mismo nombre 
-en el mismo período académico.
-
-**Expresión formal:** 
-∀ h1, h2 ∈ Horarios: 
-  (h1.nombre == h2.nombre ∧ h1.periodo_id == h2.periodo_id) → h1.id == h2.id
-
-**Validación:** 
-- Constraint UNIQUE en BD: (academic_period_id, name)
-- Prueba unitaria que intenta crear duplicados
-```
-
-#### 3. Diseño técnico (design.md)
-
-Se documenta **CÓMO** el sistema va a implementar los requisitos:
-
-**Arquitectura de alto nivel:**
-- Componentes involucrados (qué módulos se crean o modifican)
-- Flujo de datos (cómo viaja la información entre capas)
-- Integraciones (qué sistemas externos se conectan)
-
-**Diseño de bajo nivel:**
-- **Base de datos:** Tablas, funciones PL/pgSQL, índices, constraints
-- **Backend - Dominio:** Entidades, puertos (interfaces), reglas de negocio
-- **Backend - Aplicación:** Casos de uso, DTOs, lógica de orquestación
-- **Backend - Infraestructura:** Repositorios, controllers, configuración
-- **Frontend:** Tipos TypeScript, componentes React, páginas, validaciones
-
-**Estrategia de validación:**
-- Qué se prueba a nivel unitario
-- Qué se prueba a nivel de integración
-- Qué propiedades se verifican con PBT
-- Qué flujos se prueban end-to-end
-
-#### 4. Plan de implementación (tasks.md)
-
-Se documenta el **plan de ejecución** paso a paso:
-
-**Estructura de tareas:**
-- Organizadas por fases (Base de datos → Backend → Frontend → Validación)
-- Ordenadas por dependencias (no se puede hacer B sin A)
-- Marcadas como requeridas `- [ ]` u opcionales `- [ ]*`
-- Con criterios de completitud claros
-
-**Ejemplo:**
-```markdown
-### Fase 1: Base de Datos
-- [ ] 1.1 Crear tabla `schedules` en `database/schema.sql`
-- [ ] 1.2 Crear función `create_schedule()` en `database/functions/`
-- [ ] 1.3 Crear índice en `academic_period_id`
-- [ ] 1.4 Crear constraint UNIQUE en (academic_period_id, name)
-
-### Fase 2: Backend - Dominio
-- [ ] 2.1 Crear entidad `Schedule` en `domain/model/Schedule.java`
-- [ ] 2.2 Definir puerto `CreateScheduleUseCase` en `domain/port/in/`
-- [ ] 2.3 Definir puerto `ScheduleRepository` en `domain/port/out/`
-```
-
-### Garantía de claridad en criterios de validación
-
-El equipo garantiza claridad mediante:
-
-#### 1. Criterios de aceptación verificables
-
-Cada requisito funcional tiene criterios que se pueden verificar con un SÍ o NO:
-
-✅ **Bueno:** "El sistema retorna HTTP 201 con el ID del horario creado"  
-❌ **Malo:** "El sistema funciona correctamente"
-
-✅ **Bueno:** "El endpoint responde en < 200ms en el percentil 95"  
-❌ **Malo:** "El sistema es rápido"
-
-#### 2. Propiedades de corrección formales
-
-Las propiedades se expresan como condiciones lógicas que se pueden programar:
-
-```markdown
-Propiedad: "Un profesor no puede estar en dos lugares al mismo tiempo"
-
-Expresión formal:
-∀ horario H, ∀ profesor P, ∀ bloques B1, B2 ∈ H:
-  (B1.profesor == P ∧ B2.profesor == P ∧ B1.dia == B2.dia) 
-  → B1.hora_inicio ≠ B2.hora_inicio
-
-Validación:
-- Property-Based Testing: Generar 1000 horarios aleatorios y verificar
-- Constraint en BD: Trigger que valida antes de INSERT
-- Prueba unitaria: Intentar asignar profesor a bloques solapados
-```
-
-#### 3. Estrategia de validación por capa
-
-Cada capa tiene criterios específicos de validación:
-
-| Capa | Qué se valida | Cómo se valida |
-|------|---------------|----------------|
-| **Base de datos** | Funciones ejecutan correctamente, constraints se respetan | Pruebas de funciones PL/pgSQL, pruebas de integración |
-| **Backend - Dominio** | Reglas de negocio se cumplen, entidades son válidas | Pruebas unitarias con JUnit |
-| **Backend - Aplicación** | Casos de uso ejecutan correctamente | Pruebas unitarias con mocks |
-| **Backend - Infraestructura** | APIs responden según contrato, BD se actualiza | Pruebas de integración con RestAssured |
-| **Frontend** | Componentes renderizan, formularios validan | React Testing Library, Playwright |
-
-#### 4. Checklists de completitud
-
-Antes de marcar un caso de uso como completado, se verifica:
-
-**Checklist de implementación:**
-- [ ] Todas las tareas requeridas están completadas
-- [ ] Todas las pruebas pasan (unitarias + integración + E2E)
-- [ ] Todos los criterios de aceptación se cumplen
-- [ ] Todas las propiedades de corrección se mantienen
-- [ ] No hay regresiones en funcionalidad existente
-- [ ] La documentación está actualizada
-
-### Ejemplo completo: Caso de uso "Crear Horario"
-
-**Ubicación:** `docs/specs/create-schedule/`
-
-**requirements.md:**
-- RF-1: Crear horario con nombre, período y estado
-- RF-2: Validar que el período académico existe
-- RNF-1: Tiempo de respuesta < 200ms
-- Propiedad 1: Unicidad de nombre por período
-- Criterios de aceptación: 5 criterios verificables
-
-**design.md:**
-- Tabla `schedules` con campos y constraints
-- Función PL/pgSQL `create_schedule()`
-- Entidad de dominio `Schedule`
-- Caso de uso `CreateScheduleService`
-- Controller `POST /api/schedules`
-- Componente React `ScheduleForm`
-- Estrategia de validación: 4 niveles de pruebas
-
-**tasks.md:**
-- 7 fases con 25 tareas
-- Orden: BD → Dominio → Aplicación → Infraestructura → Frontend → Validación → Docs
-- Cada tarea con criterio de completitud
-
-**Resultado:** Caso de uso completamente especificado con criterios claros de validación antes de escribir una sola línea de código.
+**Roles del sistema:** Administrador, Coordinador Académico, Docente, Estudiante.
 
 ---
 
-## Reglas para agentes de IA
+## 3. Entradas
 
-### Regla 1: Lee antes de escribir código
+### 3.1. Entidades que el sistema debe recibir y almacenar
 
-Antes de implementar cualquier funcionalidad:
+| Entidad | Campos obligatorios | Regla de validación |
+|---|---|---|
+| **Estudiante** | Código único, nombre, ciclo, carrera, lista de cursos aprobados | El código no puede repetirse. Los cursos aprobados deben existir en el sistema. |
+| **Docente** | Código único, nombre, especialidad, disponibilidad horaria semanal | El código no puede repetirse. La disponibilidad se expresa como franjas (día, hora inicio, hora fin). |
+| **Curso** | Código único, nombre, créditos ∈ [1,6], horas semanales ≥ 1, lista de prerrequisitos | Los prerrequisitos deben existir en el sistema. Los corequisitos también. |
+| **Aula** | Código único, capacidad > 0, tipo (regular / laboratorio), disponibilidad | Capacidad mínima: 1. El tipo debe coincidir con el tipo de aula requerido por el componente de curso. |
+| **Componente de curso** | Tipo (GENERAL / THEORY / PRACTICE), horas semanales, tipo de aula requerido | Un curso tiene exactamente un componente GENERAL **o** la combinación THEORY + PRACTICE. No se mezclan. La suma de horas de los componentes debe coincidir con el total de horas del curso. |
 
-1. **Busca si existe un spec:** Revisa `docs/specs/{feature-name}/`
-2. **Si existe:** Lee `requirements.md`, `design.md` y `tasks.md` completos
-3. **Si no existe:** Crea el spec primero siguiendo las plantillas de este documento
-4. **Nunca asumas:** Si no hay spec, no inventes la solución
+### 3.2. Configuración del período académico
 
-### Regla 2: Sigue el orden de implementación
+- Período académico activo (fechas de inicio y fin).
+- Franjas horarias disponibles (`time_slots`): día de la semana, hora inicio, hora fin, turno (mañana / tarde / noche).
+- Tiempos de traslado entre edificios (`building_travel_times`): minutos requeridos entre edificio A y edificio B.
+- Límite máximo de créditos por estudiante por período.
+- Turno preferido del estudiante (mañana / tarde / noche).
 
-**Orden obligatorio por capa:**
+### 3.3. Compatibilidades y disponibilidades
 
-```
-1. Base de datos (schema.sql + funciones PL/pgSQL)
-2. Backend - Dominio (entidades + puertos)
-3. Backend - Aplicación (casos de uso + DTOs)
-4. Backend - Infraestructura (repositorios + controllers)
-5. Frontend (tipos + componentes + páginas)
-6. Pruebas (unitarias + integración + E2E)
-```
-
-**Nunca implementes frontend sin backend. Nunca implementes backend sin base de datos.**
-
-### Regla 3: Valida lo que implementas
-
-Después de escribir código:
-
-1. **Ejecuta las pruebas** correspondientes a la capa
-2. **Verifica los criterios de aceptación** del spec
-3. **Comprueba que no rompiste nada** (regresiones)
-4. **Actualiza el spec** si cambiaste algo del diseño
-
-### Regla 4: Respeta las reglas de arquitectura
-
-**Backend:**
-- Arquitectura hexagonal: `infrastructure -> application -> domain`
-- Dominio NO depende de infrastructure ni frameworks
-- Controllers NO acceden directo a repositorios
-- Usa funciones PL/pgSQL para operaciones de BD (excepto módulo `auth`)
-
-**Frontend:**
-- Única instancia Axios en `frontend/lib/api.ts`
-- Sesión en cookies del backend, NO en Zustand
-- Stores Zustand solo para estado simple
-- Respeta App Router de Next.js
-
-**Base de datos:**
-- `hibernate.ddl-auto=none` - NO modificar esquema desde ORM
-- Todo DDL en `database/`
-- Lógica de negocio en funciones PL/pgSQL, NO en Java
-
-**Referencias:** Ver `AGENTS.md` raíz, `backend/AGENTS.md`, `frontend/AGENTS.md`
+- Disponibilidad semanal por docente: qué franjas puede y no puede trabajar.
+- Disponibilidad por aula: en qué franjas está habilitada.
+- Qué docentes pueden dictar cada componente de curso (`teacher_course_components`).
+- Qué aulas están autorizadas para cada curso (`classroom_courses`).
 
 ---
 
-## Estructura de especificaciones
+## 4. Salidas
 
-**Ubicación:** `docs/specs/{feature-name}/`
+### 4.1. Fase 1 — Horario institucional
 
-**Archivos obligatorios:**
+| Salida | Descripción |
+|---|---|
+| Horario institucional en estado **DRAFT** | Conjunto de asignaciones curso-componente-docente-aula-franja generadas por el solver. Requiere confirmación del Coordinador para activarse. |
+| Asignaciones por componente | Para cada componente de curso: qué docente lo dicta, en qué aula, en qué franjas horarias. |
+| Reporte de conflictos | Lista de restricciones duras que no pudieron satisfacerse, con descripción del recurso y la restricción violada. |
+| Estado de ejecución | `SUCCEEDED` (se encontró solución completa) o `FAILED` (no se encontró; con lista de conflictos). |
 
-```
-docs/specs/
-└── {feature-name}/
+### 4.2. Fase 2 — Horario del estudiante
 
-    ├── requirements.md    # QUÉ debe hacer el sistema
-    ├── design.md         # CÓMO lo va a hacer técnicamente
-    └── tasks.md          # Plan de implementación paso a paso
-```
+| Salida | Descripción |
+|---|---|
+| Horario del estudiante | Conjunto de cursos asignados al estudiante para el período, con sus componentes y franjas concretas. |
+| Detalle por curso | Para cada curso asignado: componente elegido, oferta seleccionada, aula y franja. |
+| Indicador de turno desbordado (`SHIFT_OVERFLOW`) | Se emite cuando el estudiante fue asignado en un turno distinto a su turno preferido por falta de opciones. |
+| Notificación de imposibilidad | Si no existe combinación válida para un curso o para todos, el sistema indica el motivo específico (sin vacantes, sin oferta en turno, prerrequisito faltante, etc.). |
 
-**Tipos de spec:**
+### 4.3. Visualización y exportación
 
-| Tipo | Cuándo usarlo | Ejemplo |
-|------|---------------|---------|
-| **Feature** | Funcionalidad nueva que no existe | Generación de horarios, gestión de restricciones |
-| **Bugfix** | Algo está roto o funciona mal | Corrección de conflictos, validación incorrecta |
-
-**Workflows disponibles:**
-
-- **Requirements-First:** Requisitos → Diseño → Tareas (cuando sabes QUÉ pero no CÓMO)
-- **Design-First:** Diseño → Requisitos → Tareas (cuando sabes CÓMO pero necesitas formalizar QUÉ)
-
----
-
-## Flujo de trabajo obligatorio
-
-### Cuando te piden implementar una funcionalidad nueva
-
-**Paso 1: Verifica si existe el spec**
-
-```bash
-# Busca en docs/specs/{nombre-funcionalidad}/
-ls docs/specs/
-```
-
-**Paso 2a: Si NO existe el spec**
-
-1. Crea la estructura de carpetas
-2. Crea `requirements.md` usando la plantilla de este documento
-3. Crea `design.md` usando la plantilla de este documento
-4. Crea `tasks.md` usando la plantilla de este documento
-5. **Espera aprobación del usuario antes de implementar**
-
-**Paso 2b: Si SÍ existe el spec**
-
-1. Lee `requirements.md` completo
-2. Lee `design.md` completo
-3. Lee `tasks.md` completo
-4. Implementa siguiendo el orden de tareas
-
-**Paso 3: Implementa siguiendo el orden de capas**
-
-```
-1. database/schema.sql          → Crea tablas
-2. database/functions/          → Crea funciones PL/pgSQL
-3. backend/.../domain/model/    → Crea entidades de dominio
-4. backend/.../domain/port/     → Define puertos (interfaces)
-5. backend/.../application/     → Implementa casos de uso
-6. backend/.../infrastructure/  → Implementa adaptadores
-7. frontend/types/              → Define tipos TypeScript
-8. frontend/components/         → Crea componentes React
-9. frontend/app/                → Crea páginas
-```
-
-**Paso 4: Valida cada capa**
-
-```bash
-# Base de datos
-# (ejecuta pruebas de funciones PL/pgSQL si existen)
-
-# Backend
-cd backend/horarios_api
-./gradlew test
-
-# Frontend
-cd frontend
-pnpm test
-```
-
-**Paso 5: Marca tareas como completadas**
-
-Actualiza `tasks.md` cambiando `- [ ]` a `- [x]` en las tareas terminadas.
-
-### Cuando te piden corregir un bug
-
-**Paso 1: Crea un bugfix spec**
-
-1. Identifica la condición del bug (qué está fallando)
-2. Crea `docs/specs/{bug-name}/requirements.md` describiendo:
-   - Comportamiento actual (incorrecto)
-   - Comportamiento esperado (correcto)
-   - Pasos para reproducir
-   - Condición que debe cumplirse para considerar el bug resuelto
-
-**Paso 2: Diseña la solución**
-
-Crea `design.md` explicando:
-- Dónde está el problema (qué capa, qué archivo)
-- Qué hay que cambiar
-- Cómo validar que se corrigió
-
-**Paso 3: Implementa y valida**
-
-1. Escribe una prueba que falle (reproduce el bug)
-2. Corrige el código
-3. Verifica que la prueba pasa
-4. Verifica que no rompiste nada más
+- Grilla semanal (días × franjas) con: nombre del curso, componente, docente asignado y aula.
+- Exportación del horario en PDF o Excel con todos los campos de la grilla.
+- Tiempo de carga de la grilla: ≤ 3 segundos.
+- Tiempo de exportación: ≤ 30 segundos.
 
 ---
 
-## Criterios de validación
+## 5. Reglas de negocio
 
-### Checklist antes de implementar
+Las siguientes reglas definen el comportamiento del sistema independientemente de la tecnología que lo implemente.
 
-Antes de escribir código, verifica:
-
-- [ ] Existe `requirements.md` con requisitos claros
-- [ ] Existe `design.md` con diseño técnico completo
-- [ ] Existe `tasks.md` con plan de implementación
-- [ ] Entiendes qué capas vas a tocar
-- [ ] Leíste el `AGENTS.md` de cada capa afectada
-
-### Checklist durante la implementación
-
-Mientras escribes código:
-
-- [ ] Sigues el orden de tareas de `tasks.md`
-- [ ] Respetas la arquitectura hexagonal (backend)
-- [ ] No modificas esquema desde ORM (`hibernate.ddl-auto=none`)
-- [ ] Usas funciones PL/pgSQL para operaciones de BD
-- [ ] No hardcodeas secrets ni URLs
-- [ ] Escribes pruebas para lo que implementas
-
-### Checklist al terminar
-
-Antes de marcar como completado:
-
-- [ ] Todas las pruebas pasan
-- [ ] No hay regresiones (no rompiste nada existente)
-- [ ] Los criterios de aceptación del spec se cumplen
-- [ ] Actualizaste `tasks.md` marcando tareas completadas
-- [ ] Documentaste decisiones importantes si las hubo
-
-### Property-Based Testing (PBT)
-
-**Cuándo usar PBT:**
-- Lógica compleja del solver CSP
-- Validación de restricciones académicas
-- Algoritmos de asignación
-- Detección de conflictos
-
-**Ejemplo de propiedad:**
-
-```
-Propiedad: "No hay conflictos de horario para un profesor"
-
-Para todo horario generado:
-  Para todo profesor P:
-    Para todo par de bloques (B1, B2) asignados a P:
-      Si B1.dia == B2.dia:
-        Entonces B1.hora_inicio != B2.hora_inicio
-```
-
-**Herramientas:**
-- Backend Java: jqwik o QuickTheories
-- Solver Python: Hypothesis
-- Frontend: fast-check (si aplica)
+1. **Prioridad de restricciones duras:** El sistema siempre satisface primero las restricciones duras (sección 6). Las restricciones blandas (sección 7) solo se optimizan si las duras ya están satisfechas.
+2. **Sin horarios inválidos silenciosos:** Si el solver no puede satisfacer todas las restricciones duras, genera la mejor solución parcial posible y reporta explícitamente los conflictos. Nunca persiste un horario con solapamientos sin reportarlos.
+3. **Ciclo de vida del horario institucional:** Los horarios institucionales nacen en estado `DRAFT`. Solo el Coordinador puede confirmarlos. Un horario `CONFIRMED` no puede modificarse directamente; debe cancelarse para liberar recursos.
+4. **Dependencia entre fases:** La Fase 2 solo puede ejecutarse sobre un horario institucional en estado `CONFIRMED`. Sin ese prerequisito, la Fase 2 no inicia.
+5. **Conteo de créditos por curso:** Los créditos se suman por curso (`course_id`), no por componente. Un estudiante con teoría y práctica del mismo curso acumula los créditos del curso una sola vez.
+6. **Atomicidad de cursos compuestos:** Un curso con componentes THEORY + PRACTICE se asigna completo o no se asigna. No existe estado intermedio donde el estudiante tenga solo la teoría.
+7. **Atomicidad de corequisitos:** Los cursos declarados como corequisitos se asignan como grupo: todos o ninguno.
+8. **Trazabilidad obligatoria:** Toda asignación generada debe poder auditarse hasta sus datos de entrada (docente, aula, franja, componente). El sistema no acepta asignaciones sin origen trazable.
+9. **Mensajes de error descriptivos:** Los errores que se muestran al usuario siempre incluyen qué restricción fue violada y qué recurso está involucrado. Nunca se muestra solo un código genérico.
+10. **Validación en tiempo real en ajustes manuales:** Cuando el Coordinador ajusta una asignación manualmente, el sistema valida en ≤ 1 segundo si el cambio produce solapamiento antes de guardarlo.
 
 ---
 
-## Aplicación por capa
+## 6. Restricciones duras
 
-### Frontend (Next.js + React + TypeScript)
+Las restricciones duras no pueden violarse. Una asignación que viole cualquiera de ellas es inválida.
 
-**Qué especificar:**
-- Componentes de UI y su comportamiento
-- Validación de formularios (esquemas Zod)
-- Flujos de usuario (navegación, estados)
-- Integración con APIs del backend
+### Fase 1 — Horario institucional
 
-**Qué validar:**
-- Componentes renderizan correctamente
-- Formularios validan datos antes de enviar
-- Estado se mantiene consistente
-- Accesibilidad básica (WCAG)
+| ID | Restricción | Por qué existe |
+|---|---|---|
+| **H1** | Un docente no puede estar asignado a dos componentes en el mismo bloque horario | Un docente físicamente no puede estar en dos lugares al mismo tiempo |
+| **H2** | Un aula no puede albergar dos componentes en el mismo bloque horario | Un aula es un recurso físico no compartible simultáneamente |
+| **H3** | Solo se asignan franjas en las que el docente declaró disponibilidad | Respetar la disponibilidad es un acuerdo institucional con el docente |
+| **H4** | Solo se asignan franjas en las que el aula está habilitada | Las aulas pueden tener restricciones de uso por mantenimiento u otros usos |
+| **H5** | El aula asignada debe ser del tipo requerido por el componente (regular / laboratorio) | Una práctica de laboratorio no puede realizarse en un aula regular |
+| **H6** | El docente asignado debe estar habilitado para dictar ese componente específico | No todo docente puede dictar cualquier componente; hay habilitaciones por competencia |
+| **H7** | Cada asignación de componente debe tener exactamente la cantidad de horas semanales definidas en el componente | El plan de estudios define cuántas horas corresponden a cada componente |
+| **H8** | La capacidad del aula debe ser igual o mayor a la demanda proyectada del curso | Un aula pequeña no puede albergar a más estudiantes de los que tiene capacidad |
+| **H9** | Si un docente tiene clases en bloques consecutivos en edificios distintos, el tiempo de traslado debe ser factible | Un docente no puede teleportarse entre edificios |
 
-**Herramientas:**
-- Jest + React Testing Library (pruebas unitarias)
-- Playwright (pruebas E2E)
-- Zod (validación de esquemas)
+### Fase 2 — Horario del estudiante
 
-**Comandos:**
-```bash
-cd frontend
-pnpm test              # Ejecuta pruebas
-pnpm test:coverage     # Cobertura
-pnpm lint              # Linter
-```
-
-**Reglas críticas:**
-- Lee `frontend/AGENTS.md` antes de tocar frontend
-- Única instancia Axios en `frontend/lib/api.ts`
-- No uses `any`, usa `unknown` o tipos explícitos
-- Sesión en cookies del backend, NO en Zustand
-
-### Backend (Java + Spring Boot + Arquitectura Hexagonal)
-
-**Qué especificar:**
-- Casos de uso y lógica de negocio
-- Endpoints REST y sus contratos
-- Modelo de dominio y reglas de negocio
-- Integración con base de datos
-
-**Qué validar:**
-- Casos de uso ejecutan correctamente
-- APIs responden según contrato
-- Reglas de negocio se cumplen
-- Transacciones funcionan correctamente
-
-**Herramientas:**
-- JUnit 5 + Mockito (pruebas unitarias)
-- Spring Boot Test (pruebas de integración)
-- RestAssured (pruebas de API)
-- JaCoCo (cobertura)
-
-**Comandos:**
-```bash
-cd backend/horarios_api
-./gradlew test                    # Ejecuta pruebas
-./gradlew test jacocoTestReport   # Cobertura
-./gradlew bootRun                 # Ejecuta app
-```
-
-**Arquitectura obligatoria:**
-```
-infrastructure -> application -> domain
-
-domain/
-  ├── model/        # Entidades de dominio
-  └── port/
-      ├── in/       # Interfaces de entrada (casos de uso)
-      └── out/      # Interfaces de salida (repositorios)
-
-application/
-  ├── usecase/      # Implementación de casos de uso
-  └── dto/          # Objetos de transferencia
-
-infrastructure/
-  ├── in/web/       # Controllers REST
-  ├── out/
-  │   ├── persistence/  # Repositorios
-  │   └── security/     # Seguridad
-  └── config/       # Configuración Spring
-```
-
-**Reglas críticas:**
-- Lee `backend/AGENTS.md` antes de tocar backend
-- Dominio NO depende de infrastructure
-- Controllers NO acceden directo a repositorios
-- Usa funciones PL/pgSQL para operaciones de BD (excepto `auth`)
-- `hibernate.ddl-auto=none` siempre
-
-### Base de Datos (PostgreSQL + PL/pgSQL)
-
-**Qué especificar:**
-- Esquema de tablas y relaciones
-- Funciones PL/pgSQL para lógica de negocio
-- Índices necesarios para rendimiento
-- Constraints de integridad
-
-**Qué validar:**
-- Funciones ejecutan correctamente
-- Constraints se respetan
-- Queries tienen buen rendimiento
-- Integridad referencial se mantiene
-
-**Herramientas:**
-- pgTAP (pruebas de BD)
-- EXPLAIN ANALYZE (análisis de rendimiento)
-- Pruebas de integración desde backend
-
-**Ubicación:**
-```
-database/
-  ├── schema.sql       # DDL: CREATE TABLE, ALTER TABLE
-  ├── functions/       # Funciones PL/pgSQL
-  ├── migrations/      # Cambios de esquema
-  └── triggers/        # Triggers si son necesarios
-```
-
-**Reglas críticas:**
-- TODO cambio de esquema va en `database/`
-- NO modificar esquema desde ORM
-- Lógica de negocio en funciones PL/pgSQL, NO en Java
-- Usa `TIMESTAMPTZ` para fechas
-- Usa `UUID` con `gen_random_uuid()`
-- Declara índices explícitos para FKs y búsquedas frecuentes
-
-### Solver CSP (FastAPI + Python - en diseño)
-
-**Estado actual:** Solo existe diseño en `docs/Planificación/Diseno_Microservicio_Solver_CSP.md`
-
-**NO implementado aún. No generes código que asuma que existe.**
-
-**Cuando se implemente, especificar:**
-- Algoritmos de resolución de restricciones
-- Modelado de problemas CSP
-- APIs de generación de horarios
-- Optimización y heurísticas
-
-**Herramientas futuras:**
-- pytest + Hypothesis (PBT en Python)
-- Pruebas de rendimiento
-- Validación de restricciones
+| ID | Restricción | Por qué existe |
+|---|---|---|
+| **H10** | El estudiante solo puede llevar un curso si tiene todos sus prerrequisitos aprobados | El plan de estudios define prerrequisitos como condición académica |
+| **H11** | La suma de créditos de los cursos asignados no puede superar el límite del estudiante ni el del período | Límite académico para evitar sobrecarga |
+| **H12** | Solo se puede asignar un estudiante a una oferta de componente si hay vacantes disponibles | Cada sección tiene un cupo máximo físico |
+| **H13** | Los bloques asignados deben corresponder al turno preferido del estudiante; si no hay opciones en ese turno, se puede asignar en turno adyacente con indicador `SHIFT_OVERFLOW` | El turno preferido del estudiante es una restricción de disponibilidad personal |
+| **H14** | Un curso con THEORY + PRACTICE se asigna de forma atómica: ambos componentes o ninguno | Un estudiante no puede llevar solo la teoría o solo la práctica de un curso compuesto |
+| **H15** | Los corequisitos se asignan en bloque: todos o ninguno | Los corequisitos están diseñados para tomarse juntos; uno sin el otro no cumple el objetivo académico |
+| **H16** | El tiempo de traslado entre bloques consecutivos del estudiante debe ser factible según los edificios involucrados | El estudiante tampoco puede teleportarse entre edificios |
 
 ---
 
-## Plantillas
-
-### Plantilla: requirements.md
-
-```markdown
-# Requisitos: {Nombre de la Funcionalidad}
-
-## Descripción General
-[Qué se va a construir y por qué es necesario]
-
-## Contexto
-[Problema que resuelve, usuarios afectados, situación actual]
-
-## Requisitos Funcionales
-
-### RF-1: [Nombre del requisito]
-**Descripción:** [Qué debe hacer el sistema]
-
-**Criterios de aceptación:**
-- [ ] [Criterio verificable 1]
-- [ ] [Criterio verificable 2]
-- [ ] [Criterio verificable 3]
-
-### RF-2: [Siguiente requisito]
-...
-
-## Requisitos No Funcionales
-
-### RNF-1: [Nombre]
-**Categoría:** [Rendimiento | Seguridad | Usabilidad | Escalabilidad]  
-**Descripción:** [Qué característica debe tener]  
-**Métrica:** [Cómo se mide]  
-**Criterio:** [Valor objetivo, ej: "< 200ms", "> 95% uptime"]
-
-## Restricciones
-- [Limitación técnica o de negocio 1]
-- [Limitación técnica o de negocio 2]
-
-## Propiedades de Corrección
-[Invariantes que el sistema SIEMPRE debe cumplir]
-
-### Propiedad 1: [Nombre]
-**Descripción:** [Expresión lógica o descripción precisa]  
-**Validación:** [Cómo se verifica: PBT, prueba unitaria, constraint de BD]
-
-**Ejemplo:**
-```
-Propiedad: "Un profesor no puede estar en dos lugares al mismo tiempo"
-Descripción: Para todo horario, para todo profesor P, 
-             no existen dos bloques B1 y B2 donde:
-             B1.profesor == P && B2.profesor == P && 
-             B1.dia == B2.dia && B1.hora_inicio == B2.hora_inicio
-Validación: Property-Based Testing en solver + constraint en BD
-```
-
-## Dependencias
-- [Módulo o funcionalidad que debe existir antes]
-- [Tabla o función de BD requerida]
-
-## Fuera de Alcance
-- [Qué NO se incluye en esta especificación]
-```
-
-### Plantilla: design.md
-
-```markdown
-# Diseño Técnico: {Nombre de la Funcionalidad}
-
-## Arquitectura de Alto Nivel
-
-### Componentes Involucrados
-[Lista de módulos/capas que se van a modificar o crear]
-
-**Ejemplo:**
-- Frontend: Página de gestión de horarios
-- Backend: Módulo `schedule` (casos de uso + dominio)
-- Base de datos: Tablas `schedules`, `schedule_blocks`
-
-### Flujo de Datos
-[Diagrama o descripción de cómo fluye la información]
-
-**Ejemplo:**
-```
-Usuario → Frontend (formulario) 
-       → Backend API (/api/schedules POST)
-       → Caso de uso CreateSchedule
-       → Función PL/pgSQL create_schedule()
-       → BD (INSERT en schedules)
-       → Respuesta al usuario
-```
-
-## Diseño de Bajo Nivel
-
-### Base de Datos
-
-#### Tablas Nuevas
-```sql
-CREATE TABLE schedules (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    academic_period_id UUID NOT NULL REFERENCES academic_periods(id),
-    name VARCHAR(255) NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_schedules_period ON schedules(academic_period_id);
-```
-
-#### Funciones PL/pgSQL
-```sql
-CREATE OR REPLACE FUNCTION create_schedule(
-    p_academic_period_id UUID,
-    p_name VARCHAR,
-    p_status VARCHAR
-) RETURNS UUID AS $$
-DECLARE
-    v_schedule_id UUID;
-BEGIN
-    INSERT INTO schedules (academic_period_id, name, status)
-    VALUES (p_academic_period_id, p_name, p_status)
-    RETURNING id INTO v_schedule_id;
-    
-    RETURN v_schedule_id;
-END;
-$$ LANGUAGE plpgsql;
-```
-
-### Backend - Dominio
-
-#### Entidades
-```java
-// domain/model/Schedule.java
-public class Schedule {
-    private UUID id;
-    private UUID academicPeriodId;
-    private String name;
-    private ScheduleStatus status;
-    private Instant createdAt;
-    private Instant updatedAt;
-    
-    // Constructor, getters, validaciones de dominio
-}
-```
-
-#### Puertos de Entrada
-```java
-// domain/port/in/CreateScheduleUseCase.java
-public interface CreateScheduleUseCase {
-    UUID createSchedule(CreateScheduleCommand command);
-}
-```
-
-#### Puertos de Salida
-```java
-// domain/port/out/ScheduleRepository.java
-public interface ScheduleRepository {
-    UUID save(Schedule schedule);
-    Optional<Schedule> findById(UUID id);
-}
-```
-
-### Backend - Aplicación
-
-#### Casos de Uso
-```java
-// application/usecase/CreateScheduleService.java
-@Service
-public class CreateScheduleService implements CreateScheduleUseCase {
-    private final ScheduleRepository repository;
-    
-    @Override
-    public UUID createSchedule(CreateScheduleCommand command) {
-        // Lógica del caso de uso
-    }
-}
-```
-
-#### DTOs
-```java
-// application/dto/CreateScheduleCommand.java
-public record CreateScheduleCommand(
-    UUID academicPeriodId,
-    String name,
-    String status
-) {}
-```
-
-### Backend - Infraestructura
-
-#### Repositorios
-```java
-// infrastructure/out/persistence/ScheduleJdbcRepository.java
-@Repository
-public class ScheduleJdbcRepository implements ScheduleRepository {
-    private final JdbcTemplate jdbcTemplate;
-    
-    @Override
-    public UUID save(Schedule schedule) {
-        // Llama a función PL/pgSQL create_schedule()
-    }
-}
-```
-
-#### Controllers
-```java
-// infrastructure/in/web/ScheduleController.java
-@RestController
-@RequestMapping("/api/schedules")
-public class ScheduleController {
-    private final CreateScheduleUseCase createScheduleUseCase;
-    
-    @PostMapping
-    public ResponseEntity<UUID> createSchedule(@RequestBody CreateScheduleRequest request) {
-        // Llama al caso de uso
-    }
-}
-```
-
-### Frontend
-
-#### Tipos TypeScript
-```typescript
-// frontend/types/schedule.ts
-export interface Schedule {
-  id: string;
-  academicPeriodId: string;
-  name: string;
-  status: ScheduleStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type ScheduleStatus = 'draft' | 'published' | 'archived';
-```
-
-#### Componentes
-```typescript
-// frontend/components/schedule/ScheduleForm.tsx
-export function ScheduleForm() {
-  // Formulario con validación Zod
-}
-```
-
-#### Páginas
-```typescript
-// frontend/app/schedules/new/page.tsx
-export default function NewSchedulePage() {
-  // Página de creación de horario
-}
-```
-
-## Estrategia de Validación
-
-### Pruebas Unitarias
-- **Backend:** Casos de uso con repositorios mockeados
-- **Frontend:** Componentes con React Testing Library
-
-### Pruebas de Integración
-- **Backend:** Controllers + BD real (testcontainers)
-- **Frontend:** Flujos completos con Playwright
-
-### Property-Based Testing
-[Si aplica, qué propiedades se van a verificar]
-
-## Consideraciones
-
-### Rendimiento
-[Índices necesarios, caching, optimizaciones]
-
-### Seguridad
-[Validaciones, autorización, sanitización]
-
-### Decisiones de Diseño
-[Decisiones importantes y por qué se tomaron]
-```
-
-### Plantilla: tasks.md
-
-```markdown
-# Plan de Implementación: {Nombre de la Funcionalidad}
-
-## Resumen
-[Breve descripción del plan]
-
-## Tareas
-
-### Fase 1: Base de Datos
-- [ ] 1.1 Crear tablas en `database/schema.sql`
-- [ ] 1.2 Crear funciones PL/pgSQL en `database/functions/`
-- [ ] 1.3 Crear índices necesarios
-- [ ] 1.4 Escribir pruebas de funciones (si aplica)
-
-### Fase 2: Backend - Dominio
-- [ ] 2.1 Crear entidades en `domain/model/`
-- [ ] 2.2 Definir puertos de entrada en `domain/port/in/`
-- [ ] 2.3 Definir puertos de salida en `domain/port/out/`
-- [ ] 2.4 Escribir pruebas unitarias de dominio
-
-### Fase 3: Backend - Aplicación
-- [ ] 3.1 Implementar casos de uso en `application/usecase/`
-- [ ] 3.2 Crear DTOs en `application/dto/`
-- [ ] 3.3 Escribir pruebas unitarias de casos de uso
-
-### Fase 4: Backend - Infraestructura
-- [ ] 4.1 Implementar repositorios en `infrastructure/out/persistence/`
-- [ ] 4.2 Implementar controllers en `infrastructure/in/web/`
-- [ ] 4.3 Configurar beans en `infrastructure/config/`
-- [ ] 4.4 Escribir pruebas de integración
-
-### Fase 5: Frontend
-- [ ] 5.1 Crear tipos en `frontend/types/`
-- [ ] 5.2 Implementar componentes en `frontend/components/`
-- [ ] 5.3 Crear páginas en `frontend/app/`
-- [ ] 5.4 Implementar stores Zustand (si es necesario)
-- [ ] 5.5 Escribir pruebas de componentes
-
-### Fase 6: Validación
-- [ ] 6.1 Pruebas de integración backend-database
-- [ ] 6.2 Pruebas de integración frontend-backend
-- [ ] 6.3 Pruebas E2E de flujos completos
-- [ ] 6.4 Validación de propiedades de corrección (PBT si aplica)
-- [ ] 6.5 Verificación de criterios de aceptación
-
-### Fase 7: Documentación
-- [ ] 7.1 Actualizar documentación técnica
-- [ ] 7.2 Documentar decisiones de diseño
-- [ ] 7.3 Actualizar README si es necesario
-
-## Tareas Opcionales
-- [ ]* [Tarea opcional 1]
-- [ ]* [Tarea opcional 2]
-
-## Notas
-[Notas importantes sobre la implementación]
-```
+## 7. Restricciones blandas
+
+Las restricciones blandas son preferencias que mejoran la calidad del horario pero no lo invalidan. Su incumplimiento penaliza el score del horario generado.
+
+| ID | Preferencia | Impacto si no se cumple |
+|---|---|---|
+| **S1** | Minimizar huecos en el horario del estudiante (bloques libres entre clases) | Horarios con muchos huecos son percibidos como ineficientes por los estudiantes |
+| **S2** | Evitar que un docente tenga más de 4 horas consecutivas de clase | Afecta el bienestar y la calidad del dictado del docente |
+| **S3** | Distribuir los bloques de un mismo componente en días distintos (no acumular todo en un día) | Evita jornadas sobrecargadas para docentes y estudiantes |
+| **S4** | Preferir aulas cuya capacidad esté cerca de la demanda real del curso | Evita desperdiciar aulas grandes para cursos pequeños |
+| **S5** | Agrupar cursos del mismo ciclo en franjas horarias compatibles | Facilita que los estudiantes del mismo ciclo puedan organizar su horario |
+| **S6** | Preferir que la teoría y la práctica de un curso queden en días distintos | Permite al estudiante prepararse mejor entre ambas sesiones |
 
 ---
 
-## Especificaciones activas
+## 8. Casos límite
 
-Esta sección lista todas las especificaciones del proyecto.
+Los casos límite son situaciones que el sistema debe manejar correctamente sin fallar ni generar resultados inválidos. Identificarlos antes de implementar evita bugs y comportamientos inesperados.
 
-**Ubicación:** `docs/specs/`
-
-### En Desarrollo
-[Ninguna actualmente]
-
-### Completadas
-[Ninguna actualmente]
-
-### Planificadas
-[Ninguna actualmente]
-
----
-
-## Mantenimiento de este documento
-
-**Actualiza este archivo cuando:**
-- Cambien las reglas de arquitectura del proyecto
-- Se agreguen nuevas herramientas de validación
-- Se modifiquen las plantillas de especificación
-- Se agreguen nuevas capas o módulos al sistema
-
-**Responsable:** Equipo de desarrollo  
-**Frecuencia:** Cuando sea necesario
+| ID | Situación | Comportamiento esperado del sistema |
+|---|---|---|
+| **CL-01** | Docente sin disponibilidad horaria registrada | El solver no puede asignarle ningún componente. Reporta el conflicto al Coordinador. No bloquea la generación del resto del horario. |
+| **CL-02** | Aula con capacidad insuficiente para la demanda de todos los cursos | Se priorizan los cursos con mayor demanda. Los cursos que no encuentran aula suficiente reportan `NO_CLASSROOM_AVAILABLE`. |
+| **CL-03** | Curso sin docente habilitado para alguno de sus componentes | El componente no puede asignarse. El curso completo queda sin asignación y el conflicto se reporta. |
+| **CL-04** | Más cursos que bloques horarios disponibles | El solver asigna primero los cursos con menor dominio de opciones (heurística MRV). Los cursos que no encuentran slot reportan `NO_SLOT_AVAILABLE`. |
+| **CL-05** | Docente disponible solo en horario nocturno para un curso diseñado para turno diurno | El componente no puede asignarse en ese bloque. El conflicto se registra. No se fuerza la asignación violando H3. |
+| **CL-06** | Curso con teoría y práctica que requieren tipos de aula diferentes (regular y laboratorio) | El solver busca aulas de cada tipo por separado para cada componente. Si no existe alguno de los tipos, reporta `NO_CLASSROOM_AVAILABLE` para ese componente. |
+| **CL-07** | Dos cursos corequisitos donde uno no puede asignarse por falta de docente o aula | Se libera la reserva del corequisito que sí tenía asignación. Ambos quedan sin asignar. Se notifica al estudiante. |
+| **CL-08** | Estudiante sin turno preferido registrado | El solver usa todos los turnos disponibles sin restricción de turno. No se emite `SHIFT_OVERFLOW`. |
+| **CL-09** | La misma aula es requerida por múltiples cursos en el mismo bloque | Se asigna al primer curso que la solicita (según orden de prioridad del solver). Los demás buscan aula alternativa o reportan `NO_CLASSROOM_AVAILABLE`. |
+| **CL-10** | Agregar el último curso candidato al horario del estudiante excedería el límite de créditos | El curso no se agrega. El sistema muestra: créditos actuales + créditos del curso vs. límite (ej: "20 + 5 = 25 créditos, límite: 22"). |
+| **CL-11** | Se solicita generar el horario del estudiante sin que exista un horario institucional confirmado | La Fase 2 no inicia. El sistema devuelve error descriptivo: "No existe horario institucional confirmado para este período." |
+| **CL-12** | El solver no encuentra solución en el tiempo límite de 30 segundos | Se notifica al Coordinador con los conflictos identificados hasta ese momento. No se persiste ningún horario inválido. |
 
 ---
 
-## Referencias
+## 9. Reducción de ambigüedad
 
-- `AGENTS.md` (raíz) - Reglas globales del proyecto
-- `backend/AGENTS.md` - Reglas específicas de backend
-- `frontend/AGENTS.md` - Reglas específicas de frontend
-- `docs/Revisiones/Revision_Arquitectura_Backend.md` - Decisiones de arquitectura
-- `docs/Planificación/Diseno_Microservicio_Solver_CSP.md` - Diseño del solver
-- `docs/Planificación/Requerimientos_Funcionales_y_No_Funcionales.md` - Requisitos del sistema
+Esta sección documenta los términos y situaciones que en la especificación preliminar eran vagos, y cómo fueron precisados en este documento.
+
+| Término o situación ambigua | Problema | Definición precisa en este Spec |
+|---|---|---|
+| "Horario sin solapamientos" | No especificaba qué tipo de solapamiento (docente, aula, estudiante) | H1: solapamiento de docente. H2: solapamiento de aula. H16: solapamiento en horario personal del estudiante. Cada uno tiene su propia restricción. |
+| "Respetar disponibilidad del docente" | No precisaba si era solo para el solver o también para ajustes manuales | H3 aplica a la generación automática. La validación en tiempo real (regla 10 de negocio) aplica a ajustes manuales. |
+| "Generación rápida del horario" | No definía qué es "rápido" ni bajo qué condiciones | Fase 1: ≤ 30 segundos para el escenario base del PMV. Fase 2: ≤ 5 segundos por estudiante. Condiciones: hasta 50 est., 20 doc., 30 cursos, 20 aulas. |
+| "Cursos con práctica y teoría" | No estaba claro si eran cursos separados o componentes del mismo curso | Son componentes del mismo curso (`course_components`). El estudiante lleva un solo curso para créditos, pero el solver agenda dos bloques. Definido en la sección 3.1. |
+| "El sistema prioriza ciertas restricciones" | No había jerarquía explícita entre restricciones | Sección 6 (duras) vs. sección 7 (blandas). Las duras no pueden violarse. Las blandas penalizan el score. La regla 1 de negocio establece la jerarquía. |
+| "Asignación completa" | No estaba claro qué pasa si el solver no puede asignar todo | Regla 2 de negocio: genera la mejor solución parcial y reporta conflictos. CL-12 define el comportamiento por timeout. |
+| "Validar prerrequisitos" | No especificaba en qué momento se valida ni qué sucede si falta | H10 aplica en la Fase 2. CL-10 define el mensaje que se muestra al estudiante cuando el crédito excede el límite. CL-07 define qué pasa con corequisitos fallidos. |
+
+---
+
+## 10. Anticipación de conflictos
+
+Esta sección identifica los conflictos más frecuentes del dominio de timetabling y cómo el sistema los previene o maneja.
+
+### 10.1. Solapamiento de docente (el más frecuente)
+
+**Escenario:** El Coordinador asigna manualmente el curso MAT-101 y el curso FIS-101 al mismo docente en la misma franja horaria del lunes.
+
+**Conflicto:** El docente no puede estar en dos aulas al mismo tiempo.
+
+**Cómo lo previene este spec:**
+- H1 prohíbe esta asignación explícitamente.
+- La regla 10 de negocio obliga al sistema a validar en ≤ 1 segundo y rechazar antes de guardar.
+- El mensaje de error debe indicar: docente afectado, cursos en conflicto y franja horaria.
+
+---
+
+### 10.2. Solapamiento de aula
+
+**Escenario:** El solver intenta asignar los cursos BIO-101 y QUI-101 al Laboratorio L-1 en el mismo bloque del martes.
+
+**Conflicto:** El laboratorio no puede usarse por dos cursos al mismo tiempo.
+
+**Cómo lo previene este spec:**
+- H2 prohíbe esta asignación.
+- El constraint `UNIQUE(teaching_schedule_id, classroom_id, time_slot_id)` en base de datos actúa como segunda línea de defensa.
+
+---
+
+### 10.3. Curso compuesto parcialmente asignado
+
+**Escenario:** El solver encuentra aula y docente para la teoría de FIS-101, pero no para la práctica (el único laboratorio compatible está ocupado).
+
+**Conflicto:** El estudiante quedaría con solo la teoría, lo que no cumple el plan de estudios.
+
+**Cómo lo previene este spec:**
+- H14 exige atomicidad: si la práctica no puede asignarse, la teoría también se libera.
+- CL-06 define el comportamiento exacto cuando falta aula para un componente.
+
+---
+
+### 10.4. Restricción de prerrequisito no satisfecha
+
+**Escenario:** Un estudiante intenta agregar CALC-2 a su horario sin haber aprobado CALC-1.
+
+**Conflicto:** El plan de estudios no permite cursar CALC-2 sin CALC-1 aprobado.
+
+**Cómo lo previene este spec:**
+- H10 bloquea la asignación.
+- El sistema debe indicar explícitamente qué prerrequisito falta (regla 9 de negocio).
+
+---
+
+### 10.5. Saturación de recursos en horario pico
+
+**Escenario:** La mayoría de docentes solo tienen disponibilidad de lunes a miércoles. El solver intenta asignar 30 cursos en esos 3 días.
+
+**Conflicto:** Pocos bloques disponibles para muchos cursos, generando conflictos en cadena.
+
+**Cómo lo previene este spec:**
+- El solver aplica la heurística MRV (Minimum Remaining Values): asigna primero los componentes con menos opciones disponibles.
+- CL-04 define el comportamiento cuando no alcanza el espacio: reporte de `NO_SLOT_AVAILABLE` por componente no asignado.
+- R-04 del documento de riesgos identifica este escenario como riesgo de rendimiento.
+
+---
+
+### 10.6. Exceso de créditos por corequisitos
+
+**Escenario:** Un estudiante quiere llevar dos cursos corequisitos, pero juntos superan su límite de créditos.
+
+**Conflicto:** H11 (límite de créditos) y H15 (corequisitos atómicos) generan un conflicto entre sí.
+
+**Cómo lo previene este spec:**
+- H11 tiene precedencia: si los corequisitos superan el límite, el grupo completo no se asigna.
+- El sistema notifica al estudiante indicando los créditos resultantes vs. el límite.

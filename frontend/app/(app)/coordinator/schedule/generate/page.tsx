@@ -26,6 +26,7 @@ import {
   getScheduleGenerationRun,
   getScheduleOptions,
 } from "@/lib/scheduleApi";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import { useTranslation } from "@/lib/i18n";
 import { cn, toastError, toastSuccess } from "@/lib/utils";
 import type { AcademicPeriodAdmin, ClassroomAdmin } from "@/types/admin";
@@ -159,6 +160,8 @@ export default function GenerateSchedulePage() {
   );
 
   const canGenerate = Boolean(academicPeriodId) && selectedClassroomIds.length > 0 && !isGenerating;
+
+  useAdminEvents("schedules.changed", () => { void refreshOptions(); });
 
   useEffect(() => {
     if (!academicPeriodId && activePeriods.length > 0) {
