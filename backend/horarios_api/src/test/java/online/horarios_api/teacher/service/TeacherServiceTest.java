@@ -43,7 +43,8 @@ class TeacherServiceTest {
         when(teacherPort.create(any())).thenAnswer(invocation -> {
             TeacherData data = invocation.getArgument(0);
             return new Teacher(teacherId, data.userId(), data.code(), data.fullName(),
-                    null, data.specialty(), data.isActive(), data.availability(), data.courseCodes(), Instant.now(), Instant.now());
+                    null, data.specialty(), data.isActive(), data.availability(), data.courseCodes(),
+                    data.courseComponentIds(), Instant.now(), Instant.now());
         });
 
         service.createTeacher(new TeacherData(
@@ -56,7 +57,8 @@ class TeacherServiceTest {
                         new AvailabilitySlot(ScheduleDay.MONDAY, LocalTime.of(8, 0), LocalTime.of(10, 0), true),
                         new AvailabilitySlot(ScheduleDay.MONDAY, LocalTime.of(8, 0), LocalTime.of(10, 0), true)
                 ),
-                List.of("inf-101", "INF-101", " mat-001 ")
+                List.of("inf-101", "INF-101", " mat-001 "),
+                List.of()
         ));
 
         ArgumentCaptor<TeacherData> captor = ArgumentCaptor.forClass(TeacherData.class);
@@ -83,6 +85,7 @@ class TeacherServiceTest {
                         LocalTime.of(8, 0),
                         true
                 )),
+                List.of(),
                 List.of()
         ))).isInstanceOf(BadRequestException.class);
     }

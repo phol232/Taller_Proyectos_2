@@ -316,7 +316,7 @@ export default function FacultadesPage() {
     <PageShell
       title="Facultades y carreras"
       actions={
-        <Button onClick={openFacCreate} className="h-10 rounded-md bg-[#6B21A8] px-4 text-white hover:bg-[#581C87]">
+        <Button onClick={openFacCreate} size="md">
           <Plus className="h-4 w-4" />
           Nueva facultad
         </Button>
@@ -360,11 +360,8 @@ export default function FacultadesPage() {
 
           <div className="flex items-center justify-between border-b border-border bg-muted/30 px-6 py-3">
             <span className="text-xs text-muted-foreground">{carreras.length} {carreras.length === 1 ? "carrera" : "carreras"}</span>
-            <Button
-              onClick={openCarCreate}
-              className="h-8 rounded-md bg-[#6B21A8] px-3 text-xs text-white hover:bg-[#581C87]"
-            >
-              <Plus className="h-3.5 w-3.5" />
+            <Button onClick={openCarCreate} size="md">
+              <Plus className="h-4 w-4" />
               Nueva carrera
             </Button>
           </div>
@@ -434,11 +431,11 @@ export default function FacultadesPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFacDialogOpen(false)} disabled={facSubmitting}>
+            <Button variant="outline" size="md" onClick={() => setFacDialogOpen(false)} disabled={facSubmitting}>
               Cancelar
             </Button>
-            <Button onClick={() => void handleFacSubmit()} disabled={facSubmitting}>
-              {facSubmitting ? "Guardando…" : editingFac ? "Guardar" : "Crear"}
+            <Button size="md" onClick={() => void handleFacSubmit()} disabled={facSubmitting}>
+              {facSubmitting ? "Guardando…" : editingFac ? "Guardar facultad" : "Crear facultad"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -481,11 +478,11 @@ export default function FacultadesPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCarDialogOpen(false)} disabled={carSubmitting}>
+            <Button variant="outline" size="md" onClick={() => setCarDialogOpen(false)} disabled={carSubmitting}>
               Cancelar
             </Button>
-            <Button onClick={() => void handleCarSubmit()} disabled={carSubmitting}>
-              {carSubmitting ? "Guardando…" : editingCar ? "Guardar" : "Crear"}
+            <Button size="md" onClick={() => void handleCarSubmit()} disabled={carSubmitting}>
+              {carSubmitting ? "Guardando…" : editingCar ? "Guardar carrera" : "Crear carrera"}
             </Button>
           </DialogFooter>
         </DialogContent>

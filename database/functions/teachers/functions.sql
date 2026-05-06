@@ -186,7 +186,7 @@ DECLARE
     v_assignments_count INTEGER;
 BEGIN
     SELECT COUNT(*) INTO v_assignments_count
-    FROM   section_assignments
+    FROM   course_schedule_assignments
     WHERE  teacher_id = p_teacher_id;
 
     IF v_assignments_count > 0 THEN
@@ -195,7 +195,8 @@ BEGIN
     END IF;
 
     DELETE FROM teacher_courses WHERE teacher_id = p_teacher_id;
-    DELETE FROM section_teacher_candidates WHERE teacher_id = p_teacher_id;
+    DELETE FROM teacher_course_components WHERE teacher_id = p_teacher_id;
+    DELETE FROM course_teacher_candidates WHERE teacher_id = p_teacher_id;
     DELETE FROM teacher_availability WHERE teacher_id = p_teacher_id;
     DELETE FROM teachers WHERE id = p_teacher_id;
 END;
@@ -293,6 +294,13 @@ BEGIN
     FROM   courses c
     WHERE  c.id = ANY(p_course_ids)
     ON CONFLICT (teacher_id, course_id) DO NOTHING;
+
+    INSERT INTO teacher_course_components(teacher_id, course_component_id)
+    SELECT p_teacher_id, cc.id
+    FROM   course_components cc
+    WHERE  cc.course_id = ANY(p_course_ids)
+      AND  cc.is_active = TRUE
+    ON CONFLICT (teacher_id, course_component_id) DO NOTHING;
 END;
 $$;
 
@@ -325,6 +333,20 @@ BEGIN
         )
     )
     ON CONFLICT (teacher_id, course_id) DO NOTHING;
+
+    INSERT INTO teacher_course_components(teacher_id, course_component_id)
+    SELECT p_teacher_id, cc.id
+    FROM   course_components cc
+    JOIN   courses c ON c.id = cc.course_id
+    WHERE  c.code = ANY(
+        ARRAY(
+            SELECT DISTINCT UPPER(TRIM(code_value))
+            FROM   unnest(p_course_codes) AS code_value
+            WHERE  NULLIF(TRIM(code_value), '') IS NOT NULL
+        )
+    )
+      AND  cc.is_active = TRUE
+    ON CONFLICT (teacher_id, course_component_id) DO NOTHING;
 END;
 $$;
 
@@ -349,6 +371,12 @@ BEGIN
     DELETE FROM teacher_courses
     WHERE  teacher_id = p_teacher_id
        AND course_id = ANY(p_course_ids);
+
+    DELETE FROM teacher_course_components tcc
+    USING course_components cc
+    WHERE tcc.teacher_id = p_teacher_id
+      AND tcc.course_component_id = cc.id
+      AND cc.course_id = ANY(p_course_ids);
 END;
 $$;
 
@@ -381,6 +409,19 @@ BEGIN
               WHERE  NULLIF(TRIM(code_value), '') IS NOT NULL
           )
       );
+
+    DELETE FROM teacher_course_components tcc
+    USING course_components cc
+    JOIN courses c ON c.id = cc.course_id
+    WHERE tcc.teacher_id = p_teacher_id
+      AND tcc.course_component_id = cc.id
+      AND c.code = ANY(
+          ARRAY(
+              SELECT DISTINCT UPPER(TRIM(code_value))
+              FROM   unnest(p_course_codes) AS code_value
+              WHERE  NULLIF(TRIM(code_value), '') IS NOT NULL
+          )
+      );
 END;
 $$;
 
@@ -399,6 +440,8 @@ SECURITY INVOKER
 AS $$
 BEGIN
     DELETE FROM teacher_courses
+    WHERE  teacher_id = p_teacher_id;
+    DELETE FROM teacher_course_components
     WHERE  teacher_id = p_teacher_id;
 
     PERFORM fn_add_teacher_courses(p_teacher_id, p_course_ids);
@@ -421,8 +464,71 @@ AS $$
 BEGIN
     DELETE FROM teacher_courses
     WHERE  teacher_id = p_teacher_id;
+    DELETE FROM teacher_course_components
+    WHERE  teacher_id = p_teacher_id;
 
     PERFORM fn_add_teacher_courses_by_codes(p_teacher_id, p_course_codes);
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_set_teacher_course_components
+-- Reemplaza los componentes que puede dictar un docente.
+-- Mantiene teacher_courses sincronizado como índice por curso.
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_set_teacher_course_components(
+    p_teacher_id     UUID,
+    p_component_ids  UUID[]
+)
+RETURNS VOID
+LANGUAGE plpgsql
+VOLATILE
+SECURITY INVOKER
+AS $$
+BEGIN
+    DELETE FROM teacher_course_components
+    WHERE  teacher_id = p_teacher_id;
+
+    IF p_component_ids IS NOT NULL AND array_length(p_component_ids, 1) IS NOT NULL THEN
+        INSERT INTO teacher_course_components(teacher_id, course_component_id)
+        SELECT p_teacher_id, cc.id
+        FROM   course_components cc
+        WHERE  cc.id = ANY(p_component_ids)
+          AND  cc.is_active = TRUE
+        ON CONFLICT (teacher_id, course_component_id) DO NOTHING;
+    END IF;
+
+    DELETE FROM teacher_courses
+    WHERE  teacher_id = p_teacher_id;
+
+    INSERT INTO teacher_courses(teacher_id, course_id)
+    SELECT DISTINCT p_teacher_id, cc.course_id
+    FROM   teacher_course_components tcc
+    JOIN   course_components cc ON cc.id = tcc.course_component_id
+    WHERE  tcc.teacher_id = p_teacher_id
+    ON CONFLICT (teacher_id, course_id) DO NOTHING;
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- fn_list_teacher_course_component_ids
+-- ----------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_list_teacher_course_component_ids(
+    p_teacher_id UUID
+)
+RETURNS TABLE(course_component_id UUID)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT tcc.course_component_id
+    FROM   teacher_course_components tcc
+    JOIN   course_components cc ON cc.id = tcc.course_component_id
+    JOIN   courses c ON c.id = cc.course_id
+    WHERE  tcc.teacher_id = p_teacher_id
+    ORDER  BY c.code ASC, cc.sort_order ASC;
 END;
 $$;
 

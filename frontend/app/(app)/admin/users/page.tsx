@@ -219,7 +219,7 @@ export default function AdminUsersPage() {
       title="Usuarios"
 
       actions={
-        <Button type="button" onClick={openCreateDialog}>
+        <Button type="button" onClick={openCreateDialog} size="md">
           <Plus className="h-4 w-4" />
           Nuevo usuario
         </Button>
@@ -534,10 +534,10 @@ export default function AdminUsersPage() {
         </div>
 
         <DialogFooter className="border-0 bg-transparent px-0 pb-0">
-          <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+          <Button type="button" variant="outline" size="md" onClick={() => setDialogOpen(false)} disabled={submitting}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleCreateUser} disabled={submitting}>
+          <Button type="button" size="md" onClick={handleCreateUser} disabled={submitting}>
             {submitting ? "Creando..." : "Crear usuario"}
           </Button>
         </DialogFooter>

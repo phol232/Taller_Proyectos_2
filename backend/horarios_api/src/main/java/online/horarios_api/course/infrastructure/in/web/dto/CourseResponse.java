@@ -2,6 +2,7 @@ package online.horarios_api.course.infrastructure.in.web.dto;
 
 import online.horarios_api.course.domain.model.Course;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -13,9 +14,10 @@ public record CourseResponse(
         int cycle,
         int credits,
         int requiredCredits,
-        int weeklyHours,
+        BigDecimal weeklyHours,
         String requiredRoomType,
         boolean isActive,
+        List<CourseComponentResponse> components,
         List<String> prerequisites,
         Instant createdAt,
         Instant updatedAt
@@ -32,6 +34,7 @@ public record CourseResponse(
                 course.weeklyHours(),
                 course.requiredRoomType(),
                 course.isActive(),
+                course.components().stream().map(CourseComponentResponse::from).toList(),
                 course.prerequisites(),
                 course.createdAt(),
                 course.updatedAt()

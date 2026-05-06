@@ -6,9 +6,20 @@
 
 ## Alcance
 
-Este archivo aplica a todo el monorepo.
+Este archivo aplica a todo el monorepo y define las reglas globales mínimas.
 
-Si el trabajo toca `frontend/`, lee también `frontend/AGENTS.md` antes de editar código del frontend. Ese archivo contiene reglas más específicas de Next.js, TypeScript, testing y dominio UI.
+### Orden de lectura obligatorio según la capa que vayas a tocar
+
+1. **Siempre** lee primero este archivo (`AGENTS.md` raíz).
+2. Luego, antes de tocar cualquier archivo dentro de una capa, lee su `AGENTS.md` específico:
+   - Cambios en `backend/horarios_api/**` → lee primero **`backend/AGENTS.md`**.
+   - Cambios en `frontend/**` → lee primero **`frontend/AGENTS.md`**.
+   - Cambios en `database/**` → aplica las reglas de la sección "Base de datos" de este archivo.
+   - Cambios en `docs/**` → consulta la documentación cercana antes de editar.
+3. Si un cambio toca varias capas (por ejemplo backend + frontend + database), lee los `AGENTS.md` de **todas** las capas afectadas antes de modificar código.
+4. Si una regla específica de capa contradice esta raíz, gana la regla más restrictiva.
+
+No edites código de una capa sin haber leído primero su `AGENTS.md` correspondiente.
 
 ---
 
@@ -43,12 +54,16 @@ Si el trabajo toca `frontend/`, lee también `frontend/AGENTS.md` antes de edita
 Antes de cambiar código:
 
 1. Identifica qué capa estás tocando: `frontend`, `backend`, `database` o `docs`.
-2. Revisa el archivo fuente de verdad más cercano:
-   - frontend: `frontend/AGENTS.md`
+2. Lee el `AGENTS.md` de esa capa **antes** de cualquier edición:
+   - frontend → `frontend/AGENTS.md`
+   - backend → `backend/AGENTS.md`
+   - database → reglas de la sección "Base de datos" de este archivo
+3. Revisa el archivo fuente de verdad más cercano:
+   - frontend: estructura de `frontend/app/`, `frontend/components/`, `frontend/lib/api.ts`
    - backend: `backend/horarios_api/build.gradle.kts`, estructura de paquetes y controladores/ports existentes
    - database: `database/schema.sql` y `database/functions/`
    - solver: `docs/Planificación/Diseno_Microservicio_Solver_CSP.md`
-3. No asumas módulos o endpoints inexistentes.
+4. No asumas módulos o endpoints inexistentes.
 
 ---
 
@@ -217,7 +232,7 @@ No generes código que dependa de que ya estén implementados estos módulos o c
 ## Idioma y estilo
 
 - Código fuente: inglés
-- Comentarios internos: inglés
+- Comentarios internos: español
 - Mensajes visibles al usuario: español, salvo que el módulo ya sea i18n
 - Commits: convención `feat|fix|refactor|docs|test|chore`
 

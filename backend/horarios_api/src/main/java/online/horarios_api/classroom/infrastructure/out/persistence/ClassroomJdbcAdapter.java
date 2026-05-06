@@ -11,6 +11,7 @@ import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.shared.domain.model.ScheduleDay;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCallback;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,8 @@ public class ClassroomJdbcAdapter implements ClassroomPort {
             rs.getString("room_type"),
             rs.getBoolean("is_active"),
             List.of(),
+            List.of(),
+            List.of(),
             toInstant(rs, "created_at"),
             toInstant(rs, "updated_at")
     );
@@ -52,6 +55,8 @@ public class ClassroomJdbcAdapter implements ClassroomPort {
                     command.isActive()
             );
             syncAvailability(created.id(), command.availability());
+            syncCourses(created.id(), command.courseCodes());
+            syncComponents(created.id(), command.courseComponentIds());
             return findById(created.id()).orElseThrow();
         } catch (DataAccessException ex) {
             throw mapException(ex, command.code());
@@ -72,6 +77,8 @@ public class ClassroomJdbcAdapter implements ClassroomPort {
                     command.isActive()
             );
             syncAvailability(updated.id(), command.availability());
+            syncCourses(updated.id(), command.courseCodes());
+            syncComponents(updated.id(), command.courseComponentIds());
             return findById(updated.id()).orElseThrow();
         } catch (DataAccessException ex) {
             throw mapException(ex, command.code());
@@ -171,6 +178,8 @@ public class ClassroomJdbcAdapter implements ClassroomPort {
                 baseClassroom.type(),
                 baseClassroom.isActive(),
                 loadAvailability(baseClassroom.id()),
+                loadCourseCodes(baseClassroom.id()),
+                loadComponentIds(baseClassroom.id()),
                 baseClassroom.createdAt(),
                 baseClassroom.updatedAt()
         );
@@ -205,6 +214,46 @@ public class ClassroomJdbcAdapter implements ClassroomPort {
                     slot.available()
             );
         }
+    }
+
+    private List<String> loadCourseCodes(UUID classroomId) {
+        return jdbcTemplate.query(
+                "SELECT course_code FROM fn_list_classroom_course_codes(?)",
+                (rs, rowNum) -> rs.getString("course_code"),
+                classroomId
+        );
+    }
+
+    private void syncCourses(UUID classroomId, List<String> courseCodes) {
+        String[] codeArray = courseCodes == null ? new String[0] : courseCodes.toArray(new String[0]);
+        jdbcTemplate.execute(
+                "SELECT fn_set_classroom_courses_by_codes(?, ?)",
+                (PreparedStatementCallback<Boolean>) ps -> {
+                    ps.setObject(1, classroomId);
+                    ps.setArray(2, ps.getConnection().createArrayOf("varchar", codeArray));
+                    return ps.execute();
+                }
+        );
+    }
+
+    private List<UUID> loadComponentIds(UUID classroomId) {
+        return jdbcTemplate.query(
+                "SELECT course_component_id FROM fn_list_classroom_course_component_ids(?)",
+                (rs, rowNum) -> rs.getObject("course_component_id", UUID.class),
+                classroomId
+        );
+    }
+
+    private void syncComponents(UUID classroomId, List<UUID> componentIds) {
+        UUID[] idArray = componentIds == null ? new UUID[0] : componentIds.toArray(new UUID[0]);
+        jdbcTemplate.execute(
+                "SELECT fn_set_classroom_course_components(?, ?)",
+                (PreparedStatementCallback<Boolean>) ps -> {
+                    ps.setObject(1, classroomId);
+                    ps.setArray(2, ps.getConnection().createArrayOf("uuid", idArray));
+                    return ps.execute();
+                }
+        );
     }
 
     private RuntimeException mapException(DataAccessException ex, String code) {

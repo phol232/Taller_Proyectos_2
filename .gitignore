@@ -225,3 +225,5 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,visualstudiocode,mean,react
+# Backups de BD (dumps locales y de AWS)
+database/backups/

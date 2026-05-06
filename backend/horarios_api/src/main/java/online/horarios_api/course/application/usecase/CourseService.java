@@ -2,6 +2,7 @@ package online.horarios_api.course.application.usecase;
 
 import lombok.RequiredArgsConstructor;
 import online.horarios_api.course.domain.model.Course;
+import online.horarios_api.course.domain.model.CourseComponentData;
 import online.horarios_api.course.domain.model.CourseData;
 import online.horarios_api.course.domain.port.in.CourseCommandUseCase;
 import online.horarios_api.course.domain.port.in.CourseQueryUseCase;
@@ -11,10 +12,12 @@ import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @RequiredArgsConstructor
 public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
@@ -123,9 +126,15 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
         if (requiredCredits < 0) {
             throw new BadRequestException("Los créditos requeridos no pueden ser negativos.");
         }
-        if (command.weeklyHours() < 1) {
-            throw new BadRequestException("Las horas semanales deben ser mayores o iguales a 1.");
+        if (command.weeklyHours() == null || command.weeklyHours().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Las horas semanales deben ser mayores a 0.");
         }
+
+        List<CourseComponentData> components = normalizeComponents(
+                command.components(),
+                command.weeklyHours(),
+                roomType
+        );
 
         List<String> prerequisites = command.prerequisites() == null
                 ? List.of()
@@ -151,7 +160,87 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
                 command.weeklyHours(),
                 roomType,
                 command.isActive() == null ? Boolean.TRUE : command.isActive(),
+                components,
                 prerequisites
+        );
+    }
+
+    private List<CourseComponentData> normalizeComponents(
+            List<CourseComponentData> components,
+            BigDecimal courseWeeklyHours,
+            String fallbackRoomType
+    ) {
+        if (components == null || components.isEmpty()) {
+            return List.of(new CourseComponentData(
+                    "GENERAL",
+                    courseWeeklyHours,
+                    fallbackRoomType,
+                    1,
+                    Boolean.TRUE
+            ));
+        }
+
+        AtomicInteger nextOrder = new AtomicInteger(1);
+        List<CourseComponentData> normalized = components.stream()
+                .map(component -> normalizeComponent(component, fallbackRoomType, nextOrder.getAndIncrement()))
+                .toList();
+
+        long generalCount = normalized.stream()
+                .filter(component -> "GENERAL".equals(component.componentType()))
+                .count();
+        long specificCount = normalized.stream()
+                .filter(component -> !"GENERAL".equals(component.componentType()))
+                .count();
+        if (generalCount > 0 && specificCount > 0) {
+            throw new BadRequestException("No se puede mezclar un componente general con teoría/práctica.");
+        }
+        if (generalCount > 1) {
+            throw new BadRequestException("Un curso solo puede tener un componente general.");
+        }
+
+        // Nota: no se valida que la suma de horas de componentes coincida con courseWeeklyHours —
+        // ambos se gestionan de forma independiente (formulario curso vs modal Horarios).
+
+        List<String> componentTypes = normalized.stream().map(CourseComponentData::componentType).toList();
+        if (new LinkedHashSet<>(componentTypes).size() != componentTypes.size()) {
+            throw new BadRequestException("No se pueden repetir tipos de componente en un mismo curso.");
+        }
+
+        List<Integer> sortOrders = normalized.stream().map(CourseComponentData::sortOrder).toList();
+        if (new LinkedHashSet<>(sortOrders).size() != sortOrders.size()) {
+            throw new BadRequestException("No se pueden repetir órdenes de componente en un mismo curso.");
+        }
+
+        return normalized;
+    }
+
+    private CourseComponentData normalizeComponent(
+            CourseComponentData component,
+            String fallbackRoomType,
+            int fallbackSortOrder
+    ) {
+        String type = requireText(component.componentType(), "El tipo de componente es obligatorio.")
+                .toUpperCase(Locale.ROOT);
+        if (!List.of("GENERAL", "THEORY", "PRACTICE").contains(type)) {
+            throw new BadRequestException("El tipo de componente debe ser GENERAL, THEORY o PRACTICE.");
+        }
+        if (component.weeklyHours() == null || component.weeklyHours().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Las horas del componente deben ser mayores a 0.");
+        }
+        String componentRoomType = normalizeNullable(component.requiredRoomType());
+        if (componentRoomType == null) {
+            componentRoomType = fallbackRoomType;
+        }
+        int sortOrder = component.sortOrder() == null ? fallbackSortOrder : component.sortOrder();
+        if (sortOrder < 1) {
+            throw new BadRequestException("El orden del componente debe ser mayor o igual a 1.");
+        }
+        return new CourseComponentData(
+                type,
+                component.weeklyHours(),
+                componentRoomType,
+                sortOrder,
+                component.isActive() == null ? Boolean.TRUE : component.isActive()
         );
     }
 

@@ -13,6 +13,7 @@ import online.horarios_api.shared.domain.model.Page;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -101,7 +102,9 @@ public class ClassroomService implements ClassroomCommandUseCase, ClassroomQuery
                 command.capacity(),
                 requireText(command.type(), "El tipo de aula es obligatorio."),
                 command.isActive() == null ? Boolean.TRUE : command.isActive(),
-                normalizeAvailability(command.availability())
+                normalizeAvailability(command.availability()),
+                normalizeCourseCodes(command.courseCodes()),
+                command.courseComponentIds() == null ? List.of() : command.courseComponentIds()
         );
     }
 
@@ -124,5 +127,18 @@ public class ClassroomService implements ClassroomCommandUseCase, ClassroomQuery
             throw new BadRequestException(message);
         }
         return value.trim();
+    }
+
+    private List<String> normalizeCourseCodes(List<String> courseCodes) {
+        if (courseCodes == null || courseCodes.isEmpty()) {
+            return List.of();
+        }
+        return courseCodes.stream()
+                .filter(code -> code != null && !code.isBlank())
+                .map(code -> code.trim().toUpperCase(Locale.ROOT))
+                .collect(java.util.stream.Collectors.collectingAndThen(
+                        java.util.stream.Collectors.toCollection(LinkedHashSet::new),
+                        List::copyOf
+                ));
     }
 }

@@ -42,7 +42,7 @@ class ClassroomServiceTest {
         when(classroomPort.create(any())).thenAnswer(invocation -> {
             ClassroomData data = invocation.getArgument(0);
             return new Classroom(UUID.randomUUID(), data.code(), data.name(), data.capacity(), data.type(),
-                    data.isActive(), data.availability(), Instant.now(), Instant.now());
+                    data.isActive(), data.availability(), data.courseCodes(), data.courseComponentIds(), Instant.now(), Instant.now());
         });
 
         service.createClassroom(new ClassroomData(
@@ -51,7 +51,9 @@ class ClassroomServiceTest {
                 30,
                 " laboratorio ",
                 null,
-                List.of(new AvailabilitySlot(ScheduleDay.MONDAY, LocalTime.of(8, 0), LocalTime.of(10, 0), true))
+                List.of(new AvailabilitySlot(ScheduleDay.MONDAY, LocalTime.of(8, 0), LocalTime.of(10, 0), true)),
+                List.of(),
+                List.of()
         ));
 
         ArgumentCaptor<ClassroomData> captor = ArgumentCaptor.forClass(ClassroomData.class);
@@ -65,7 +67,7 @@ class ClassroomServiceTest {
     @DisplayName("createClassroom: capacidad inválida → BadRequestException")
     void createClassroom_invalidCapacity() {
         assertThatThrownBy(() -> service.createClassroom(new ClassroomData(
-                "A-101", "Aula", 0, "Laboratorio", true, List.of()
+                "A-101", "Aula", 0, "Laboratorio", true, List.of(), List.of(), List.of()
         ))).isInstanceOf(BadRequestException.class);
     }
 }

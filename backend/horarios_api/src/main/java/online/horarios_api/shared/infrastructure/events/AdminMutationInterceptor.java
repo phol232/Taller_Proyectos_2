@@ -20,9 +20,9 @@ public class AdminMutationInterceptor implements HandlerInterceptor {
             "/api/classrooms", "classrooms.changed",
             "/api/students", "students.changed",
             "/api/academic-periods", "academic-periods.changed",
-            "/api/course-offerings", "course-offerings.changed",
             "/api/facultades", "facultades.changed",
-            "/api/carreras", "carreras.changed"
+            "/api/carreras", "carreras.changed",
+            "/api/schedules", "schedules.changed"
     );
 
     private final SseEventPublisher publisher;

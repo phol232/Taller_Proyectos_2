@@ -26,7 +26,7 @@ public class AcademicPeriodController {
     private final AcademicPeriodQueryUseCase academicPeriodQueryUseCase;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
     @Operation(summary = "Listar períodos académicos")
     public ResponseEntity<List<AcademicPeriodResponse>> listAll() {
         return ResponseEntity.ok(academicPeriodQueryUseCase.listAcademicPeriods().stream()
@@ -35,14 +35,14 @@ public class AcademicPeriodController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
     @Operation(summary = "Obtener período académico por ID")
     public ResponseEntity<AcademicPeriodResponse> findById(@PathVariable UUID id) {
         return ResponseEntity.ok(AcademicPeriodResponse.from(academicPeriodQueryUseCase.getAcademicPeriod(id)));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
     @Operation(summary = "Buscar períodos académicos")
     public ResponseEntity<List<AcademicPeriodResponse>> search(@RequestParam String q) {
         return ResponseEntity.ok(academicPeriodQueryUseCase.searchAcademicPeriods(q).stream()

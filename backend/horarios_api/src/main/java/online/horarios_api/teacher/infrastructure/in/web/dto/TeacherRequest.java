@@ -24,5 +24,7 @@ public record TeacherRequest(
         @Valid
         List<AvailabilitySlotRequest> availability,
 
-        List<String> courseCodes
+        List<String> courseCodes,
+
+        List<UUID> courseComponentIds
 ) {}

@@ -38,6 +38,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
             rs.getBoolean("is_active"),
             List.of(),
             List.of(),
+            List.of(),
             toInstant(rs, "created_at"),
             toInstant(rs, "updated_at")
     );
@@ -55,7 +56,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
                     command.isActive()
             );
             syncAvailability(created.id(), command.availability());
-            syncCourses(created.id(), command.courseCodes());
+            syncCourses(created.id(), command.courseCodes(), command.courseComponentIds());
             return findById(created.id()).orElseThrow();
         } catch (DataAccessException ex) {
             throw mapException(ex, command.code());
@@ -76,7 +77,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
                     command.isActive()
             );
             syncAvailability(updated.id(), command.availability());
-            syncCourses(updated.id(), command.courseCodes());
+            syncCourses(updated.id(), command.courseCodes(), command.courseComponentIds());
             return findById(updated.id()).orElseThrow();
         } catch (DataAccessException ex) {
             throw mapException(ex, command.code());
@@ -178,6 +179,7 @@ public class TeacherJdbcAdapter implements TeacherPort {
                 baseTeacher.isActive(),
                 loadAvailability(baseTeacher.id()),
                 loadCourseCodes(baseTeacher.id()),
+                loadCourseComponentIds(baseTeacher.id()),
                 baseTeacher.createdAt(),
                 baseTeacher.updatedAt()
         );
@@ -222,7 +224,28 @@ public class TeacherJdbcAdapter implements TeacherPort {
         );
     }
 
-    private void syncCourses(UUID teacherId, List<String> courseCodes) {
+    private List<UUID> loadCourseComponentIds(UUID teacherId) {
+        return jdbcTemplate.query(
+                "SELECT course_component_id FROM fn_list_teacher_course_component_ids(?)",
+                (rs, rowNum) -> rs.getObject("course_component_id", UUID.class),
+                teacherId
+        );
+    }
+
+    private void syncCourses(UUID teacherId, List<String> courseCodes, List<UUID> componentIds) {
+        if (componentIds != null && !componentIds.isEmpty()) {
+            UUID[] componentArray = componentIds.toArray(new UUID[0]);
+            jdbcTemplate.execute(
+                    "SELECT fn_set_teacher_course_components(?, ?)",
+                    (PreparedStatementCallback<Boolean>) ps -> {
+                        ps.setObject(1, teacherId);
+                        ps.setArray(2, ps.getConnection().createArrayOf("uuid", componentArray));
+                        return ps.execute();
+                    }
+            );
+            return;
+        }
+
         String[] codeArray = courseCodes == null ? new String[0] : courseCodes.toArray(new String[0]);
         jdbcTemplate.execute(
                 "SELECT fn_set_teacher_courses_by_codes(?, ?)",

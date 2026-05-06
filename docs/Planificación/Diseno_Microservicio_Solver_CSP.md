@@ -1,549 +1,364 @@
-# Diseño del Microservicio Solver CSP
+# Diseño del Microservicio Solver CSP — Planner UC
 
-## 1. Objetivo
+## Contexto del Sistema
 
-Definir el modelo de datos y la arquitectura mínima para implementar el motor de horarios requerido por `Requerimientos_Funcionales_y_No_Funcionales.md`, respetando las reglas de `frontend/AGENTS.md`.
+El microservicio Solver CSP genera horarios académicos institucionales y personales sin solapamientos, respetando disponibilidad de docentes, aulas, vacantes, prerrequisitos, créditos, turno preferido y tiempos de traslado.
 
-El estado actual del repositorio solo cubre autenticación, sesiones y perfil. Para cumplir RF-01 a RF-17, sí es necesario agregar tablas nuevas.
+PostgreSQL es la fuente de verdad. El backend y el solver no crean esquema desde ORM; toda operación de datos se hace mediante funciones PL/pgSQL o tablas diseñadas en `database/`.
 
----
-
-## 2. Decisión de arquitectura
-
-### 2.1 Responsabilidades por servicio
-
-**Spring Boot (`backend/horarios_api`)**
-- Sigue siendo el sistema de registro para autenticación, usuarios, perfil y CRUD académico.
-- Expone los flujos de negocio del sistema principal.
-- Mantiene la política actual: DDL manual en `database/` y lógica SQL reusable en PL/pgSQL.
-
-**FastAPI (`solver_api`, pendiente de implementación)**
-- Encapsula la generación de horarios docente y estudiante.
-- Ejecuta validaciones CSP y devuelve conflictos explicables.
-- Persiste artefactos propios del solver (`solver_runs`, conflictos, resultados de generación).
-- No debe duplicar autenticación ni lógica ya resuelta por el backend Java.
-
-### 2.2 Persistencia
-
-Para el PMV conviene usar **el mismo PostgreSQL** con separación lógica por bounded context:
-- tablas transaccionales académicas compartidas por el sistema;
-- tablas operativas del solver para corridas, conflictos y auditoría.
-
-El microservicio FastAPI debe usar **SQLAlchemy Core o `psycopg`**, no ORM rico, para mantenerse alineado con la regla del proyecto de no esconder el acceso a datos detrás de mapeos automáticos.
-
-### 2.3 Estrategia de integración
-
-- El backend Java sigue siendo la puerta principal para usuarios y CRUD.
-- El solver FastAPI trabaja sobre snapshots consistentes del período.
-- La generación docente conviene ejecutarla como **job asíncrono**:
-  - `POST /api/v1/teacher-schedules/generate`
-  - respuesta `202 Accepted` con `run_id`
-  - `GET /api/v1/solver-runs/{run_id}` para consultar estado
-- La generación de propuesta para estudiante puede ser síncrona mientras siga cumpliendo el límite de 5 segundos.
+El dominio no usa “secciones” como concepto principal. La unidad académica visible para el estudiante es el **curso**. La unidad que el solver agenda es el **componente horario del curso**.
 
 ---
 
-## 3. Tablas que ya existen y se reutilizan
+## Modelo Mental Clave
 
-Estas tablas ya están en `database/schema.sql` y no deben duplicarse:
-
-- `users`
-- `profiles`
-- `refresh_tokens`
-- `password_reset_tokens`
-- `oauth2_linked_accounts`
-
-`users` ya resuelve identidad, email, rol y estado activo. Las entidades académicas deben colgarse de esa identidad cuando aplique.
-
----
-
-## 4. Tablas nuevas obligatorias
-
-## 4.1 Núcleo académico
-
-| Tabla | Propósito | Columnas clave / reglas |
-|---|---|---|
-| `academic_periods` | Períodos académicos sobre los que se genera el horario. | `id`, `code`, `name`, `starts_at`, `ends_at`, `status`, `max_student_credits`; `code` único. |
-| `time_slots` | Bloques horarios fijos reutilizables por el solver. | `id`, `day_of_week`, `start_time`, `end_time`, `slot_order`, `is_active`; `UNIQUE(day_of_week, start_time, end_time)`. |
-| `teachers` | Datos académicos del docente. | `id`, `user_id`, `code`, `specialty`, `is_active`; `user_id` único, `code` único. |
-| `teacher_availability` | Disponibilidad semanal del docente por bloque. | `teacher_id`, `time_slot_id`, `is_available`; `UNIQUE(teacher_id, time_slot_id)`. |
-| `students` | Datos académicos del estudiante. | `id`, `user_id`, `code`, `cycle`, `career`, `credit_limit`, `is_active`; `user_id` único, `code` único. |
-| `student_completed_courses` | Cursos aprobados del estudiante. | `student_id`, `course_id`, `approved_at`; `UNIQUE(student_id, course_id)`. |
-| `classrooms` | Aulas físicas. | `id`, `code`, `name`, `capacity`, `room_type`, `is_active`; `code` único. |
-| `classroom_availability` | Disponibilidad del aula por bloque. | `classroom_id`, `time_slot_id`, `is_available`; `UNIQUE(classroom_id, time_slot_id)`. |
-| `courses` | Catálogo base de cursos. | `id`, `code`, `name`, `credits`, `weekly_hours`, `required_room_type`, `is_active`; `code` único. |
-| `course_prerequisites` | Relación N:M de prerrequisitos. | `course_id`, `prerequisite_course_id`; `UNIQUE(course_id, prerequisite_course_id)`. |
-| `course_offerings` | Oferta de un curso en un período. | `id`, `academic_period_id`, `course_id`, `expected_enrollment`, `status`; `UNIQUE(academic_period_id, course_id)`. |
-| `course_sections` | Secciones concretas de una oferta. | `id`, `course_offering_id`, `section_code`, `vacancy_limit`, `status`; `UNIQUE(course_offering_id, section_code)`. |
-| `section_teacher_candidates` | Docentes que sí pueden dictar una sección. | `section_id`, `teacher_id`, `priority_weight`; `UNIQUE(section_id, teacher_id)`. |
-
-## 4.2 Horario docente
-
-| Tabla | Propósito | Columnas clave / reglas |
-|---|---|---|
-| `teaching_schedules` | Cabecera del horario docente de un período. | `id`, `academic_period_id`, `version`, `status`, `created_by`, `confirmed_by`, `created_at`, `confirmed_at`; permitir una sola versión `CONFIRMED` activa por período. |
-| `section_assignments` | Asignación de una sección dentro de un horario. | `id`, `teaching_schedule_id`, `section_id`, `teacher_id`, `classroom_id`, `assignment_status`; `UNIQUE(teaching_schedule_id, section_id)`. |
-| `section_assignment_slots` | Bloques horarios concretos de cada asignación. | `id`, `section_assignment_id`, `teaching_schedule_id`, `section_id`, `teacher_id`, `classroom_id`, `time_slot_id`; índices/constraints para evitar conflictos. |
-
-**Constraints recomendados en `section_assignment_slots`:**
-- `UNIQUE(teaching_schedule_id, teacher_id, time_slot_id)`
-- `UNIQUE(teaching_schedule_id, classroom_id, time_slot_id)`
-- índice por `section_id`
-- índice por `time_slot_id`
-
-Con esto el borrador ya funciona como reserva transaccional de recursos y cubre RF-08, RF-09, RF-10 y RF-11.
-
-## 4.3 Horario del estudiante
-
-| Tabla | Propósito | Columnas clave / reglas |
-|---|---|---|
-| `student_schedules` | Cabecera del horario del estudiante por período. | `id`, `student_id`, `academic_period_id`, `status`, `generated_by`, `created_at`, `confirmed_at`; `UNIQUE(student_id, academic_period_id, status)` parcial según estado activo. |
-| `student_schedule_items` | Secciones elegidas por el estudiante. | `id`, `student_schedule_id`, `student_id`, `section_id`, `course_id`, `item_status`; `UNIQUE(student_schedule_id, section_id)` y `UNIQUE(student_schedule_id, course_id)`. |
-
-La vacante disponible de una sección se calcula con:
-- `course_sections.vacancy_limit`
-- menos el conteo de `student_schedule_items` activos/confirmados para esa sección.
-
----
-
-## 5. Tablas nuevas recomendadas para el microservicio solver
-
-| Tabla | Propósito | Columnas clave / reglas |
-|---|---|---|
-| `solver_runs` | Auditoría y seguimiento de cada corrida. | `id`, `run_type` (`TEACHER`/`STUDENT`), `academic_period_id`, `student_id` nullable, `status`, `requested_by`, `started_at`, `finished_at`, `time_limit_ms`, `input_hash`, `result_summary`. |
-| `solver_run_conflicts` | Conflictos explicables cuando no hay solución o cuando una validación falla. | `id`, `solver_run_id`, `conflict_type`, `resource_type`, `resource_id`, `section_id`, `time_slot_id`, `message`, `details_json`. |
-
-Estas dos tablas no son opcionales si quieren:
-- polling de jobs;
-- trazabilidad;
-- explicación de conflictos para RF-15;
-- evidencia para depurar si una corrida supera el tiempo objetivo.
-
----
-
-## 6. Tablas que no conviene modelar como JSON
-
-No almacenar como arrays o JSON en una sola columna:
-
-- cursos aprobados del estudiante;
-- prerrequisitos;
-- disponibilidad docente;
-- disponibilidad de aula;
-- franjas asignadas a secciones.
-
-Eso rompería validaciones, índices y control de concurrencia. Todas esas relaciones deben ser normalizadas.
-
----
-
-## 7. Algoritmo recomendado
-
-## 7.1 Generación de horario docente
-
-### Variables
-
-Cada variable del CSP es una `course_section` del período.
-
-### Dominio de cada variable
-
-Cada sección tiene como dominio las combinaciones factibles de:
-- docente candidato;
-- aula compatible;
-- conjunto de `time_slots` necesarios para cubrir `weekly_hours`.
-
-Antes de iniciar la búsqueda, el dominio se poda con restricciones locales:
-- docente permitido para la sección;
-- disponibilidad completa del docente;
-- disponibilidad completa del aula;
-- capacidad del aula mayor o igual a la matrícula esperada;
-- compatibilidad `required_room_type` del curso vs `room_type` del aula.
-
-### Hard constraints
-
-- un docente no puede ocupar dos bloques superpuestos;
-- un aula no puede ocupar dos bloques superpuestos;
-- la sección debe cubrir exactamente sus horas semanales;
-- la disponibilidad docente y del aula debe respetarse al 100%;
-- la capacidad del aula no puede quedar por debajo de la vacante esperada.
-
-### Soft constraints del PMV
-
-Solo después de encontrar factibilidad:
-- distribuir carga semanal del docente;
-- evitar concentrar toda la carga de una sección en un mismo día;
-- priorizar candidatos con `priority_weight` mayor.
-
-### Heurísticas
-
-Orden recomendado:
-1. **MRV**: elegir primero la sección con menos valores posibles.
-2. **Degree heuristic**: en empate, elegir la que colisiona con más otras secciones.
-3. **LCV**: probar primero el valor que menos reduce dominios ajenos.
-4. **Forward checking** tras cada asignación.
-5. **AC-3 opcional** al construir dominios iniciales o tras grandes podas.
-
-### Estrategia de búsqueda
-
-- Backtracking con deadline duro (`<= 30s`).
-- Guardar la mejor solución factible encontrada hasta el momento.
-- Si no existe solución, devolver los conflictos más frecuentes detectados durante la poda.
-
-## 7.2 Generación de horario del estudiante
-
-La generación del estudiante debe correr **después** de existir un horario docente confirmado del período.
-
-### Variables
-
-Cada variable es un curso seleccionado por el estudiante.
-
-### Dominio
-
-Las secciones confirmadas disponibles para ese curso.
-
-### Filtros previos
-
-Antes de buscar:
-- eliminar cursos sin prerrequisitos cumplidos;
-- eliminar secciones sin vacantes;
-- calcular crédito máximo permitido del estudiante.
-
-### Hard constraints
-
-- no exceder `credit_limit`;
-- no elegir dos secciones solapadas;
-- no elegir secciones sin vacante;
-- no elegir cursos con prerrequisitos faltantes.
-
-### Estrategia
-
-- ordenar cursos por menor número de secciones disponibles;
-- backtracking + forward checking;
-- detenerse en la primera solución válida o hasta `<= 5s`;
-- si no hay solución, devolver conflictos detallados por curso, sección o crédito.
-
----
-
-## 8. Flujo transaccional recomendado
-
-## 8.1 Horario docente
-
-1. El coordinador solicita generación.
-2. Se crea `solver_runs(status='PENDING')`.
-3. El solver toma snapshot del período.
-4. Genera una propuesta.
-5. Si hay solución:
-   - crea `teaching_schedules(status='DRAFT')`;
-   - inserta `section_assignments`;
-   - inserta `section_assignment_slots`;
-   - marca `solver_runs(status='SUCCEEDED')`.
-6. Si no hay solución:
-   - inserta `solver_run_conflicts`;
-   - marca `solver_runs(status='FAILED')`.
-7. La confirmación final del horario cambia `teaching_schedules.status` a `CONFIRMED`.
-
-## 8.2 Horario del estudiante
-
-1. El estudiante selecciona cursos.
-2. El solver valida prerrequisitos, créditos, vacantes y solapamientos.
-3. Si hay propuesta válida:
-   - crea/actualiza `student_schedules(status='DRAFT')`;
-   - inserta `student_schedule_items`.
-4. Al confirmar:
-   - cambia el estado a `CONFIRMED`.
-
----
-
-## 9. Estructura sugerida del microservicio FastAPI
+Un curso puede ser general o estar compuesto por teoría/práctica:
 
 ```text
-solver_api/
-├── app/
-│   ├── api/
-│   │   ├── routes/
-│   │   │   ├── teacher_schedule.py
-│   │   │   ├── student_schedule.py
-│   │   │   └── solver_runs.py
-│   ├── application/
-│   │   ├── use_cases/
-│   │   │   ├── generate_teacher_schedule.py
-│   │   │   ├── validate_teacher_schedule.py
-│   │   │   ├── generate_student_schedule.py
-│   │   │   └── validate_student_schedule.py
-│   ├── domain/
-│   │   ├── models/
-│   │   ├── services/
-│   │   ├── constraints/
-│   │   └── ports/
-│   └── infrastructure/
-│       ├── persistence/
-│       ├── repositories/
-│       └── settings/
-├── tests/
-│   ├── unit/
-│   └── integration/
-└── pyproject.toml
+courses
+  = unidad académica
+  = créditos, ciclo, prerrequisitos, corequisitos, cursos aprobados
+  └── course_components[]
+        = unidad horaria asignable por el solver
+        = GENERAL | THEORY | PRACTICE
+        = horas semanales + tipo de aula requerido
 ```
 
-Regla de dependencias:
+Esto permite casos reales como:
 
-`api -> application -> domain`
+```text
+FIS-101 Física I
+  credits = 4
+  ├── THEORY  2h/sem · Aula regular · Docente A
+  └── PRACTICE 2h/sem · Laboratorio · Docente B
+```
 
-`infrastructure` implementa repositorios y acceso a PostgreSQL, pero no contiene la lógica del solver.
-
----
-
-## 10. Capa de Machine Learning complementaria
-
-## 10.1 Principio de diseño
-
-Machine Learning **no reemplaza** al motor CSP. En este proyecto debe actuar como una capa complementaria para:
-
-- priorizar opciones válidas;
-- puntuar soluciones factibles;
-- sugerir combinaciones con menor riesgo operativo;
-- explicar por qué una propuesta probablemente será corregida.
-
-Regla del proyecto:
-
-- **CSP / restricciones hard** decide si un horario es válido.
-- **ML** ayuda a decidir qué horario válido parece mejor.
-
-## 10.2 Casos de uso aprobados para ML
-
-Los casos con mejor relación valor/complejidad para el PMV+ son:
-
-| Caso | Tipo de problema | Uso en el sistema |
-|---|---|---|
-| Sugerir franjas con menos probabilidad de conflicto | Clasificación / score de riesgo | Ordenar dominios antes o durante la búsqueda CSP |
-| Aprender preferencias históricas de estudiantes o coordinadores | Ranking / clasificación | Priorizar secciones o combinaciones válidas |
-| Detectar patrones de horarios que luego son corregidos manualmente | Clasificación supervisada | Penalizar soluciones que suelen terminar en ajuste manual |
-
-## 10.3 Stack recomendado
-
-| Herramienta | Uso recomendado |
-|---|---|
-| `pandas` | Construcción de datasets, limpieza y feature engineering |
-| `scikit-learn` | Baselines, pipelines, validación, métricas y modelos simples |
-| `XGBoost` o `LightGBM` | Modelos de producción para datos tabulares del PMV+ |
-| `SHAP` | Explicabilidad de scores y ranking de variables influyentes |
-
-Decisión recomendada:
-
-- **baseline**: `pandas` + `scikit-learn`
-- **producción PMV+**: `pandas` + `XGBoost` o `LightGBM`
-- **explicabilidad**: `SHAP`
-
-## 10.4 Qué modelo usar en cada caso
-
-### A. Sugerir franjas horarias con menos probabilidad de conflicto
-
-**Problema**
-- predecir el riesgo de conflicto de una combinación válida candidata.
-
-**Label sugerido**
-- `conflict_risk = 1` si la combinación terminó generando conflicto, rechazo o inviabilidad;
-- `conflict_risk = 0` si se sostuvo sin conflicto.
-
-**Baseline**
-- `LogisticRegression`
-- `RandomForestClassifier`
-
-**Modelo recomendado para PMV+**
-- `XGBoost` o `LightGBM`
-
-**Features sugeridas**
-- día de la semana
-- hora de inicio
-- hora de fin
-- duración total
-- carga acumulada del docente ese día
-- carga acumulada del aula ese día
-- cantidad de secciones cercanas en franja vecina
-- tipo de aula requerida vs tipo de aula real
-- matrícula esperada vs capacidad del aula
-- número de candidatos restantes para esa sección
-
-### B. Aprender preferencias históricas de estudiantes o coordinadores
-
-**Problema**
-- rankear opciones válidas según probabilidad de aceptación o elección.
-
-**Label sugerido**
-- `accepted = 1` si la opción fue elegida o mantenida;
-- `accepted = 0` si fue descartada o reemplazada.
-
-**Baseline**
-- `LogisticRegression`
-- `RandomForestClassifier`
-
-**Modelo recomendado para PMV+**
-- `XGBoost` o `LightGBM`
-
-**Si el histórico crece mucho**
-- pasar a un enfoque de **learning to rank** como `LambdaMART`.
-
-**Features sugeridas**
-- día de la semana
-- turno mañana/tarde/noche
-- cantidad de huecos en el horario
-- número de cursos en el mismo día
-- si la franja deja bloques consecutivos cómodos o fragmenta la jornada
-- historial de aceptación del usuario para esa franja
-- historial de aceptación por coordinador para cierto patrón
-- balance semanal de carga
-
-### C. Detectar patrones de horarios corregidos manualmente
-
-**Problema**
-- predecir si una asignación o propuesta válida será modificada después.
-
-**Label sugerido**
-- `manually_corrected = 1` si el coordinador modificó o reemplazó la asignación;
-- `manually_corrected = 0` si permaneció igual.
-
-**Baseline**
-- `LogisticRegression`
-
-**Modelo recomendado para PMV+**
-- `XGBoost` o `LightGBM`
-
-**Features sugeridas**
-- densidad de cursos por día
-- cantidad de huecos
-- carga total por docente
-- concentración excesiva en un día
-- distancia temporal entre bloques
-- aula al límite de capacidad
-- franja históricamente poco preferida
-- número de conflictos blandos penalizados en la solución
-
-## 10.5 Tabla de datos para ML
-
-Para soportar entrenamiento y trazabilidad, conviene agregar estas tablas cuando se active la capa ML:
-
-| Tabla | Propósito |
-|---|---|
-| `schedule_feedback_events` | Registrar aceptación, rechazo, reemplazo, corrección manual y confirmación de propuestas |
-| `ml_feature_snapshots` | Guardar snapshot de features usadas en entrenamiento o scoring |
-| `ml_training_runs` | Auditoría de entrenamientos, versión de dataset, métrica y artefacto generado |
-| `ml_model_registry` | Versionado de modelos publicados, tipo de problema, estado y ruta del artefacto |
-| `ml_prediction_logs` | Registro de scores emitidos por modelo durante generación o ranking |
-
-### Columnas mínimas sugeridas
-
-**`schedule_feedback_events`**
-- `id`
-- `event_type`
-- `academic_period_id`
-- `student_id` nullable
-- `teaching_schedule_id` nullable
-- `student_schedule_id` nullable
-- `section_id` nullable
-- `assignment_id` nullable
-- `actor_user_id`
-- `event_payload_json`
-- `created_at`
-
-**`ml_model_registry`**
-- `id`
-- `model_name`
-- `model_type`
-- `target_name`
-- `library_name`
-- `library_version`
-- `artifact_path`
-- `feature_schema_json`
-- `metrics_json`
-- `status`
-- `created_at`
-- `activated_at`
-
-**`ml_prediction_logs`**
-- `id`
-- `model_id`
-- `solver_run_id`
-- `prediction_type`
-- `entity_type`
-- `entity_id`
-- `score`
-- `explanation_json`
-- `created_at`
-
-## 10.6 Flujo recomendado de ML
-
-1. El sistema registra eventos de decisión humana y resultados de scheduling.
-2. Un proceso offline arma datasets con `pandas`.
-3. Se entrena un baseline en `scikit-learn`.
-4. Si el baseline aporta valor, se migra a `XGBoost` o `LightGBM`.
-5. El modelo publicado se registra en `ml_model_registry`.
-6. Durante la generación, el solver consulta el score del modelo.
-7. Ese score se usa como:
-   - criterio de orden de dominio;
-   - penalización soft;
-   - ranking de soluciones factibles.
-8. `SHAP` genera explicaciones para auditoría o depuración.
-
-## 10.7 Cómo integrar ML con el CSP
-
-La integración correcta no es “ML genera el horario”, sino:
-
-- el CSP construye valores posibles;
-- ML asigna un score a cada valor o a cada solución parcial;
-- el solver usa ese score para:
-  - ordenar candidatos;
-  - romper empates;
-  - priorizar soluciones más aceptables.
-
-Ejemplo de score compuesto:
-
-`final_score = hard_validity + ml_preference_score - soft_penalty`
-
-Donde:
-- `hard_validity` no es negociable;
-- `ml_preference_score` ayuda a ordenar;
-- `soft_penalty` castiga patrones indeseables.
-
-## 10.8 Qué no usar al inicio
-
-No se recomienda para el PMV:
-
-- redes neuronales profundas;
-- transformers;
-- reinforcement learning para construir el horario completo;
-- modelos generativos que intenten reemplazar el solver.
-
-Razones:
-
-- el dominio actual es tabular;
-- el PMV tendrá pocos datos históricos;
-- se necesita explicabilidad;
-- el riesgo técnico sube mucho y el valor incremental inicial es bajo.
-
-## 10.9 Recomendación de adopción por fases
-
-### Fase 1
-- solo CSP + hard constraints + soft constraints manuales
-
-### Fase 2
-- `pandas` + `scikit-learn` para baseline
-- medir si mejora ranking, aceptación o reducción de correcciones
-
-### Fase 3
-- `XGBoost` o `LightGBM` para producción PMV+
-- `SHAP` para explicar scores
-
-### Fase 4
-- learning to rank si el histórico crece y hay suficientes decisiones reales
+El estudiante sigue llevando **un solo curso** para créditos y avance académico, pero su horario muestra varios bloques si el curso tiene varios componentes.
 
 ---
 
-## 11. Resumen de decisión
+## Tablas Principales
 
-Si se quiere cumplir los RF y lo que hoy dice `AGENTS.md`, la respuesta corta es:
+### Entrada Académica
 
-- **sí**, hacen falta tablas nuevas;
-- el solver debe ser un **microservicio FastAPI separado**;
-- el modelo debe ser **normalizado**, no basado en arrays/JSON;
-- la generación docente y del estudiante deben ser **dos casos de uso distintos**;
-- el algoritmo recomendado para el PMV es **CSP con backtracking + MRV + LCV + forward checking**, con soporte opcional de AC-3;
-- si luego agregan ML, debe ser una **capa de scoring/ranking complementaria** con `scikit-learn` como baseline y `XGBoost`/`LightGBM` para producción;
-- la confirmación del horario y la consistencia concurrente deben quedar protegidas por **constraints SQL e índices únicos**, no solo por lógica en aplicación.
+| Tabla | Uso |
+|---|---|
+| `courses` | Código, nombre, ciclo, créditos, horas totales, prerrequisitos de créditos |
+| `course_components` | Componentes `GENERAL`, `THEORY`, `PRACTICE`; horas y aula requerida por componente |
+| `course_prerequisites` | Prerrequisitos por curso |
+| `course_corequisites` | Cursos que deben tomarse juntos |
+| `teacher_course_components` | Docentes que pueden dictar cada componente |
+| `classroom_courses` | Aulas autorizadas para el curso |
+| `teachers`, `teacher_availability` | Docentes y disponibilidad |
+| `classrooms`, `classroom_availability` | Aulas, capacidad, tipo y disponibilidad |
+| `time_slots` | Franjas de tiempo |
+| `building_travel_times` | Tiempo de traslado entre edificios |
+| `students`, `student_completed_courses`, `profiles` | Datos académicos del estudiante, cursos aprobados y turno |
+
+### Salida Institucional
+
+```text
+teaching_schedules
+course_schedule_assignments
+  = oferta de un componente en un aula/docente
+  = (teaching_schedule_id, course_id, course_component_id, teacher_id)
+course_assignment_slots
+  = slots concretos de esa oferta
+  = incluye course_component_id, aula y time_slot
+```
+
+### Salida del Estudiante
+
+```text
+student_schedules
+student_schedule_items
+  = una fila por curso asignado al estudiante
+  = créditos se cuentan una sola vez
+student_schedule_item_components
+  = componentes concretos elegidos para ese curso
+  = course_component_id + course_assignment_id
+```
+
+---
+
+## Reglas de Modelado
+
+1. Un curso activo debe tener al menos un componente activo.
+2. Un curso puede tener exactamente un componente `GENERAL`, o componentes específicos `THEORY`/`PRACTICE`.
+3. No se mezcla `GENERAL` con `THEORY`/`PRACTICE`.
+4. La suma de `course_components.weekly_hours` debe coincidir con `courses.weekly_hours`.
+5. `courses.credits`, prerrequisitos, corequisitos y cursos aprobados se evalúan por `course_id`.
+6. Docente, aula, tipo de aula y slots se evalúan por `course_component_id`.
+7. `teacher_courses` queda como compatibilidad/índice por curso; la fuente precisa para el solver es `teacher_course_components`.
+
+---
+
+## Restricciones Duras — Fase 1
+
+### H1 — Sin solapamiento de docente
+
+Un docente no puede tener dos componentes en el mismo `time_slot_id` dentro del mismo horario institucional.
+
+```sql
+UNIQUE(teaching_schedule_id, teacher_id, time_slot_id)
+```
+
+### H2 — Sin solapamiento de aula
+
+Un aula no puede alojar dos componentes en el mismo `time_slot_id`.
+
+```sql
+UNIQUE(teaching_schedule_id, classroom_id, time_slot_id)
+```
+
+### H3 — Disponibilidad del docente
+
+Solo se asignan slots donde el docente esté disponible.
+
+### H4 — Disponibilidad del aula
+
+Solo se asignan slots donde el aula esté disponible.
+
+### H5 — Compatibilidad aula-componente
+
+Para asignar un componente:
+
+```text
+classroom_courses(classroom_id, course_id) existe
+AND classrooms.room_type = course_components.required_room_type
+```
+
+### H6 — Competencia del docente por componente
+
+Para asignar un componente:
+
+```text
+teacher_course_components(teacher_id, course_component_id) existe
+```
+
+### H7 — Horas exactas por componente
+
+Cada `course_schedule_assignment` debe tener exactamente:
+
+```text
+course_components.weekly_hours
+```
+
+slots en `course_assignment_slots`.
+
+### H8 — Capacidad suficiente
+
+La capacidad del aula asignada debe cubrir la demanda proyectada de esa oferta.
+
+La demanda se calcula por curso, porque el estudiante que necesita el curso necesita todos sus componentes. Luego se replica por componente para definir cuántas ofertas de cada componente se requieren.
+
+### H9 — Tiempo de traslado del docente
+
+Si un docente tiene slots consecutivos en edificios distintos, el traslado debe ser factible según `building_travel_times`.
+
+---
+
+## Restricciones Duras — Fase 2
+
+### H10 — Prerrequisitos aprobados
+
+Un estudiante solo puede recibir un curso si aprobó todos sus prerrequisitos.
+
+### H11 — Límite de créditos
+
+Los créditos se suman por curso, no por componente:
+
+```text
+SUM(DISTINCT courses.credits)
+  <= MIN(students.credit_limit, academic_periods.max_student_credits)
+```
+
+### H12 — Vacantes por oferta de componente
+
+Cada `course_schedule_assignment` tiene `max_capacity` y `enrolled_count`. El solver reserva vacante por cada componente elegido.
+
+Para que un estudiante reciba un curso con teoría/práctica, debe haber vacante en todas las ofertas de componentes elegidas.
+
+### H13 — Turno del estudiante
+
+Todos los slots de los componentes elegidos deben calzar con el turno preferido del estudiante. Si no existe combinación en el turno preferido, el solver puede intentar turnos adyacentes y registrar `SHIFT_OVERFLOW`.
+
+### H14 — Curso compuesto indivisible
+
+Un curso con varios componentes se asigna de forma atómica:
+
+```text
+asignar THEORY + PRACTICE
+o no asignar el curso
+```
+
+No se permite que el estudiante quede solo con teoría o solo con práctica.
+
+### H15 — Corequisitos
+
+Los cursos corequisitos siguen agrupados por `course_id`. Si un grupo incluye cursos compuestos, el solver debe asignar todos los componentes de todos los cursos del grupo o ninguno.
+
+### H16 — Tiempo de traslado del estudiante
+
+Se valida traslado entre todos los bloques de componentes elegidos en el horario personal.
+
+---
+
+## Restricciones Blandas
+
+| ID | Descripción |
+|---|---|
+| S1 | Minimizar huecos en horario estudiantil |
+| S2 | Evitar más de 4 horas consecutivas para un docente |
+| S3 | Distribuir slots de un componente en días distintos |
+| S4 | Preferir aulas con capacidad cercana a la demanda |
+| S5 | Agrupar cursos del mismo ciclo en franjas convenientes |
+| S6 | Preferir teoría y práctica en días distintos cuando sea posible |
+
+---
+
+## Algoritmo — Fase 1: Horario Institucional
+
+```text
+Entrada:
+  - academic_period_id
+  - courses activos
+  - course_components activos
+  - teacher_course_components
+  - classroom_courses
+  - disponibilidades de docentes/aulas
+  - time_slots y building_travel_times
+
+Proceso:
+  1. Cargar cursos y componentes.
+  2. Proyectar demanda por curso.
+  3. Para cada componente del curso, calcular N_aulas.
+  4. Crear variables CSP por (course_component_id, offer_index).
+  5. Ordenar variables por:
+       (N_aulas * component.weekly_hours) DESC,
+       menos aulas compatibles,
+       menos docentes compatibles.
+  6. Para cada variable:
+       a. Buscar docentes en teacher_course_components.
+       b. Buscar aulas autorizadas para course_id y con room_type compatible.
+       c. Buscar slots donde docente y aula estén disponibles.
+       d. Validar solapamientos y traslado docente.
+       e. Backtracking si no hay combinación válida.
+  7. Persistir:
+       teaching_schedules
+       course_schedule_assignments con course_component_id
+       course_assignment_slots con course_component_id
+```
+
+Salida:
+
+```text
+teaching_schedule DRAFT
+solver_run SUCCEEDED o FAILED
+solver_run_conflicts con causa específica
+```
+
+---
+
+## Algoritmo — Fase 2: Horario del Estudiante
+
+```text
+Entrada:
+  - teaching_schedule CONFIRMED
+  - estudiantes activos
+  - cursos aprobados
+  - ofertas de componentes con vacantes
+  - corequisitos
+  - turno preferido
+
+Proceso por estudiante:
+  1. Calcular cursos candidatos:
+       - ciclo permitido
+       - no aprobados
+       - prerrequisitos aprobados
+       - todos sus componentes tienen ofertas disponibles
+  2. Agrupar corequisitos por course_id.
+  3. Ordenar candidatos por ciclo y créditos.
+  4. Para cada curso o grupo:
+       a. Intentar elegir una oferta para cada componente requerido.
+       b. Verificar vacantes, turno, solapamientos y traslado.
+       c. Reservar todos los componentes si el curso completo es válido.
+       d. Si falla un componente, liberar reservas parciales.
+  5. Persistir:
+       student_schedule_items por curso
+       student_schedule_item_components por componente elegido
+```
+
+El estudiante nunca recibe créditos duplicados por tener teoría y práctica.
+
+---
+
+## Migraciones Requeridas del Solver
+
+Las migraciones estructurales de este cambio viven en:
+
+```text
+database/solver/migraciones/
+```
+
+Archivo base:
+
+```text
+database/solver/migraciones/202604_course_components_solver.sql
+```
+
+Incluye:
+
+1. `course_components`.
+2. `teacher_course_components`.
+3. `course_component_id` en `course_schedule_assignments`.
+4. `course_component_id` en `course_assignment_slots`.
+5. `student_schedule_item_components`.
+6. Backfill de componente `GENERAL` para cursos existentes.
+7. Backfill de docentes por componente desde `teacher_courses`.
+8. Índices para FKs y búsquedas del solver.
+
+---
+
+## Funciones PL/pgSQL Relevantes
+
+| Función | Responsabilidad |
+|---|---|
+| `fn_replace_course_components` | Reemplazar componentes de un curso en transacción |
+| `fn_list_course_components` | Listar componentes para API de cursos |
+| `fn_set_teacher_course_components` | Asignar docentes a componentes |
+| `fn_list_teacher_course_component_ids` | Hidratar API de docentes |
+| `fn_solver_list_active_course_components` | Entrada principal de componentes al solver |
+| `fn_solver_list_teacher_course_components` | Docentes compatibles por componente |
+| `fn_solver_persist_teaching_schedule` | Persistir ofertas componente-aula |
+| `fn_solver_persist_student_schedule` | Persistir cursos agrupados y componentes elegidos |
+
+---
+
+## Componentes del Microservicio
+
+| Componente | Responsabilidad |
+|---|---|
+| `SolverInputLoader` | Carga cursos, componentes, docentes, aulas, disponibilidad y estudiantes |
+| `DemandProjector` | Calcula ofertas necesarias por componente usando demanda por curso |
+| `TeacherScheduleSolver` | Agenda componentes con CSP/backtracking |
+| `ConstraintValidator` | Valida restricciones H1-H9 antes de persistir |
+| `VacancyTracker` | Controla vacantes por oferta de componente |
+| `StudentScheduleSolver` | Asigna cursos completos eligiendo todos sus componentes |
+| `CorequisiteGrouper` | Agrupa cursos corequisitos por `course_id` |
+| `ShiftFilter` | Filtra slots por turno |
+| `TravelTimeChecker` | Valida traslado de docentes y estudiantes |
+| `ConflictReporter` | Registra conflictos explicables |
+
+---
+
+## Reglas de Negocio Adicionales
+
+1. El solver siempre genera horarios institucionales en `DRAFT`.
+2. Un horario `CONFIRMED` no se modifica directamente.
+3. Fase 2 solo opera sobre un `teaching_schedule` confirmado.
+4. Si un componente no tiene docente o aula compatible, se registra `NO_ASSIGNMENT_POSSIBLE`.
+5. Si un estudiante no consigue todos los componentes de un curso, el curso completo no se asigna.
+6. Si una oferta de componente se queda sin vacantes, se registra `NO_VACANCY`.
+7. La priorización por GPA aplica al orden de atención de estudiantes, no cambia créditos ni prerrequisitos.
+8. `input_hash` debe considerar cursos, componentes, docentes, aulas, slots y restricciones relevantes.

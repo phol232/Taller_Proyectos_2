@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import online.horarios_api.shared.infrastructure.in.web.dto.AvailabilitySlotRequest;
 
 import java.util.List;
+import java.util.UUID;
 
 public record ClassroomRequest(
         @NotBlank(message = "El código es obligatorio")
@@ -23,5 +24,9 @@ public record ClassroomRequest(
         Boolean isActive,
 
         @Valid
-        List<AvailabilitySlotRequest> availability
+        List<AvailabilitySlotRequest> availability,
+
+        List<String> courseCodes,
+
+        List<UUID> courseComponentIds
 ) {}

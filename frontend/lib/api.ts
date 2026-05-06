@@ -8,6 +8,16 @@ import {
 import { toastError } from "@/lib/utils";
 import type { AuthResponse } from "@/types/auth";
 
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    suppressGlobalErrorToast?: boolean;
+  }
+
+  export interface InternalAxiosRequestConfig {
+    suppressGlobalErrorToast?: boolean;
+  }
+}
+
 type ApiErrorData = {
   message?: string;
 };
@@ -65,6 +75,7 @@ api.interceptors.response.use(
 
     const { status, data } = error.response;
     const url = getRequestUrl(error);
+    const suppressGlobalErrorToast = Boolean(error.config?.suppressGlobalErrorToast);
 
     if (status === 401) {
       if (url.includes("/api/auth/refresh")) {
@@ -88,6 +99,8 @@ api.interceptors.response.use(
           error
         );
       }
+    } else if (suppressGlobalErrorToast) {
+      return Promise.reject(error);
     } else if (status === 403) {
       toastError("Sin permisos", "Tu rol no tiene acceso a esta acción.");
     } else if (status === 409) {

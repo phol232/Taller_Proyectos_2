@@ -13,7 +13,6 @@ const assignment = (id: string, teacherId: string, ts: TimeSlot): Assignment => 
   courseId: `course-${id}`,
   courseName: `Curso ${id}`,
   courseCode: `C-${id}`,
-  section: "A",
   teacherId,
   teacherName: `Docente ${teacherId}`,
   classroomId: `room-${teacherId}`,

@@ -14,6 +14,8 @@ public record Classroom(
         String type,
         boolean isActive,
         List<AvailabilitySlot> availability,
+        List<String> courseCodes,
+        List<UUID> courseComponentIds,
         Instant createdAt,
         Instant updatedAt
 ) {}

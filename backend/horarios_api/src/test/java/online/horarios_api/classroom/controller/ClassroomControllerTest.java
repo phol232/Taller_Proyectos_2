@@ -63,7 +63,7 @@ class ClassroomControllerTest {
         mockMvc.perform(post("/api/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new ClassroomRequest("", "", 0, "", true, List.of())
+                                new ClassroomRequest("", "", 0, "", true, List.of(), List.of(), List.of())
                         )))
                 .andExpect(status().isBadRequest());
 
@@ -74,13 +74,13 @@ class ClassroomControllerTest {
     @DisplayName("POST /api/classrooms: payload válido → 200")
     void createClassroom_validPayload_returns200() throws Exception {
         Classroom classroom = new Classroom(UUID.randomUUID(), "A-101", "Aula 101", 30, "Laboratorio",
-                true, List.of(), Instant.now(), Instant.now());
+                true, List.of(), List.of(), List.of(), Instant.now(), Instant.now());
         when(classroomCommandUseCase.createClassroom(any())).thenReturn(classroom);
 
         mockMvc.perform(post("/api/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new ClassroomRequest("A-101", "Aula 101", 30, "Laboratorio", true, List.of())
+                                new ClassroomRequest("A-101", "Aula 101", 30, "Laboratorio", true, List.of(), List.of(), List.of())
                         )))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("A-101"));

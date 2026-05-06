@@ -45,6 +45,7 @@ import { SelectField } from "@/components/admin/SelectField";
 import { FiltersPopover, type StatusFilter } from "@/components/admin/FiltersPopover";
 import { ApprovedCoursePicker } from "@/components/admin/ApprovedCoursePicker";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
+import { formatDecimal } from "@/lib/decimalFormat";
 import { studentSchema } from "@/lib/validators/student.schema";
 import { toastError, toastSuccess, cn } from "@/lib/utils";
 import { joinFullName, splitFullName } from "@/lib/fullName";
@@ -357,7 +358,7 @@ export default function StudentsPage() {
     <PageShell
       title="Estudiantes"
       actions={
-        <Button onClick={openCreate} className="h-10 rounded-md bg-[#6B21A8] px-4 text-white hover:bg-[#581C87]">
+        <Button onClick={openCreate} size="md">
           <Plus className="h-4 w-4" />
           Nuevo estudiante
         </Button>
@@ -576,11 +577,11 @@ export default function StudentsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+            <Button variant="outline" size="md" onClick={() => setDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={() => void handleSubmit()} disabled={submitting}>
-              {submitting ? "Guardando…" : editing ? "Guardar" : "Crear"}
+            <Button size="md" onClick={() => void handleSubmit()} disabled={submitting}>
+              {submitting ? "Guardando…" : editing ? "Guardar estudiante" : "Crear estudiante"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -990,7 +991,7 @@ function ApprovedCoursesModal({
                             </div>
                           </div>
                           <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                            Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
+                            Ciclo {c.cycle ?? 1} · {c.credits} cr · {formatDecimal(c.weeklyHours)}h/sem
                           </span>
                         </button>
                       ))}
@@ -1048,7 +1049,7 @@ function ApprovedCoursesModal({
                       </div>
                       {c ? (
                         <p className="text-xs text-muted-foreground">
-                          Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
+                          Ciclo {c.cycle ?? 1} · {c.credits} cr · {formatDecimal(c.weeklyHours)}h/sem
                           {c.requiredRoomType ? ` · ${c.requiredRoomType}` : ""}
                         </p>
                       ) : (
@@ -1128,7 +1129,7 @@ function ApprovedDetailModal({ course, onClose }: { course: CourseAdmin | null; 
           <DetailRow label="Nombre"          value={course.name} />
           <DetailRow label="Ciclo"           value={String(course.cycle ?? 1)} />
           <DetailRow label="Créditos"        value={String(course.credits)} />
-          <DetailRow label="Horas semanales" value={String(course.weeklyHours)} />
+          <DetailRow label="Horas semanales" value={formatDecimal(course.weeklyHours)} />
           <DetailRow label="Tipo de aula"    value={course.requiredRoomType ?? "—"} />
           <DetailRow label="Estado"          value={course.isActive ? "Activo" : "Inactivo"} />
         </div>

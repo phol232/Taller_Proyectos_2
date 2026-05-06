@@ -12,8 +12,6 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 public class CatalogBeanConfig {
 
-    /** Bean concreto del servicio. @Primary para que Spring lo prefiera
-     *  cuando haya ambigüedad de tipo CatalogService. */
     @Bean
     @Primary
     public CatalogService catalogService(CatalogPort catalogPort) {

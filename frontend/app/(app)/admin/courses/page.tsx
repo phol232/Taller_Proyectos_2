@@ -49,10 +49,11 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { SelectField } from "@/components/admin/SelectField";
 import { FiltersPopover, type StatusFilter } from "@/components/admin/FiltersPopover";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
+import { formatDecimal, splitHoursInTenths } from "@/lib/decimalFormat";
 import { courseSchema } from "@/lib/validators/course.schema";
 import { toastError, toastSuccess, cn } from "@/lib/utils";
 import { useAdminEvents } from "@/hooks/useAdminEvents";
-import type { CourseAdmin } from "@/types/admin";
+import type { CourseAdmin, CourseComponentAdmin, CourseComponentType } from "@/types/admin";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,17 @@ function flattenErrors(error: z.ZodError): Record<string, string> {
   }, {});
 }
 
+const DECIMAL_STEP = "0.1";
+const DECIMAL_EPSILON = 0.000001;
+
+function parseNumericInput(value: string): number {
+  return value === "" ? 0 : Number(value);
+}
+
+function areNumbersEqual(left: number, right: number): boolean {
+  return Math.abs(left - right) < DECIMAL_EPSILON;
+}
+
 // ─── Form types ───────────────────────────────────────────────────────────────
 
 type CourseFormState = {
@@ -113,6 +125,7 @@ type CourseFormState = {
   weeklyHours: number;
   requiredRoomType: string;
   isActive: boolean;
+  components: CourseComponentAdmin[];
   prerequisites: string[];
 };
 
@@ -125,6 +138,9 @@ const EMPTY_FORM: CourseFormState = {
   weeklyHours: 4,
   requiredRoomType: "",
   isActive: true,
+  components: [
+    { id: null, componentType: "GENERAL", weeklyHours: 4, requiredRoomType: "", sortOrder: 1, isActive: true },
+  ],
   prerequisites: [],
 };
 
@@ -132,6 +148,43 @@ const CYCLE_OPTIONS = Array.from({ length: 10 }, (_, index) => {
   const value = String(index + 1);
   return { value, label: value };
 });
+
+const COMPONENT_LABELS: Record<CourseComponentType, string> = {
+  GENERAL: "General",
+  THEORY: "Teoría",
+  PRACTICE: "Práctica",
+};
+
+function normalizeCourseComponents(course: CourseAdmin): CourseComponentAdmin[] {
+  const components = course.components ?? [];
+  if (components.length > 0) {
+    return components.map((component, index) => ({
+      id: component.id ?? null,
+      componentType: component.componentType,
+      weeklyHours: component.weeklyHours,
+      requiredRoomType: component.requiredRoomType,
+      sortOrder: component.sortOrder ?? index + 1,
+      isActive: component.isActive,
+    }));
+  }
+  return [{
+    id: null,
+    componentType: "GENERAL",
+    weeklyHours: course.weeklyHours,
+    requiredRoomType: course.requiredRoomType ?? "",
+    sortOrder: 1,
+    isActive: true,
+  }];
+}
+
+function summarizeComponents(components: CourseComponentAdmin[] | undefined, fallbackHours: number) {
+  if (!components || components.length === 0) return `${formatDecimal(fallbackHours)} h/sem`;
+  return components
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((component) => `${formatDecimal(component.weeklyHours)} ${COMPONENT_LABELS[component.componentType].toLowerCase()}`)
+    .join(" + ");
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -163,12 +216,16 @@ export default function CoursesPage() {
   const [activeCoursePrerreq, setActiveCoursePrerreq]       = useState<CourseAdmin | null>(null);
   const [, setActiveCoursePrerreqIdx] = useState(0);
 
+  // Schedule / components modal
+  const [scheduleModalOpen, setScheduleModalOpen]           = useState(false);
+  const [activeScheduleCourse, setActiveScheduleCourse]     = useState<CourseAdmin | null>(null);
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
-  const loadCourses = useCallback(async (search: string, pg = page) => {
-    setLoading(true);
+  const loadCourses = useCallback(async (search: string, pg = page, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = search.trim()
         ? await adminApi.searchCourses(search.trim(), pg)
@@ -179,7 +236,7 @@ export default function CoursesPage() {
     } catch (error) {
       toastError("No se pudieron cargar los cursos", getApiErrorMessage(error, "Intenta nuevamente."));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [page]);
 
@@ -190,18 +247,24 @@ export default function CoursesPage() {
 
   const anyModalOpenRef = useRef(false);
   useEffect(() => {
-    anyModalOpenRef.current = prereqModalOpen || dialogOpen;
-  }, [prereqModalOpen, dialogOpen]);
+    anyModalOpenRef.current = prereqModalOpen || dialogOpen || scheduleModalOpen;
+  }, [prereqModalOpen, dialogOpen, scheduleModalOpen]);
 
   useEffect(() => { void loadCourses(query, page); }, [query, page, loadCourses]);
   useAdminEvents("courses.changed", () => {
     if (!anyModalOpenRef.current) {
-      void loadCourses(query, page);
+      // Recarga silenciosa: no colapsa el grid ni provoca salto de scroll
+      void loadCourses(query, page, true);
     }
   });
 
   const roomTypes = useMemo(
-    () => Array.from(new Set(courses.map((c) => c.requiredRoomType).filter((v): v is string => !!v))).sort(),
+    () => Array.from(new Set(
+      courses.flatMap((c) => [
+        c.requiredRoomType,
+        ...(c.components ?? []).map((component) => component.requiredRoomType),
+      ]).filter((v): v is string => !!v),
+    )).sort(),
     [courses],
   );
 
@@ -210,7 +273,11 @@ export default function CoursesPage() {
       courses.filter((c) => {
         if (statusFilter === "active" && !c.isActive) return false;
         if (statusFilter === "inactive" && c.isActive) return false;
-        if (roomTypeFilter !== "all" && c.requiredRoomType !== roomTypeFilter) return false;
+        if (
+          roomTypeFilter !== "all" &&
+          c.requiredRoomType !== roomTypeFilter &&
+          !(c.components ?? []).some((component) => component.requiredRoomType === roomTypeFilter)
+        ) return false;
         if (minCredits.trim() && c.credits < Number(minCredits)) return false;
         if (maxCredits.trim() && c.credits > Number(maxCredits)) return false;
         return true;
@@ -241,6 +308,7 @@ export default function CoursesPage() {
   }
 
   function openEdit(course: CourseAdmin) {
+    const components = normalizeCourseComponents(course);
     setEditing(course);
     setForm({
       code: course.code,
@@ -251,6 +319,7 @@ export default function CoursesPage() {
       weeklyHours: course.weeklyHours,
       requiredRoomType: course.requiredRoomType ?? "",
       isActive: course.isActive,
+      components,
       prerequisites: course.prerequisites,
     });
     setErrors({});
@@ -263,7 +332,15 @@ export default function CoursesPage() {
 
     setSubmitting(true);
     try {
-      const payload = { ...result.data, requiredRoomType: result.data.requiredRoomType.trim() };
+      const payload = {
+        ...result.data,
+        requiredRoomType: result.data.requiredRoomType.trim(),
+        components: result.data.components.map((component) => ({
+          ...component,
+          id: component.id ?? null,
+          requiredRoomType: component.requiredRoomType.trim(),
+        })),
+      };
       if (editing) {
         const updated = await adminApi.updateCourse(editing.id, payload);
         setCourses((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
@@ -323,13 +400,23 @@ export default function CoursesPage() {
     setActiveCoursePrerreq(updated);
   }
 
+  function openScheduleModal(course: CourseAdmin) {
+    setActiveScheduleCourse(course);
+    setScheduleModalOpen(true);
+  }
+
+  function onScheduleUpdated(updated: CourseAdmin) {
+    setCourses((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setActiveScheduleCourse(updated);
+  }
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <PageShell
       title="Cursos"
       actions={
-        <Button onClick={openCreate} className="h-10 rounded-md bg-[#6B21A8] px-4 text-white hover:bg-[#581C87]">
+        <Button onClick={openCreate} size="md">
           <Plus className="h-4 w-4" />
           Nuevo curso
         </Button>
@@ -370,6 +457,7 @@ export default function CoursesPage() {
                   <Input
                     type="number"
                     min={0}
+                    step={DECIMAL_STEP}
                     value={minCredits}
                     onChange={(e) => setMinCredits(e.target.value)}
                     placeholder="Mín."
@@ -377,6 +465,7 @@ export default function CoursesPage() {
                   <Input
                     type="number"
                     min={0}
+                    step={DECIMAL_STEP}
                     value={maxCredits}
                     onChange={(e) => setMaxCredits(e.target.value)}
                     placeholder="Máx."
@@ -410,6 +499,7 @@ export default function CoursesPage() {
               course={course}
               paletteIndex={idx}
               onPrerequisitos={() => openPrereqModal(course, idx)}
+              onSchedule={() => openScheduleModal(course)}
               onEdit={() => openEdit(course)}
               onDeactivate={() => setConfirmDeactivate(course)}
               onDelete={() => setConfirmDelete(course)}
@@ -446,6 +536,14 @@ export default function CoursesPage() {
         onOpenChange={setPrereqModalOpen}
         course={activeCoursePrerreq}
         onUpdated={onPrereqsUpdated}
+      />
+
+      {/* ── Schedule / Components Modal ──────────────────────── */}
+      <ScheduleModal
+        open={scheduleModalOpen}
+        onOpenChange={setScheduleModalOpen}
+        course={activeScheduleCourse}
+        onUpdated={onScheduleUpdated}
       />
 
       {/* ── Create / Edit dialog ─────────────────────────────── */}
@@ -492,8 +590,9 @@ export default function CoursesPage() {
                     type="number"
                     min={1}
                     max={6}
+                    step={1}
                     value={form.credits}
-                    onChange={(e) => setForm((p) => ({ ...p, credits: Number(e.target.value) }))}
+                    onChange={(e) => setForm((p) => ({ ...p, credits: parseNumericInput(e.target.value) }))}
                   />
                 </FormField>
               </div>
@@ -501,17 +600,19 @@ export default function CoursesPage() {
                 <FormField label="Horas semanales" error={errors.weeklyHours}>
                   <Input
                     type="number"
-                    min={1}
-                    value={form.weeklyHours}
-                    onChange={(e) => setForm((p) => ({ ...p, weeklyHours: Number(e.target.value) }))}
+                    min={0.1}
+                    step={DECIMAL_STEP}
+                    value={formatDecimal(form.weeklyHours)}
+                    onChange={(e) => setForm((p) => ({ ...p, weeklyHours: parseNumericInput(e.target.value) }))}
                   />
                 </FormField>
                 <FormField label="Créditos requeridos" error={errors.requiredCredits}>
                   <Input
                     type="number"
                     min={0}
-                    value={form.requiredCredits}
-                    onChange={(e) => setForm((p) => ({ ...p, requiredCredits: Number(e.target.value) }))}
+                    step={DECIMAL_STEP}
+                    value={formatDecimal(form.requiredCredits)}
+                    onChange={(e) => setForm((p) => ({ ...p, requiredCredits: parseNumericInput(e.target.value) }))}
                   />
                 </FormField>
               </div>
@@ -530,11 +631,11 @@ export default function CoursesPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+            <Button variant="outline" size="md" onClick={() => setDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={() => void handleSubmit()} disabled={submitting}>
-              {submitting ? "Guardando…" : editing ? "Guardar" : "Crear"}
+            <Button size="md" onClick={() => void handleSubmit()} disabled={submitting}>
+              {submitting ? "Guardando…" : editing ? "Guardar curso" : "Crear curso"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -565,12 +666,121 @@ export default function CoursesPage() {
   );
 }
 
+function CourseComponentsEditor({
+  value,
+  error,
+  fieldErrors,
+  onChange,
+}: {
+  value: CourseComponentAdmin[];
+  error?: string;
+  fieldErrors: Record<string, string>;
+  onChange: (components: CourseComponentAdmin[]) => void;
+}) {
+  const mode = value.length === 1 && value[0].componentType === "GENERAL" ? "GENERAL" : "SPLIT";
+
+  function switchMode(nextMode: "GENERAL" | "SPLIT") {
+    if (nextMode === "GENERAL") {
+      const first = value[0];
+      onChange([{
+        id: first?.componentType === "GENERAL" ? first.id : null,
+        componentType: "GENERAL",
+        weeklyHours: Math.max(0.1, value.reduce((sum, component) => sum + component.weeklyHours, 0) || 4),
+        requiredRoomType: first?.requiredRoomType ?? "",
+        sortOrder: 1,
+        isActive: true,
+      }]);
+      return;
+    }
+    const roomType = value[0]?.requiredRoomType ?? "";
+    const total = Math.max(0.2, value.reduce((sum, component) => sum + component.weeklyHours, 0) || 4);
+    const { theoryHours, practiceHours } = splitHoursInTenths(total);
+    onChange([
+      { id: null, componentType: "THEORY", weeklyHours: theoryHours, requiredRoomType: roomType, sortOrder: 1, isActive: true },
+      { id: null, componentType: "PRACTICE", weeklyHours: practiceHours, requiredRoomType: roomType, sortOrder: 2, isActive: true },
+    ]);
+  }
+
+  function updateComponent(index: number, patch: Partial<CourseComponentAdmin>) {
+    onChange(value.map((component, current) => current === index ? { ...component, ...patch } : component));
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Componentes horarios</h3>
+          {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+        </div>
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1">
+          <button
+            type="button"
+            onClick={() => switchMode("GENERAL")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-medium transition",
+              mode === "GENERAL" ? "bg-violet-600 text-white" : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            General
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("SPLIT")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-medium transition",
+              mode === "SPLIT" ? "bg-violet-600 text-white" : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            Teoría/Práctica
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {value.map((component, index) => (
+          <div key={`${component.componentType}-${index}`} className="grid grid-cols-[1fr_5rem_1.4fr] gap-2 rounded-lg border border-border p-3">
+            <FormField label="Tipo">
+              <SelectField
+                value={component.componentType}
+                onChange={(next) => updateComponent(index, { componentType: next as CourseComponentType })}
+                options={[
+                  ...(mode === "GENERAL" ? [{ value: "GENERAL", label: "General" }] : []),
+                  ...(mode === "SPLIT" ? [
+                    { value: "THEORY", label: "Teoría" },
+                    { value: "PRACTICE", label: "Práctica" },
+                  ] : []),
+                ]}
+              />
+            </FormField>
+            <FormField label="Horas" error={fieldErrors[`components.${index}.weeklyHours`]}>
+              <Input
+                type="number"
+                min={0.1}
+                step={DECIMAL_STEP}
+                value={formatDecimal(component.weeklyHours)}
+                onChange={(event) => updateComponent(index, { weeklyHours: parseNumericInput(event.target.value) })}
+              />
+            </FormField>
+            <FormField label="Tipo de aula" error={fieldErrors[`components.${index}.requiredRoomType`]}>
+              <Input
+                value={component.requiredRoomType}
+                onChange={(event) => updateComponent(index, { requiredRoomType: event.target.value })}
+              />
+            </FormField>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── CourseCard ───────────────────────────────────────────────────────────────
 
 function CourseCard({
   course,
   paletteIndex,
   onPrerequisitos,
+  onSchedule,
   onEdit,
   onDeactivate,
   onDelete,
@@ -578,6 +788,7 @@ function CourseCard({
   course: CourseAdmin;
   paletteIndex: number;
   onPrerequisitos: () => void;
+  onSchedule: () => void;
   onEdit: () => void;
   onDeactivate: () => void;
   onDelete: () => void;
@@ -614,13 +825,25 @@ function CourseCard({
         {requiredCredits > 0 && (
           <div className="flex items-center gap-2">
             <Target className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-            <span className="text-xs text-muted-foreground">{requiredCredits} créditos requeridos</span>
+            <span className="text-xs text-muted-foreground">{formatDecimal(requiredCredits)} créditos requeridos</span>
           </div>
         )}
         <div className="flex items-center gap-2">
           <Clock className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-          <span className="text-xs text-muted-foreground">{course.weeklyHours} h/sem</span>
+          <span className="text-xs text-muted-foreground">{formatDecimal(course.weeklyHours)} h/sem · {summarizeComponents(course.components, course.weeklyHours)}</span>
         </div>
+        {(course.components ?? []).length > 1 && (
+          <div className="space-y-1 pl-5">
+            {(course.components ?? [])
+              .slice()
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((component) => (
+                <p key={component.id ?? component.componentType} className="text-xs text-muted-foreground">
+                  {COMPONENT_LABELS[component.componentType]} · {formatDecimal(component.weeklyHours)}h · {component.requiredRoomType}
+                </p>
+              ))}
+          </div>
+        )}
         {course.requiredRoomType && (
           <div className="flex items-center gap-2">
             <MapPin className="h-3.5 w-3.5 shrink-0 text-cyan-500" />
@@ -655,20 +878,20 @@ function CourseCard({
       {/* Divider */}
       <div className="mx-4 border-t border-border" />
 
-      {/* Ver Prerrequisitos */}
-      <div className="px-4 py-3">
+      {/* Prerrequisitos + Componentes horarios */}
+      <div className="grid grid-cols-2 gap-2 px-4 py-3">
         <button
           type="button"
           onClick={onPrerequisitos}
           className={cn(
-            "flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
+            "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
             palette.bg,
             palette.text,
             "hover:opacity-80",
           )}
         >
           <BookOpen className="h-3.5 w-3.5" />
-          Ver prerrequisitos
+          Prerrequisitos
           {requirementCount > 0 && (
             <span
               className={cn(
@@ -680,6 +903,14 @@ function CourseCard({
               {requirementCount}
             </span>
           )}
+        </button>
+        <button
+          type="button"
+          onClick={onSchedule}
+          className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-100 px-3 py-2 text-xs font-medium text-blue-600 transition hover:opacity-80 dark:bg-blue-950/40 dark:text-blue-400"
+        >
+          <Clock className="h-3.5 w-3.5" />
+          Horarios
         </button>
       </div>
 
@@ -730,7 +961,7 @@ function PrerequisitesModal({
   const [saving, setSaving]                   = useState(false);
   const [confirmRemove, setConfirmRemove]     = useState<string | null>(null);
   const [detailCode, setDetailCode]           = useState<string | null>(null);
-  const [requiredCreditsDraft, setRequiredCreditsDraft] = useState(0);
+  const [requiredCreditsDraft, setRequiredCreditsDraft] = useState<number>(0);
   const [resolved, setResolved]               = useState<Record<string, CourseAdmin>>({});
   const [searchResults, setSearchResults]     = useState<CourseAdmin[]>([]);
   const [searchLoading, setSearchLoading]     = useState(false);
@@ -827,6 +1058,7 @@ function PrerequisitesModal({
         weeklyHours: course.weeklyHours,
         requiredRoomType: course.requiredRoomType ?? "",
         isActive: course.isActive,
+        components: normalizeCourseComponents(course),
         prerequisites: [...course.prerequisites, newCode],
       });
       onUpdated(updated);
@@ -841,8 +1073,8 @@ function PrerequisitesModal({
 
   async function handleSaveRequiredCredits() {
     if (!course) return;
-    if (!Number.isInteger(requiredCreditsDraft) || requiredCreditsDraft < 0) {
-      toastError("Créditos requeridos inválidos", "Ingresa un número entero mayor o igual a 0.");
+    if (Number.isNaN(requiredCreditsDraft) || requiredCreditsDraft < 0) {
+      toastError("Créditos requeridos inválidos", "Ingresa un número mayor o igual a 0.");
       return;
     }
     setSaving(true);
@@ -856,6 +1088,7 @@ function PrerequisitesModal({
         weeklyHours: course.weeklyHours,
         requiredRoomType: course.requiredRoomType ?? "",
         isActive: course.isActive,
+        components: normalizeCourseComponents(course),
         prerequisites: course.prerequisites,
       });
       onUpdated(updated);
@@ -880,6 +1113,7 @@ function PrerequisitesModal({
         weeklyHours: course.weeklyHours,
         requiredRoomType: course.requiredRoomType ?? "",
         isActive: course.isActive,
+        components: normalizeCourseComponents(course),
         prerequisites: course.prerequisites.filter((p) => p !== code),
       });
       onUpdated(updated);
@@ -908,7 +1142,7 @@ function PrerequisitesModal({
             <span className="text-xs text-muted-foreground">
               {course.prerequisites.length}{" "}
               {course.prerequisites.length === 1 ? "curso requerido" : "cursos requeridos"}
-              {(course.requiredCredits ?? 0) > 0 ? ` · ${course.requiredCredits ?? 0} créditos requeridos` : ""}
+              {(course.requiredCredits ?? 0) > 0 ? ` · ${formatDecimal(course.requiredCredits ?? 0)} créditos requeridos` : ""}
             </span>
           </div>
 
@@ -921,14 +1155,15 @@ function PrerequisitesModal({
                 <Input
                   type="number"
                   min={0}
-                  value={requiredCreditsDraft}
-                  onChange={(e) => setRequiredCreditsDraft(Number(e.target.value))}
+                  step={DECIMAL_STEP}
+                  value={formatDecimal(requiredCreditsDraft)}
+                  onChange={(e) => setRequiredCreditsDraft(parseNumericInput(e.target.value))}
                   className="h-9 bg-background"
                 />
                 <Button
                   type="button"
                   size="sm"
-                  disabled={saving || requiredCreditsDraft === (course.requiredCredits ?? 0)}
+                  disabled={saving || areNumbersEqual(requiredCreditsDraft, course.requiredCredits ?? 0)}
                   onClick={() => void handleSaveRequiredCredits()}
                 >
                   Guardar
@@ -979,7 +1214,7 @@ function PrerequisitesModal({
                             </div>
                           </div>
                           <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                            Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
+                            Ciclo {c.cycle ?? 1} · {c.credits} cr · {formatDecimal(c.weeklyHours)}h/sem
                           </span>
                         </button>
                       ))}
@@ -1037,7 +1272,7 @@ function PrerequisitesModal({
                       </div>
                       {c ? (
                         <p className="text-xs text-muted-foreground">
-                          Ciclo {c.cycle ?? 1} · {c.credits} cr · {c.weeklyHours}h/sem
+                          Ciclo {c.cycle ?? 1} · {c.credits} cr · {formatDecimal(c.weeklyHours)}h/sem
                           {c.requiredRoomType ? ` · ${c.requiredRoomType}` : ""}
                         </p>
                       ) : (
@@ -1068,6 +1303,124 @@ function PrerequisitesModal({
         onClose={() => setDetailCode(null)}
       />
     </>
+  );
+}
+
+// ─── ScheduleModal ────────────────────────────────────────────────────────────
+
+function ScheduleModal({
+  open,
+  onOpenChange,
+  course,
+  onUpdated,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  course: CourseAdmin | null;
+  onUpdated: (updated: CourseAdmin) => void;
+}) {
+  const [components, setComponents]   = useState<CourseComponentAdmin[]>([]);
+  const [saving, setSaving]           = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (open && course) {
+      setComponents(normalizeCourseComponents(course));
+      setFieldErrors({});
+    }
+  }, [open, course]);
+
+  function handleChange(updated: CourseComponentAdmin[]) {
+    setComponents(updated.map((c, i) => ({ ...c, sortOrder: i + 1 })));
+  }
+
+  async function handleSave() {
+    if (!course) return;
+
+    // Validar que la suma de horas coincida con las horas semanales del curso
+    const hoursSum = components.reduce((sum, c) => sum + c.weeklyHours, 0);
+    if (!areNumbersEqual(hoursSum, course.weeklyHours)) {
+      const msg = `La suma de componentes es ${formatDecimal(hoursSum)} h y debe ser ${formatDecimal(course.weeklyHours)} h (horas semanales del curso).`;
+      setFieldErrors({ components: msg });
+      toastError("No se pueden guardar los componentes", msg);
+      return;
+    }
+    setFieldErrors({});
+
+    setSaving(true);
+    try {
+      const updated = await adminApi.updateCourse(course.id, {
+        code: course.code,
+        name: course.name,
+        cycle: course.cycle ?? 1,
+        credits: course.credits,
+        requiredCredits: course.requiredCredits ?? 0,
+        weeklyHours: course.weeklyHours,
+        requiredRoomType: course.requiredRoomType ?? "",
+        isActive: course.isActive,
+        components: components.map((c) => ({
+          ...c,
+          id: c.id ?? null,
+          requiredRoomType: c.requiredRoomType.trim(),
+        })),
+        prerequisites: course.prerequisites,
+      });
+      onUpdated(updated);
+      onOpenChange(false);
+      toastSuccess("Componentes horarios actualizados");
+    } catch (error) {
+      toastError("No se pudieron actualizar los componentes", getApiErrorMessage(error, "Intenta nuevamente."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!course) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[34rem]">
+        <DialogHeader className="border-b border-border px-6 py-5 pr-14">
+          <DialogTitle>Componentes horarios · {course.name}</DialogTitle>
+          <DialogDescription>
+            Configura cuántas horas teóricas, prácticas o generales lleva el curso cada semana.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Resumen actual */}
+        {(() => {
+          const hoursSum = components.reduce((sum, c) => sum + c.weeklyHours, 0);
+          const match = areNumbersEqual(hoursSum, course.weeklyHours);
+          return (
+            <div className={`flex items-center gap-2 border-b border-border px-6 py-3 ${match ? "bg-muted/30" : "bg-amber-50 dark:bg-amber-950/30"}`}>
+              <Clock className={`h-3.5 w-3.5 ${match ? "text-blue-500" : "text-amber-500"}`} />
+              <span className={`text-xs ${match ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400"}`}>
+                {match
+                  ? `${formatDecimal(hoursSum)} h/sem · ${summarizeComponents(components, course.weeklyHours)}`
+                  : `Suma actual: ${formatDecimal(hoursSum)} h y debe coincidir con las horas del curso (${formatDecimal(course.weeklyHours)} h)`}
+              </span>
+            </div>
+          );
+        })()}
+
+        <div className="px-6 py-5">
+          <CourseComponentsEditor
+            value={components}
+            fieldErrors={fieldErrors}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-4">
+          <Button variant="outline" size="md" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button size="md" onClick={() => void handleSave()} disabled={saving}>
+            {saving ? "Guardando…" : "Guardar cambios"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1282,7 +1635,7 @@ function PrerequisitesPicker({
                   </div>
                   {course && (
                     <p className="text-xs text-muted-foreground">
-                      Ciclo {course.cycle ?? 1} · {course.credits} cr · {course.weeklyHours}h/sem
+                      Ciclo {course.cycle ?? 1} · {course.credits} cr · {formatDecimal(course.weeklyHours)}h/sem
                     </p>
                   )}
                 </div>
@@ -1358,8 +1711,9 @@ function PrereqDetailModal({ course, onClose }: { course: CourseAdmin | null; on
           <PrereqRow label="Nombre"          value={course.name} />
           <PrereqRow label="Ciclo"           value={String(course.cycle ?? 1)} />
           <PrereqRow label="Créditos"        value={String(course.credits)} />
-          <PrereqRow label="Créditos requeridos" value={String(course.requiredCredits ?? 0)} />
-          <PrereqRow label="Horas semanales" value={String(course.weeklyHours)} />
+          <PrereqRow label="Créditos requeridos" value={formatDecimal(course.requiredCredits ?? 0)} />
+          <PrereqRow label="Horas semanales" value={formatDecimal(course.weeklyHours)} />
+          <PrereqRow label="Componentes" value={summarizeComponents(course.components, course.weeklyHours)} />
           <PrereqRow label="Tipo de aula"    value={course.requiredRoomType ?? "—"} />
           <PrereqRow label="Estado"          value={course.isActive ? "Activo" : "Inactivo"} />
         </div>
