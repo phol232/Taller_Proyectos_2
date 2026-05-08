@@ -112,6 +112,13 @@ Planner UC automatiza la generación de horarios mediante un **motor basado en C
       <br/><sub>Base de Datos</sub>
     </td>
     <td align="center" width="140">
+      <a href="https://redis.io/">
+        <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/redis/redis-original.svg" width="50" height="50" alt="Redis"/>
+      </a>
+      <br/><strong>Redis</strong>
+      <br/><sub>Caché</sub>
+    </td>
+    <td align="center" width="140">
       <a href="https://www.docker.com/">
         <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg" width="50" height="50" alt="Docker"/>
       </a>
@@ -130,6 +137,7 @@ Planner UC automatiza la generación de horarios mediante un **motor basado en C
 | **Motor CSP** | ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) | Microservicio Python para resolución de restricciones CSP |
 | **Base de Datos** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white) | BD relacional con soporte transaccional ACID |
 | **Acceso a Datos** | ![JPA](https://img.shields.io/badge/Spring_Data_JPA-6DB33F?style=flat-square&logo=spring&logoColor=white) | Spring Data JPA + SQL nativo para máximo rendimiento |
+| **Caché** | ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white) | Caché compartido entre backend y motor CSP; gestión de concurrencia distribuida |
 | **Contenedores** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) | Orquestación con Docker Compose |
 | **Autenticación** | ![Google](https://img.shields.io/badge/Google_OAuth-4285F4?style=flat-square&logo=google&logoColor=white) ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) | Login con Google OAuth2 + tokens JWT |
 | **Testing** | ![JUnit](https://img.shields.io/badge/JUnit5-25A162?style=flat-square&logo=junit5&logoColor=white) ![pytest](https://img.shields.io/badge/pytest-0A9EDC?style=flat-square&logo=pytest&logoColor=white) | JUnit 5 (backend) + pytest (CSP service) — cobertura ≥ 70% |
@@ -251,6 +259,7 @@ El corazón de Planner UC es su **motor de optimización basado en Constraint Sa
 | **Backend** | Spring Boot | `8080` | API REST principal + autenticación |
 | **Motor CSP** | FastAPI (Python) | `8001` | Microservicio de generación de horarios |
 | **Base de Datos** | PostgreSQL | `5432` | Persistencia de datos |
+| **Caché** | Redis | `6379` | Caché compartido entre backend y motor CSP; concurrencia distribuida |
 
 ---
 
@@ -684,6 +693,7 @@ SOFTWARE.
   <img src="https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot"/>
   <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/>
   <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis"/>
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"/>
   <img src="https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" alt="JWT"/>
   <img src="https://img.shields.io/badge/Google_OAuth-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Google OAuth"/>

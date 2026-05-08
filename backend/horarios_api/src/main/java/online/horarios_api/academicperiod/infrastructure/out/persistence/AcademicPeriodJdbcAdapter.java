@@ -42,14 +42,15 @@ public class AcademicPeriodJdbcAdapter implements AcademicPeriodPort {
     public AcademicPeriod create(AcademicPeriodData command) {
         try {
             return jdbcTemplate.queryForObject(
-                    "SELECT * FROM fn_create_academic_period(?, ?, ?, ?, ?, ?)",
+                    "SELECT * FROM fn_create_academic_period(?, ?, ?, ?, ?, ?, ?)",
                     rowMapper,
                     command.code(),
                     command.name(),
                     command.startsAt(),
                     command.endsAt(),
                     command.status(),
-                    command.maxStudentCredits()
+                    command.maxStudentCredits(),
+                    command.isActive()
             );
         } catch (DataAccessException ex) {
             throw mapException(ex, command.code());
@@ -60,7 +61,7 @@ public class AcademicPeriodJdbcAdapter implements AcademicPeriodPort {
     public AcademicPeriod update(UUID periodId, AcademicPeriodData command) {
         try {
             return jdbcTemplate.queryForObject(
-                    "SELECT * FROM fn_update_academic_period(?, ?, ?, ?, ?, ?, ?)",
+                    "SELECT * FROM fn_update_academic_period(?, ?, ?, ?, ?, ?, ?, ?)",
                     rowMapper,
                     periodId,
                     command.code(),
@@ -68,7 +69,8 @@ public class AcademicPeriodJdbcAdapter implements AcademicPeriodPort {
                     command.startsAt(),
                     command.endsAt(),
                     command.status(),
-                    command.maxStudentCredits()
+                    command.maxStudentCredits(),
+                    command.isActive()
             );
         } catch (DataAccessException ex) {
             throw mapException(ex, command.code());
@@ -96,6 +98,11 @@ public class AcademicPeriodJdbcAdapter implements AcademicPeriodPort {
     @Override
     public List<AcademicPeriod> search(String query) {
         return jdbcTemplate.query("SELECT * FROM fn_search_academic_periods(?)", rowMapper, query);
+    }
+
+    @Override
+    public void activate(UUID periodId) {
+        jdbcTemplate.queryForObject("SELECT fn_activate_academic_period(?)", Object.class, periodId);
     }
 
     @Override

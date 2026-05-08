@@ -92,6 +92,7 @@ export const adminApi = {
     (await api.post<AcademicPeriodAdmin>("/api/academic-periods", payload)).data,
   updateAcademicPeriod: async (id: string, payload: Partial<AcademicPeriodAdmin>) =>
     (await api.put<AcademicPeriodAdmin>(`/api/academic-periods/${id}`, payload)).data,
+  activateAcademicPeriod: async (id: string) => api.post(`/api/academic-periods/${id}/activate`),
   deactivateAcademicPeriod: async (id: string) => api.post(`/api/academic-periods/${id}/deactivate`),
   deleteAcademicPeriod: async (id: string) => api.delete(`/api/academic-periods/${id}`),
 

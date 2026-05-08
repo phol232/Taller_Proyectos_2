@@ -60,7 +60,8 @@ public class AcademicPeriodController {
                 request.startsAt(),
                 request.endsAt(),
                 request.status(),
-                request.maxStudentCredits()
+                request.maxStudentCredits(),
+                request.isActive()
         );
         return ResponseEntity.ok(AcademicPeriodResponse.from(
                 academicPeriodCommandUseCase.createAcademicPeriod(command)
@@ -78,11 +79,20 @@ public class AcademicPeriodController {
                 request.startsAt(),
                 request.endsAt(),
                 request.status(),
-                request.maxStudentCredits()
+                request.maxStudentCredits(),
+                request.isActive()
         );
         return ResponseEntity.ok(AcademicPeriodResponse.from(
                 academicPeriodCommandUseCase.updateAcademicPeriod(id, command)
         ));
+    }
+
+    @PostMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Activar período académico")
+    public ResponseEntity<Void> activate(@PathVariable UUID id) {
+        academicPeriodCommandUseCase.activateAcademicPeriod(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/deactivate")

@@ -13,6 +13,7 @@ public interface AcademicPeriodPort {
     Optional<AcademicPeriod> findById(UUID periodId);
     List<AcademicPeriod> findAll();
     List<AcademicPeriod> search(String query);
+    void activate(UUID periodId);
     void deactivate(UUID periodId);
     void delete(UUID periodId);
 }
