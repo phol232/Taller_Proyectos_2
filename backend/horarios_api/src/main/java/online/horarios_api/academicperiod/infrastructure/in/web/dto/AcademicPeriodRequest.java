@@ -21,5 +21,7 @@ public record AcademicPeriodRequest(
         @NotBlank(message = "El estado es obligatorio")
         String status,
 
-        Integer maxStudentCredits
+        Integer maxStudentCredits,
+
+        Boolean isActive
 ) {}

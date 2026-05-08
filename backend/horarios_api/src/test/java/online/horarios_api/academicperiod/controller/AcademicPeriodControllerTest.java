@@ -63,7 +63,7 @@ class AcademicPeriodControllerTest {
         mockMvc.perform(post("/api/academic-periods")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new AcademicPeriodRequest("", "", null, null, "", null)
+                                new AcademicPeriodRequest("", "", null, null, "", null, null)
                         )))
                 .andExpect(status().isBadRequest());
 
@@ -81,7 +81,7 @@ class AcademicPeriodControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new AcademicPeriodRequest("2026-I", "Periodo 2026-I",
-                                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31), "PLANNING", 22)
+                                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31), "PLANNING", 22, true)
                         )))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2026-I"));

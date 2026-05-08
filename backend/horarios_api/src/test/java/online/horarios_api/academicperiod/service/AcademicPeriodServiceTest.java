@@ -48,6 +48,7 @@ class AcademicPeriodServiceTest {
                 LocalDate.of(2026, 3, 1),
                 LocalDate.of(2026, 7, 31),
                 " planning ",
+                null,
                 null
         ));
 
@@ -67,7 +68,8 @@ class AcademicPeriodServiceTest {
                 LocalDate.of(2026, 8, 1),
                 LocalDate.of(2026, 7, 1),
                 "PLANNING",
-                22
+                22,
+                null
         ))).isInstanceOf(BadRequestException.class);
     }
 }

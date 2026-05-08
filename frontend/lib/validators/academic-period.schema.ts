@@ -7,6 +7,7 @@ export const academicPeriodSchema = z.object({
   endsAt: z.string().min(1, "La fecha de fin es obligatoria"),
   status: z.enum(["PLANNING", "ACTIVE", "CLOSED"]),
   maxStudentCredits: z.number().int().min(1, "Debe ser mayor a 0"),
+  isActive: z.boolean(),
 }).refine((value) => value.endsAt >= value.startsAt, {
   message: "La fecha de fin no puede ser anterior a la fecha de inicio",
   path: ["endsAt"],

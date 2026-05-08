@@ -12,3 +12,4 @@
 
 \i migrations/202605_solver_classroom_component_quality.sql
 \i migrations/202605_solver_elective_course_rules.sql
+\i migrations/202605_academic_period_is_active.sql

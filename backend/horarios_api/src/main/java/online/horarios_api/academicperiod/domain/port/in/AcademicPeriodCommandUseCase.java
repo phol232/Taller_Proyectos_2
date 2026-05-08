@@ -8,6 +8,7 @@ import java.util.UUID;
 public interface AcademicPeriodCommandUseCase {
     AcademicPeriod createAcademicPeriod(AcademicPeriodData command);
     AcademicPeriod updateAcademicPeriod(UUID periodId, AcademicPeriodData command);
+    void activateAcademicPeriod(UUID periodId);
     void deactivateAcademicPeriod(UUID periodId);
     void deleteAcademicPeriod(UUID periodId);
 }

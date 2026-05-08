@@ -8,5 +8,6 @@ public record AcademicPeriodData(
         LocalDate startsAt,
         LocalDate endsAt,
         String status,
-        Integer maxStudentCredits
+        Integer maxStudentCredits,
+        Boolean isActive
 ) {}

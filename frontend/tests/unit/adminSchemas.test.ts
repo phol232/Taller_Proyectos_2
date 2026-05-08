@@ -11,6 +11,7 @@ describe("academicPeriodSchema", () => {
       endsAt: "2026-07-30",
       status: "ACTIVE",
       maxStudentCredits: 22,
+      isActive: true,
     });
 
     expect(result.success).toBe(true);
@@ -24,6 +25,7 @@ describe("academicPeriodSchema", () => {
       endsAt: "2026-07-30",
       status: "ACTIVE",
       maxStudentCredits: 22,
+      isActive: true,
     });
 
     expect(result.success).toBe(false);
