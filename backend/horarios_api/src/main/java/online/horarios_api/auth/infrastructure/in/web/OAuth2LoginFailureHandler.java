@@ -1,7 +1,9 @@
 package online.horarios_api.auth.infrastructure.in.web;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -27,7 +29,21 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 
         log.warn("Fallo en autenticación OAuth2: {}", exception.getMessage());
 
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        expireCookie(response, "JSESSIONID");
+
         String errorParam = URLEncoder.encode("oauth2_error", StandardCharsets.UTF_8);
         response.sendRedirect(frontendRedirectResolver.resolveBaseUrl(request) + "/login?error=" + errorParam);
+    }
+
+    private void expireCookie(HttpServletResponse response, String name) {
+        Cookie cookie = new Cookie(name, "");
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        cookie.setHttpOnly(true);
+        response.addCookie(cookie);
     }
 }

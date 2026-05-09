@@ -51,7 +51,21 @@ function LoginContent() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    const error = searchParams.get("error");
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    if (!error) return;
+
+    // Marca el error como consumido en sessionStorage para que no reaparezca
+    // si el usuario navega a otra pantalla y vuelve (bfcache, remount, etc.).
+    // El flag se limpia automáticamente al iniciar un nuevo flujo OAuth (ver handleGoogleLogin).
+    const consumedKey = `login_error_consumed:${error}`;
+    if (sessionStorage.getItem(consumedKey)) {
+      window.history.replaceState(null, "", "/login");
+      return;
+    }
+    sessionStorage.setItem(consumedKey, "1");
+    window.history.replaceState(null, "", "/login");
+
     if (error === "domain_not_allowed") {
       setDomainModalOpen(true);
     } else if (error === "oauth2_failed") {
@@ -60,6 +74,9 @@ function LoginContent() {
   }, [searchParams, t]);
 
   function handleGoogleLogin() {
+    // Limpia flags previos para que un nuevo intento OAuth pueda mostrar el modal de error.
+    sessionStorage.removeItem("login_error_consumed:domain_not_allowed");
+    sessionStorage.removeItem("login_error_consumed:oauth2_failed");
     const redirectUri = encodeURIComponent(window.location.origin);
     window.location.href = `${BACKEND_URL}/oauth2/authorization/google?redirect_uri=${redirectUri}`;
   }

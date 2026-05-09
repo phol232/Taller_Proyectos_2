@@ -1,5 +1,6 @@
 package online.horarios_api.auth.infrastructure.in.web;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -84,11 +85,25 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         } catch (DomainException e) {
             log.warn("Login OAuth2 rechazado: {}", e.getMessage());
+            invalidateSession(request, response);
             response.sendRedirect(frontendBaseUrl + "/login?error=" + e.getMessage());
         } catch (Exception e) {
             log.error("Error en OAuth2 success handler: {}", e.getMessage(), e);
+            invalidateSession(request, response);
             response.sendRedirect(frontendBaseUrl + "/login?error=oauth2_failed");
         }
+    }
+
+    private void invalidateSession(HttpServletRequest request, HttpServletResponse response) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        Cookie cookie = new Cookie("JSESSIONID", "");
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        cookie.setHttpOnly(true);
+        response.addCookie(cookie);
     }
 
     private @Nullable OidcUser extractOidcUser(OAuth2AuthenticationToken token) {
