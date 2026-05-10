@@ -35,6 +35,11 @@ class ShiftFilter:
         start, end = self._ranges[shift]
         return slot.start_time >= start and slot.end_time <= end
 
+    def slot_in_any_shift(self, slot: TimeSlot, shifts: frozenset[Shift]) -> bool:
+        if not shifts or Shift.FLEXIBLE in shifts:
+            return True
+        return any(self.slot_in_shift(slot, sh) for sh in shifts)
+
     def all_slots_in_shift(
         self, slot_ids: Iterable[UUID], slots: dict[UUID, TimeSlot], shift: Shift
     ) -> bool:

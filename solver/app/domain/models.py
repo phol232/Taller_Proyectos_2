@@ -99,7 +99,7 @@ class Student:
     cycle: int
     credit_limit: int
     gpa: float | None
-    preferred_shift: Shift | None
+    preferred_shifts: frozenset[Shift]
     completed_course_ids: frozenset[UUID]
 
 

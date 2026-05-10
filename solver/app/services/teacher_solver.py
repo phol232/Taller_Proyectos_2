@@ -41,7 +41,7 @@ log = get_logger(__name__)
 _Block = tuple[DayOfWeek, time, time]
 
 # Hora a partir de la cual se considera turno nocturno
-_NIGHT_START = time(18, 0)
+_NIGHT_START = time(19, 0)
 # Frontera entre franja S1 (mañana) y S2 (medio-día/tarde)
 _AFTERNOON_START = time(12, 0)
 
@@ -73,8 +73,8 @@ def _shift_score(slot_start: time, section_idx: int) -> int:
 
     Preferencia (score 0 = preferido, mayor = peor):
       S1 (idx 0) → mañana   (07:00–12:00)
-      S2 (idx 1) → tarde    (12:00–18:00)
-      S3 (idx≥2) → nocturno (18:00–22:10)
+      S2 (idx 1) → tarde    (12:00–19:00)
+      S3 (idx≥2) → nocturno (19:00–22:10)
 
     S3 fuera de noche recibe penalización alta (_S3_WRONG_SHIFT_PENALTY * distancia).
     Si la franja preferida no tiene candidatos viables, el algoritmo

@@ -22,9 +22,9 @@ class Settings(BaseSettings):
     internal_token: str = Field(default="")
 
     # Default shift definitions (24h clock).
-    shift_morning_start: str = Field(default="06:00")
-    shift_morning_end: str = Field(default="13:00")
-    shift_afternoon_start: str = Field(default="13:00")
+    shift_morning_start: str = Field(default="07:00")
+    shift_morning_end: str = Field(default="12:00")
+    shift_afternoon_start: str = Field(default="12:00")
     shift_afternoon_end: str = Field(default="19:00")
     shift_evening_start: str = Field(default="19:00")
     shift_evening_end: str = Field(default="22:10")

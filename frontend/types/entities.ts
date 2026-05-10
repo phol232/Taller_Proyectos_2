@@ -2,20 +2,23 @@ export type Role = "admin" | "coordinator" | "teacher" | "student";
 
 export type SexType = "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY";
 
+export type PreferredShift = "MORNING" | "AFTERNOON" | "EVENING" | "FLEXIBLE";
+
 export interface ProfileResponse {
-  id:         string | null;
-  userId:     string;
-  fullName:   string;
-  email:      string;
-  role:       string;
-  dni:        string | null;
-  phone:      string | null;
-  sex:        SexType | null;
-  age:        number | null;
-  facultadId: string | null;
-  carreraId:  string | null;
-  createdAt:  string | null;
-  updatedAt:  string | null;
+  id:             string | null;
+  userId:         string;
+  fullName:       string;
+  email:          string;
+  role:           string;
+  dni:            string | null;
+  phone:          string | null;
+  sex:            SexType | null;
+  age:            number | null;
+  facultadId:     string | null;
+  carreraId:      string | null;
+  preferredShifts: PreferredShift[];
+  createdAt:       string | null;
+  updatedAt:       string | null;
 }
 
 export interface Student {

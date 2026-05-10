@@ -2,14 +2,14 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Mail, Shield, Pencil, Save, X, CreditCard, Phone, User2, CalendarDays, GraduationCap, BookOpen } from "lucide-react";
+import { Mail, Shield, Pencil, Save, X, CreditCard, Phone, User2, CalendarDays, GraduationCap, BookOpen, Clock } from "lucide-react";
 import { toastError, toastSuccess } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/lib/i18n";
 import { profileApi } from "@/lib/profileApi";
 import { adminApi } from "@/lib/adminApi";
 import { Input } from "@/components/ui/input";
-import type { SexType } from "@/types/entities";
+import type { SexType, PreferredShift } from "@/types/entities";
 import type { FacultadAdmin, CarreraAdmin } from "@/types/admin";
 
 const UC_PURPLE = "#6B21A8";
@@ -30,6 +30,7 @@ interface ProfileForm {
   age: string;
   facultadId: string;
   carreraId: string;
+  preferredShifts: PreferredShift[];
 }
 
 function FieldLabel({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
@@ -41,14 +42,113 @@ function FieldLabel({ icon: Icon, children }: { icon: React.ElementType; childre
   );
 }
 
+interface ShiftCheckboxGroupProps {
+  value: PreferredShift[];
+  disabled: boolean;
+  onChange: (next: PreferredShift[]) => void;
+  labels: {
+    morning: string;
+    afternoon: string;
+    evening: string;
+    flexible: string;
+    maxReached: string;
+  };
+}
+
+function ShiftCheckboxGroup({ value, disabled, onChange, labels }: ShiftCheckboxGroupProps) {
+  const isFlexible = value.includes("FLEXIBLE");
+  const concreteSelected = value.filter(s => s !== "FLEXIBLE");
+  const maxReached = concreteSelected.length >= 2;
+
+  function toggleConcrete(shift: Exclude<PreferredShift, "FLEXIBLE">) {
+    if (disabled) return;
+    if (isFlexible) {
+      onChange([shift]);
+      return;
+    }
+    if (value.includes(shift)) {
+      onChange(value.filter(s => s !== shift));
+      return;
+    }
+    if (concreteSelected.length >= 2) return;
+    onChange([...value, shift]);
+  }
+
+  function toggleFlexible() {
+    if (disabled) return;
+    onChange(isFlexible ? [] : ["FLEXIBLE"]);
+  }
+
+  const concrete: { code: Exclude<PreferredShift, "FLEXIBLE">; label: string }[] = [
+    { code: "MORNING",   label: labels.morning },
+    { code: "AFTERNOON", label: labels.afternoon },
+    { code: "EVENING",   label: labels.evening },
+  ];
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {concrete.map(opt => {
+          const checked = value.includes(opt.code);
+          const blocked = !checked && !isFlexible && maxReached;
+          return (
+            <label
+              key={opt.code}
+              className={`flex items-center gap-2 h-12 px-3 rounded-lg border text-sm transition select-none
+                ${checked
+                  ? "border-[#6B21A8] bg-[#6B21A8]/8 text-[#6B21A8] dark:text-white dark:bg-[#6B21A8]/15"
+                  : "border-gray-200 dark:border-white/12 bg-transparent text-gray-700 dark:text-gray-300"
+                }
+                ${disabled || blocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5"}
+              `}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                disabled={disabled || blocked}
+                onChange={() => toggleConcrete(opt.code)}
+                className="h-4 w-4 accent-[#6B21A8] cursor-pointer disabled:cursor-not-allowed"
+              />
+              <span className="truncate">{opt.label}</span>
+            </label>
+          );
+        })}
+      </div>
+
+      <label
+        className={`flex items-center gap-2 h-12 px-3 rounded-lg border text-sm transition select-none
+          ${isFlexible
+            ? "border-[#6B21A8] bg-[#6B21A8]/8 text-[#6B21A8] dark:text-white dark:bg-[#6B21A8]/15"
+            : "border-gray-200 dark:border-white/12 bg-transparent text-gray-700 dark:text-gray-300"
+          }
+          ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5"}
+        `}
+      >
+        <input
+          type="checkbox"
+          checked={isFlexible}
+          disabled={disabled}
+          onChange={toggleFlexible}
+          className="h-4 w-4 accent-[#6B21A8] cursor-pointer disabled:cursor-not-allowed"
+        />
+        <span className="truncate">{labels.flexible}</span>
+      </label>
+
+      {maxReached && !isFlexible && !disabled && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">{labels.maxReached}</p>
+      )}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { user } = useAuthStore();
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving]   = useState(false);
   const [loading, setLoading] = useState(true);
-  const [form, setForm]   = useState<ProfileForm>({ dni: "", phone: "", sex: "", age: "", facultadId: "", carreraId: "" });
-  const [saved, setSaved] = useState<ProfileForm>({ dni: "", phone: "", sex: "", age: "", facultadId: "", carreraId: "" });
+  const [form, setForm]   = useState<ProfileForm>({ dni: "", phone: "", sex: "", age: "", facultadId: "", carreraId: "", preferredShifts: [] });
+  const [saved, setSaved] = useState<ProfileForm>({ dni: "", phone: "", sex: "", age: "", facultadId: "", carreraId: "", preferredShifts: [] });
 
   const [facultades, setFacultades] = useState<FacultadAdmin[]>([]);
   const [carreras, setCarreras] = useState<CarreraAdmin[]>([]);
@@ -69,6 +169,7 @@ export default function ProfilePage() {
           age:   data.age != null ? String(data.age) : "",
           facultadId: data.facultadId ?? "",
           carreraId:  data.carreraId  ?? "",
+          preferredShifts: data.preferredShifts ?? [],
         };
         setForm(loaded);
         setSaved(loaded);
@@ -125,6 +226,7 @@ export default function ProfilePage() {
         age:   form.age !== "" ? Number(form.age) : null,
         facultadId: form.facultadId || null,
         carreraId:  form.carreraId  || null,
+        preferredShifts: form.preferredShifts,
       });
       const updated: ProfileForm = {
         dni:   data.dni   ?? "",
@@ -133,6 +235,7 @@ export default function ProfilePage() {
         age:   data.age != null ? String(data.age) : "",
         facultadId: data.facultadId ?? "",
         carreraId:  data.carreraId  ?? "",
+        preferredShifts: data.preferredShifts ?? [],
       };
       setForm(updated);
       setSaved(updated);
@@ -365,6 +468,31 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Section: Preferencias académicas */}
+        <div className="px-6 pt-5 pb-6 border-t border-gray-100 dark:border-white/8">
+          <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-4">
+            {t.profile.sectionPreferences}
+          </p>
+          <div>
+            <FieldLabel icon={Clock}>{t.profile.preferredShiftLabel}</FieldLabel>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              {t.profile.preferredShiftHelp}
+            </p>
+            <ShiftCheckboxGroup
+              value={form.preferredShifts}
+              disabled={!editing}
+              onChange={next => setForm(prev => ({ ...prev, preferredShifts: next }))}
+              labels={{
+                morning:  t.profile.shiftMorning,
+                afternoon:t.profile.shiftAfternoon,
+                evening:  t.profile.shiftEvening,
+                flexible: t.profile.shiftFlexible,
+                maxReached: t.profile.preferredShiftMaxReached,
+              }}
+            />
+          </div>
+        </div>
 
         {/* Footer: Save / Cancel — solo cuando editing */}
         {editing && (

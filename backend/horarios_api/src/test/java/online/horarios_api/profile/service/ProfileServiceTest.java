@@ -2,6 +2,7 @@ package online.horarios_api.profile.service;
 
 import online.horarios_api.profile.application.usecase.ProfileService;
 import online.horarios_api.profile.domain.exception.DuplicateProfileFieldException;
+import online.horarios_api.profile.domain.model.PreferredShift;
 import online.horarios_api.profile.domain.model.Profile;
 import online.horarios_api.profile.domain.model.ProfileData;
 import online.horarios_api.profile.domain.model.ProfileInfo;
@@ -16,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -57,7 +59,8 @@ class ProfileServiceTest {
         UUID userId = UUID.randomUUID();
         UUID profileId = UUID.randomUUID();
         UserInfo user = buildUserInfo(userId);
-        ProfileData command = new ProfileData(" 12345678 ", " 999888777 ", SexType.MALE, 22, null, null);
+        ProfileData command = new ProfileData(" 12345678 ", " 999888777 ", SexType.MALE, 22, null, null,
+                List.of(PreferredShift.MORNING, PreferredShift.AFTERNOON));
 
         when(userReadPort.findUserInfoById(userId)).thenReturn(Optional.of(user));
         when(profilePort.findByUserId(userId)).thenReturn(Optional.empty());
@@ -66,6 +69,7 @@ class ProfileServiceTest {
             return new Profile(profileId, profile.getUserId(),
                     profile.getDni(), profile.getPhone(), profile.getSex(),
                     profile.getAge(), profile.getFacultadId(), profile.getCarreraId(),
+                    profile.getPreferredShift(),
                     null, null);
         });
 
@@ -77,6 +81,8 @@ class ProfileServiceTest {
         assertThat(result.phone()).isEqualTo("999888777");
         assertThat(result.sex()).isEqualTo(SexType.MALE);
         assertThat(result.age()).isEqualTo(22);
+        assertThat(result.preferredShifts())
+                .containsExactlyInAnyOrder(PreferredShift.MORNING, PreferredShift.AFTERNOON);
     }
 
     @Test
@@ -84,7 +90,7 @@ class ProfileServiceTest {
     void upsertProfile_duplicateDni_throwsConflict() {
         UUID userId = UUID.randomUUID();
         UserInfo user = buildUserInfo(userId);
-        ProfileData command = new ProfileData("12345678", null, null, null, null, null);
+        ProfileData command = new ProfileData("12345678", null, null, null, null, null, List.of());
 
         when(userReadPort.findUserInfoById(userId)).thenReturn(Optional.of(user));
         when(profilePort.existsByDniAndUserIdNot(eq("12345678"), eq(userId))).thenReturn(true);

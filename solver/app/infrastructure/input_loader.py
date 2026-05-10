@@ -235,12 +235,17 @@ class SolverInputLoader:
                 completed[r["student_id"]].add(r["course_id"])
 
         for r in student_rows:
-            shift = None
-            if r["preferred_shift"]:
-                try:
-                    shift = Shift(r["preferred_shift"])
-                except ValueError:
-                    shift = None
+            shifts: set[Shift] = set()
+            raw = r["preferred_shift"]
+            if raw:
+                for token in str(raw).split(","):
+                    token = token.strip()
+                    if not token:
+                        continue
+                    try:
+                        shifts.add(Shift(token))
+                    except ValueError:
+                        pass
             gpa = float(r["gpa"]) if r["gpa"] is not None else None
             data.students[r["id"]] = Student(
                 id=r["id"],
@@ -249,6 +254,6 @@ class SolverInputLoader:
                 cycle=r["cycle"],
                 credit_limit=r["credit_limit"],
                 gpa=gpa,
-                preferred_shift=shift,
+                preferred_shifts=frozenset(shifts),
                 completed_course_ids=frozenset(completed.get(r["id"], set())),
             )
