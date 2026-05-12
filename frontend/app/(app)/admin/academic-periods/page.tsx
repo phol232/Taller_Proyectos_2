@@ -343,16 +343,16 @@ export default function AcademicPeriodsPage() {
           </DialogHeader>
           <div className="grid gap-4 md:grid-cols-2">
             <FormField label="Código" error={errors.code}>
-              <Input value={form.code} onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))} />
+              <Input value={form.code} onChange={(event) => { setForm((prev) => ({ ...prev, code: event.target.value })); if (errors.code) setErrors((prev) => { const next = { ...prev }; delete next.code; return next; }); }} />
             </FormField>
             <FormField label="Nombre" error={errors.name}>
-              <Input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
+              <Input value={form.name} onChange={(event) => { setForm((prev) => ({ ...prev, name: event.target.value })); if (errors.name) setErrors((prev) => { const next = { ...prev }; delete next.name; return next; }); }} />
             </FormField>
             <FormField label="Fecha de inicio" error={errors.startsAt}>
-              <Input type="date" value={form.startsAt} onChange={(event) => setForm((prev) => ({ ...prev, startsAt: event.target.value }))} />
+              <Input type="date" value={form.startsAt} onChange={(event) => { setForm((prev) => ({ ...prev, startsAt: event.target.value })); if (errors.startsAt) setErrors((prev) => { const next = { ...prev }; delete next.startsAt; return next; }); }} />
             </FormField>
             <FormField label="Fecha de fin" error={errors.endsAt}>
-              <Input type="date" value={form.endsAt} onChange={(event) => setForm((prev) => ({ ...prev, endsAt: event.target.value }))} />
+              <Input type="date" value={form.endsAt} onChange={(event) => { setForm((prev) => ({ ...prev, endsAt: event.target.value })); if (errors.endsAt) setErrors((prev) => { const next = { ...prev }; delete next.endsAt; return next; }); }} />
             </FormField>
             <FormField label="Etapa" error={errors.status}>
               <SelectField
@@ -366,7 +366,7 @@ export default function AcademicPeriodsPage() {
               />
             </FormField>
             <FormField label="Máximo de créditos" error={errors.maxStudentCredits}>
-              <Input type="number" value={form.maxStudentCredits} onChange={(event) => setForm((prev) => ({ ...prev, maxStudentCredits: Number(event.target.value) }))} />
+              <Input type="number" value={form.maxStudentCredits} onChange={(event) => { setForm((prev) => ({ ...prev, maxStudentCredits: Number(event.target.value) })); if (errors.maxStudentCredits) setErrors((prev) => { const next = { ...prev }; delete next.maxStudentCredits; return next; }); }} />
             </FormField>
             <FormField label="Estado" error={errors.isActive}>
               <SelectField

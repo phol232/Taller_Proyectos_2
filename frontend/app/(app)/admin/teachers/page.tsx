@@ -459,7 +459,7 @@ export default function TeachersPage() {
                 <FormField label="Código" error={errors.code}>
                   <Input
                     value={form.code}
-                    onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, code: e.target.value })); if (errors.code) setErrors((prev) => { const next = { ...prev }; delete next.code; return next; }); }}
                   />
                 </FormField>
                 <FormField label="Activo">
@@ -474,14 +474,14 @@ export default function TeachersPage() {
                 <FormField label="Nombres" error={errors.nombres ?? errors.fullName}>
                   <Input
                     value={form.nombres}
-                    onChange={(e) => setForm((p) => ({ ...p, nombres: e.target.value }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, nombres: e.target.value })); if (errors.nombres ?? errors.fullName) setErrors((prev) => { const next = { ...prev }; delete next.nombres; delete next.fullName; return next; }); }}
                     placeholder="Nombres"
                   />
                 </FormField>
                 <FormField label="Apellidos" error={errors.apellidos}>
                   <Input
                     value={form.apellidos}
-                    onChange={(e) => setForm((p) => ({ ...p, apellidos: e.target.value }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, apellidos: e.target.value })); if (errors.apellidos) setErrors((prev) => { const next = { ...prev }; delete next.apellidos; return next; }); }}
                     placeholder="Apellido paterno materno"
                   />
                 </FormField>
@@ -489,7 +489,7 @@ export default function TeachersPage() {
               <FormField label="Especialidad" error={errors.specialty}>
                 <Input
                   value={form.specialty}
-                  onChange={(e) => setForm((p) => ({ ...p, specialty: e.target.value }))}
+                  onChange={(e) => { setForm((p) => ({ ...p, specialty: e.target.value })); if (errors.specialty) setErrors((prev) => { const next = { ...prev }; delete next.specialty; return next; }); }}
                 />
               </FormField>
               {editing && (

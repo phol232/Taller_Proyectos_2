@@ -407,7 +407,7 @@ export default function FacultadesPage() {
             <FormField label="Código" error={facErrors.code}>
               <Input
                 value={facForm.code}
-                onChange={(e) => setFacForm((p) => ({ ...p, code: e.target.value }))}
+                onChange={(e) => { setFacForm((p) => ({ ...p, code: e.target.value })); if (facErrors.code) setFacErrors((prev) => { const next = { ...prev }; delete next.code; return next; }); }}
                 placeholder="Ej. FIC"
                 maxLength={20}
               />
@@ -415,7 +415,7 @@ export default function FacultadesPage() {
             <FormField label="Nombre" error={facErrors.name}>
               <Input
                 value={facForm.name}
-                onChange={(e) => setFacForm((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) => { setFacForm((p) => ({ ...p, name: e.target.value })); if (facErrors.name) setFacErrors((prev) => { const next = { ...prev }; delete next.name; return next; }); }}
                 placeholder="Ej. Facultad de Ingeniería"
                 maxLength={255}
               />
@@ -454,7 +454,7 @@ export default function FacultadesPage() {
             <FormField label="Código (opcional)" error={carErrors.code}>
               <Input
                 value={carForm.code}
-                onChange={(e) => setCarForm((p) => ({ ...p, code: e.target.value }))}
+                onChange={(e) => { setCarForm((p) => ({ ...p, code: e.target.value })); if (carErrors.code) setCarErrors((prev) => { const next = { ...prev }; delete next.code; return next; }); }}
                 placeholder="Ej. ING-SIS"
                 maxLength={20}
               />
@@ -462,7 +462,7 @@ export default function FacultadesPage() {
             <FormField label="Nombre" error={carErrors.name}>
               <Input
                 value={carForm.name}
-                onChange={(e) => setCarForm((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) => { setCarForm((p) => ({ ...p, name: e.target.value })); if (carErrors.name) setCarErrors((prev) => { const next = { ...prev }; delete next.name; return next; }); }}
                 placeholder="Ej. Ingeniería de Sistemas"
                 maxLength={255}
               />
