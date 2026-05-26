@@ -62,8 +62,6 @@ class SolverInputLoader:
 
             return data
 
-    # ---------- private ----------
-
     def _call_period(self, cur, period_id: UUID) -> dict[str, Any]:
         cur.execute("SELECT * FROM fn_solver_get_period(%s)", (period_id,))
         row = cur.fetchone()
@@ -160,13 +158,7 @@ class SolverInputLoader:
             data.classroom_course_components[r["course_component_id"]].add(r["classroom_id"])
 
     def _normalize_classroom_course_scope(self, data: SolverInput) -> None:
-        """Evita que filas padre usadas por UI se lean como restricción global.
 
-        Cuando un aula tiene componentes explícitos de un curso, esa relación
-        por componente es la fuente precisa. La fila en classroom_courses puede
-        existir solo para listar el curso en la UI y no debe autorizar todos sus
-        componentes dentro de esa misma aula.
-        """
         scoped_by_course: dict[UUID, set[UUID]] = defaultdict(set)
         for component_id, classroom_ids in data.classroom_course_components.items():
             component = data.course_components.get(component_id)
