@@ -1,20 +1,3 @@
-"""Phase 1: TeacherScheduleSolver.
-
-Greedy CSP: asigna (course_component, classroom, teacher, bloque_horario)
-respetando que cada componente ocupa un bloque CONTINUO de `weekly_hours` horas
-dentro de una ventana de disponibilidad del docente Y del aula.
-
-Restricciones respetadas:
-  H1 – Un docente no puede estar en dos sitios al mismo tiempo.
-  H2 – Un aula no puede albergar dos clases al mismo tiempo.
-  H3 – Disponibilidad horaria del docente (ventanas en time_slots).
-  H4 – Disponibilidad horaria del aula (ventanas en time_slots).
-  H5 – room_type del aula debe coincidir con required_room_type del componente.
-  H6 – El docente debe estar asignado al componente (teacher_course_components).
-  H7 – La duración del bloque = weekly_hours del componente.
-  H8 – Para un mismo curso, THEORY debe quedar programada antes que PRACTICE/GENERAL.
-  classroom_courses / classroom_course_components: solo aulas autorizadas.
-"""
 from __future__ import annotations
 
 import time as _time
@@ -23,6 +6,7 @@ from collections import defaultdict
 from datetime import time
 from uuid import UUID
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.domain.models import (
     Conflict,
@@ -37,16 +21,12 @@ from app.services.demand_projector import CourseDemand
 
 log = get_logger(__name__)
 
-# Bloque ocupado: (day, start_time, end_time)
 _Block = tuple[DayOfWeek, time, time]
 
-# Hora a partir de la cual se considera turno nocturno
 _NIGHT_START = time(19, 0)
-# Frontera entre franja S1 (mañana) y S2 (medio-día/tarde)
+
 _AFTERNOON_START = time(12, 0)
 
-# Bloques maestros institucionales: sesiones de 90 min,
-# con 10 min de desplazamiento entre sesiones.
 _MASTER_START = time(7, 0)
 _MASTER_END = time(22, 10)
 _CLASS_BLOCK_MINUTES = 90
@@ -54,43 +34,25 @@ _TRAVEL_GAP_MINUTES = 10
 _LUNCH_RECESS_START = time(13, 30)
 _LUNCH_RECESS_END = time(14, 0)
 
-# Restricción de fin de semana.
-# True  = bloqueo total (hard constraint): nunca se asigna sábado/domingo.
-# False = sábado/domingo disponibles como fallback; el score ya los penaliza
-#         mediante is_weekend = 1 en la función de coste, por lo que el
-#         algoritmo los usará solo cuando no haya slots Lun-Vie disponibles.
 _BLOCK_WEEKENDS: bool = False
 
-# Pesos de penalización por franja incorrecta:
-#   S1/S2: penalización baja (1 por franja de distancia)
-#   S3 fuera de noche: penalización alta para forzar noche cuando sea posible
-_S3_WRONG_SHIFT_PENALTY = 6   # S3 en mañana o tarde → penalización fuerte
-_S1S2_WRONG_SHIFT_PENALTY = 1  # S1/S2 desfasadas → penalización suave
+_S3_WRONG_SHIFT_PENALTY = 6   
+_S1S2_WRONG_SHIFT_PENALTY = 1  
 
 
 def _shift_score(slot_start: time, section_idx: int) -> int:
-    """Soft constraint de turno por sección (3 franjas).
 
-    Preferencia (score 0 = preferido, mayor = peor):
-      S1 (idx 0) → mañana   (07:00–12:00)
-      S2 (idx 1) → tarde    (12:00–19:00)
-      S3 (idx≥2) → nocturno (19:00–22:10)
-
-    S3 fuera de noche recibe penalización alta (_S3_WRONG_SHIFT_PENALTY * distancia).
-    Si la franja preferida no tiene candidatos viables, el algoritmo
-    recae en franjas alternativas. Nunca bloquea.
-    """
     if slot_start >= _NIGHT_START:
-        franja = 2  # noche
+        franja = 2  
     elif slot_start >= _AFTERNOON_START:
-        franja = 1  # tarde
+        franja = 1  
     else:
-        franja = 0  # mañana
+        franja = 0  
     pref = 0 if section_idx == 0 else (1 if section_idx == 1 else 2)
     distancia = abs(franja - pref)
     if distancia == 0:
         return 0
-    # S3 fuera de noche → penalización más fuerte
+    
     penalty = _S3_WRONG_SHIFT_PENALTY if section_idx >= 2 else _S1S2_WRONG_SHIFT_PENALTY
     return penalty * distancia
 
@@ -175,8 +137,6 @@ def _compact_block_groups(
                 out.append(group)
     return out
 
-
-# Orden de días de la semana (para H8 y para penalizar fin de semana)
 _DAY_ORDER: dict[DayOfWeek, int] = {
     DayOfWeek.MONDAY: 0,
     DayOfWeek.TUESDAY: 1,
@@ -187,25 +147,15 @@ _DAY_ORDER: dict[DayOfWeek, int] = {
     DayOfWeek.SUNDAY: 6,
 }
 
-# Días considerados fin de semana (penalización suave)
+
 _WEEKEND_DAYS = {DayOfWeek.SATURDAY, DayOfWeek.SUNDAY}
 
-# Descanso mínimo HARD entre bloques del mismo docente en el mismo día (minutos).
-# Gap = 0 (bloques consecutivos sin pausa) queda prohibido como hard constraint.
-# Un bloque de un curso entre medio (~2h) satisface este umbral.
-_TEACHER_REST_HARD_MIN = 1   # cualquier hueco > 0 ya cumple el hard
+_TEACHER_REST_HARD_MIN = 1 
 
-# Descanso mínimo DESEADO (soft): si el gap es menor a esto pero > 0, se penaliza.
-# 90 min ≈ un bloque de 1.5h de otro curso entre medio.
 _TEACHER_REST_MIN = 90
 
-# Gap máximo tolerable entre bloques del mismo docente el mismo día (en minutos).
-# Bloques con hueco > _MAX_GAP_MIN reciben penalización soft proporcional al exceso.
 _MAX_GAP_MIN = 10
 
-# Restricción dura: prohibir bloques que crucen la franja de almuerzo.
-# Los bloques que empiecen antes de _LUNCH_END y terminen después de _LUNCH_START
-# son descartados como candidatos.
 _BLOCK_LUNCH = True
 _LUNCH_START = time(13, 30)
 _LUNCH_END   = time(14,  0)
@@ -230,44 +180,32 @@ class TeacherScheduleSolver:
         self._demand = demand
         self._rng = random.Random(seed)
 
-        # Bloques ocupados por entidad
         self._teacher_blocks: dict[UUID, list[_Block]] = defaultdict(list)
         self._classroom_blocks: dict[UUID, list[_Block]] = defaultdict(list)
 
-        # Evitar reusar misma aula para dos ofertas del mismo componente
         self._course_used_classrooms: dict[UUID, set[UUID]] = defaultdict(set)
 
-        # Variedad de sala: conteo de bloques por (classroom_id, day, course_id).
-        # Penaliza (soft) asignar el mismo curso a la misma sala el mismo día varias veces.
         self._classroom_day_course_count: dict[
             tuple[UUID, DayOfWeek], dict[UUID, int]
         ] = defaultdict(lambda: defaultdict(int))
 
-        # Dispersión diaria: cuántas secciones del mismo curso ya caen en un día dado.
-        # Se usa como soft constraint para distribuir secciones entre distintos días.
         self._course_day_sections: dict[tuple[UUID, DayOfWeek], int] = defaultdict(int)
 
-        # Diagnóstico por curso; la precedencia real se aplica por sección.
         self._course_theory_ends: dict[UUID, list[tuple[int, time]]] = defaultdict(list)
-        # H8 por sección: la práctica de una sección sigue a su propia teoría,
-        # no a la última teoría global del curso.
+
         self._section_theory_end: dict[tuple[UUID, int], tuple[int, time]] = {}
 
-        # Consistencia docente: docente que ya tiene asignada la THEORY de
-        # (course_id, section_idx). Cuando se busca PRACTICE/GENERAL para esa
-        # misma sección, se prefiere reutilizar este docente.
         self._section_teacher: dict[tuple[UUID, int], UUID] = {}
 
-        # Variedad docente: docentes ya usados por curso (cualquier sección/componente).
-        # Penaliza (soft) asignar el mismo docente a varias secciones distintas del mismo curso.
         self._course_used_teachers: dict[UUID, set[UUID]] = defaultdict(set)
 
-        # Cache: classroom_id → set de course_id autorizados (inverso de classroom_courses)
         self._classroom_courses_cache: dict[UUID, set[UUID]] | None = None
         self._classroom_criticality_cache: dict[UUID, int] | None = None
         self._master_blocks_cache: dict[DayOfWeek, list[ScheduledBlock]] | None = None
         self._component_scoped_room_cache: dict[UUID, set[UUID]] | None = None
         self._classroom_authorized_component_cache: dict[UUID, int] | None = None
+
+        self._availability_blocks_cache: dict[tuple[UUID, UUID], list[ScheduledBlock]] = {}
         self._metrics: dict[str, int | float | str] = {}
 
         self._deadline_ts: float | None = None
@@ -337,9 +275,7 @@ class TeacherScheduleSolver:
         component_scoped_rooms = self._component_scoped_rooms_by_course().get(component.course_id, set())
 
         def fallback_classrooms() -> set[UUID]:
-            # Sin catálogo explícito: solo aulas libres o que ya incluyan el curso.
-            # Si el aula ya tiene componentes explícitos del curso, no se usa
-            # como fallback para componentes no marcados en esa aula.
+
             fallback = set()
             for cid in self._data.classrooms:
                 if cid in component_scoped_rooms:
@@ -418,28 +354,49 @@ class TeacherScheduleSolver:
         min_day_idx: int | None = None,
         min_start: time | None = None,
     ) -> list[ScheduledBlock]:
+
+        key = (teacher_id, classroom_id)
+        full = self._availability_blocks_cache.get(key)
+        if full is None:
+            full = self._compute_availability_blocks(teacher_id, classroom_id)
+            self._availability_blocks_cache[key] = full
+
+        if min_day_idx is None and min_start is None:
+            return full
+
+        out: list[ScheduledBlock] = []
+        for block in full:
+            day_idx = _DAY_ORDER.get(block.day, 9)
+            if min_day_idx is not None and day_idx < min_day_idx:
+                continue
+            if (
+                min_day_idx is not None
+                and day_idx == min_day_idx
+                and min_start is not None
+                and block.start_time < min_start
+            ):
+                continue
+            out.append(block)
+        return out
+
+    def _compute_availability_blocks(
+        self,
+        teacher_id: UUID,
+        classroom_id: UUID,
+    ) -> list[ScheduledBlock]:
+        """Calcula la lista completa de bloques maestros donde el teacher y
+        el aula están ambos disponibles. Solo se invoca en cache-miss."""
         t_windows = self._available_windows(self._data.teacher_availability.get(teacher_id, set()))
         c_windows = self._available_windows(self._data.classroom_availability.get(classroom_id, set()))
         out: list[ScheduledBlock] = []
 
         for day, day_blocks in self._master_blocks_by_day().items():
-            day_idx = _DAY_ORDER.get(day, 9)
-            if min_day_idx is not None and day_idx < min_day_idx:
-                continue
-
             teacher_windows = [window for window in t_windows if window.day_of_week == day]
             classroom_windows = [window for window in c_windows if window.day_of_week == day]
             if not teacher_windows or not classroom_windows:
                 continue
 
             for block in day_blocks:
-                if (
-                    min_day_idx is not None
-                    and day_idx == min_day_idx
-                    and min_start is not None
-                    and block.start_time < min_start
-                ):
-                    continue
                 if not any(
                     _contains(window.start_time, window.end_time, block.start_time, block.end_time)
                     for window in teacher_windows
@@ -454,8 +411,85 @@ class TeacherScheduleSolver:
 
         return out
 
-    # ------------------------------------------------------------------
     def solve(self, *, time_limit_ms: int) -> tuple[TeachingScheduleSolution, list[Conflict]]:
+
+        start_ts = _time.monotonic()
+        overall_deadline_ts = start_ts + time_limit_ms / 1000.0
+
+        settings = get_settings()
+        max_restarts = max(0, int(settings.local_search_max_hard_restarts))
+        min_budget_ms = int(settings.local_search_hard_restart_min_budget_ms)
+        first_ratio = float(settings.local_search_hard_restart_first_ratio)
+
+        global_best: TeachingScheduleSolution | None = None
+        global_best_conflicts: list[Conflict] = []
+        global_best_score_int: int | None = None
+        cycle_scores: list[int] = []
+        last_cycle_solution: TeachingScheduleSolution | None = None
+        last_cycle_conflicts: list[Conflict] = []
+        cycles_run = 0
+
+        while cycles_run <= max_restarts:
+            remaining_ms = max(0, int((overall_deadline_ts - _time.monotonic()) * 1000))
+
+            if cycles_run == 0 and max_restarts > 0:
+                cycle_budget = min(remaining_ms, int(time_limit_ms * first_ratio))
+            else:
+                cycle_budget = remaining_ms
+
+            if cycles_run > 0 and cycle_budget < min_budget_ms:
+                break
+            if cycle_budget < 1_000:
+                break
+
+            if cycles_run > 0:
+                self._reset_search_state()
+
+            cycle_solution, cycle_conflicts = self._solve_one_pass(cycle_budget)
+            last_cycle_solution = cycle_solution
+            last_cycle_conflicts = cycle_conflicts
+            cycles_run += 1
+
+            cycle_score = int(cycle_solution.metrics.get("score", 0))
+            cycle_scores.append(cycle_score)
+
+            is_better = (
+                cycle_solution.offers
+                and (
+                    global_best_score_int is None
+                    or cycle_score < global_best_score_int
+                )
+            )
+            if is_better:
+                global_best = cycle_solution
+                global_best_conflicts = cycle_conflicts
+                global_best_score_int = cycle_score
+
+            ls_term = cycle_solution.metrics.get("ls_termination_reason")
+            if ls_term == "BUDGET_EXCEEDED":
+                break
+
+        if global_best is None:
+            return last_cycle_solution or TeachingScheduleSolution(), last_cycle_conflicts
+
+        total_elapsed_ms = round((_time.monotonic() - start_ts) * 1000)
+        global_best.metrics["hard_restarts"] = cycles_run - 1
+        global_best.metrics["cycles_run"] = cycles_run
+        global_best.metrics["cycle_scores"] = ",".join(str(s) for s in cycle_scores)
+        global_best.metrics["total_duration_ms"] = total_elapsed_ms
+
+        log.info(
+            "[Phase 1] multi-start: %d cycles | scores=%s | best=%d | total=%dms",
+            cycles_run,
+            cycle_scores,
+            global_best_score_int,
+            total_elapsed_ms,
+        )
+
+        return global_best, global_best_conflicts
+
+    def _solve_one_pass(self, time_limit_ms: int) -> tuple[TeachingScheduleSolution, list[Conflict]]:
+        """Un ciclo: greedy multi-restart + fase de mejora local."""
         start_ts = _time.monotonic()
         self._deadline_ts = start_ts + time_limit_ms / 1000.0
 
@@ -518,6 +552,39 @@ class TeacherScheduleSolver:
                 "solver Phase 1 time budget exceeded",
             )]
 
+        ls_metrics: dict[str, int | float | str] = {}
+        settings = get_settings()
+        if (
+            settings.local_search_ratio > 0
+            and best_solution.offers
+            and best_score is not None
+        ):
+            remaining_ms = (self._deadline_ts - _time.monotonic()) * 1000
+            if remaining_ms >= settings.local_search_min_budget_ms:
+                from app.services.local_search.improver import LocalSearchImprover
+
+                improver = LocalSearchImprover(
+                    solver=self,
+                    solution=best_solution,
+                    score=best_score,
+                    rng=self._rng,
+                    max_iters=settings.local_search_max_iters,
+                    patience=settings.local_search_patience,
+                    max_kicks=settings.local_search_max_kicks,
+                )
+                best_solution, best_score = improver.run(deadline_ts=self._deadline_ts)
+                ls_metrics = improver.metrics
+                log.info(
+                    "[Phase 1] local search: %d iters | accepted=%d | rejected=%d | kicks=%d (improved=%d) | reason=%s | improvement=%s%%",
+                    int(ls_metrics.get("local_search_iters", 0)),
+                    int(ls_metrics.get("local_search_accepted", 0)),
+                    int(ls_metrics.get("local_search_rejected", 0)),
+                    int(ls_metrics.get("local_search_kicks", 0)),
+                    int(ls_metrics.get("local_search_post_kick_improvements", 0)),
+                    ls_metrics.get("ls_termination_reason", "NONE"),
+                    ls_metrics.get("local_search_improvement_pct", 0.0),
+                )
+
         elapsed_ms = round((_time.monotonic() - start_ts) * 1000)
         best_solution.metrics = {
             "attempts": attempts,
@@ -530,6 +597,7 @@ class TeacherScheduleSolver:
             "unassigned_variables": int(best_score[4]) if best_score else 0,
             "weekend_blocks": int(best_score[6]) if best_score else 0,
             **aggregate_metrics,
+            **ls_metrics,
         }
 
         log.info(
@@ -575,7 +643,11 @@ class TeacherScheduleSolver:
             type_order = 0 if comp.component_type.upper() == "THEORY" else 1
             eligible_count = len(self._eligible_classrooms_for_component(cid))
             teacher_count = len(self._data.teacher_course_components.get(cid, set()))
-            return (eligible_count, teacher_count, type_order, -comp.weekly_hours)
+
+            return (
+                eligible_count, teacher_count, type_order,
+                -comp.weekly_hours, self._rng.random(),
+            )
 
         for vars_in_course in course_to_vars.values():
             vars_in_course.sort(key=comp_order)
@@ -619,12 +691,14 @@ class TeacherScheduleSolver:
                 and rule.placement_strategy.upper() == "FILL_REMAINING"
                 else 0
             )
+
             return (
                 priority,
                 fill_remaining,
-                min(classroom_counts, default=0),
-                min(teacher_counts, default=0),
-                min((teacher_minutes(cid) for cid in component_ids), default=0),
+                min(classroom_counts, default=0) + self._rng.uniform(-0.5, 0.5),
+                min(teacher_counts, default=0) + self._rng.uniform(-0.3, 0.3),
+                min((teacher_minutes(cid) for cid in component_ids), default=0)
+                + self._rng.uniform(-15, 15),
                 -len(component_ids),
             )
 
@@ -663,22 +737,21 @@ class TeacherScheduleSolver:
             conflicts.extend(self._diagnose_failures())
         return solution, conflicts, unassigned, total
 
-    # ------------------------------------------------------------------
     def _apply_offer(self, offer: CourseOffer, placed: list[CourseOffer], section_idx: int) -> None:
         for scheduled in offer.blocks:
             block: _Block = (scheduled.day, scheduled.start_time, scheduled.end_time)
             self._teacher_blocks[offer.teacher_id].append(block)
             self._classroom_blocks[offer.classroom_id].append(block)
         self._course_used_classrooms[offer.course_component_id].add(offer.classroom_id)
-        # Variedad: registrar el curso en este (sala, día)
+
         for scheduled in offer.blocks:
             self._classroom_day_course_count[(offer.classroom_id, scheduled.day)][offer.course_id] += 1
-        # Dispersión: registrar cuántas secciones de este curso caen este día
+
         for day in {scheduled.day for scheduled in offer.blocks}:
             self._course_day_sections[(offer.course_id, day)] += 1
-        # Variedad docente: registrar este docente como usado en el curso
+
         self._course_used_teachers[offer.course_id].add(offer.teacher_id)
-        # H8: registrar fin de THEORY del curso (afecta a PRACTICE/GENERAL siguientes)
+
         placed_comp = self._data.course_components[offer.course_component_id]
         if placed_comp.component_type.upper() == "THEORY":
             last_block = max(
@@ -688,7 +761,7 @@ class TeacherScheduleSolver:
             self._course_theory_ends[offer.course_id].append(
                 (_DAY_ORDER.get(last_block.day, 9), last_block.end_time)
             )
-            # Consistencia docente: anclar el docente a esta (curso, sección)
+
             self._section_teacher[(offer.course_id, section_idx)] = offer.teacher_id
             self._section_theory_end[(offer.course_id, section_idx)] = (
                 _DAY_ORDER.get(last_block.day, 9),
@@ -708,7 +781,7 @@ class TeacherScheduleSolver:
             except ValueError:
                 pass
         self._course_used_classrooms[offer.course_component_id].discard(offer.classroom_id)
-        # Variedad: decrementar el contador para este (sala, día, curso)
+
         for scheduled in offer.blocks:
             key = (offer.classroom_id, scheduled.day)
             count_map = self._classroom_day_course_count.get(key)
@@ -716,12 +789,11 @@ class TeacherScheduleSolver:
                 count_map[offer.course_id] -= 1
                 if count_map[offer.course_id] <= 0:
                     del count_map[offer.course_id]
-        # Dispersión: decrementar secciones del curso en este día
+
         for day in {scheduled.day for scheduled in offer.blocks}:
             dkey = (offer.course_id, day)
             self._course_day_sections[dkey] = max(0, self._course_day_sections.get(dkey, 0) - 1)
-        # Variedad docente: el rollback es atómico por curso completo,
-        # así que al revertir todos sus bloques limpiamos el set entero.
+
         self._course_used_teachers.pop(offer.course_id, None)
         placed_comp = self._data.course_components[offer.course_component_id]
         if placed_comp.component_type.upper() == "THEORY":
@@ -735,7 +807,7 @@ class TeacherScheduleSolver:
                 ends.remove(entry)
                 if not ends:
                     self._course_theory_ends.pop(offer.course_id, None)
-            # Liberar el ancla docente para esa sección
+
             self._section_teacher.pop((offer.course_id, offer.section_number - 1), None)
             self._section_theory_end.pop((offer.course_id, offer.section_number - 1), None)
 
@@ -764,7 +836,6 @@ class TeacherScheduleSolver:
 
         candidates: list[tuple[tuple, CourseOffer]] = []
 
-        # Priorizar docentes con menos minutos libres restantes (más restringidos primero)
         def _teacher_free_minutes(tid: UUID) -> int:
             total = sum(
                 _duration_minutes(window.start_time, window.end_time)
@@ -809,7 +880,7 @@ class TeacherScheduleSolver:
                     self._metrics["candidate_groups_considered"] = (
                         int(self._metrics["candidate_groups_considered"]) + 1
                     )
-                    # H10 (hard): no se asigna ningún bloque que cruce almuerzo.
+
                     if any(
                         _BLOCK_LUNCH and block.start_time < _LUNCH_END and block.end_time > _LUNCH_START
                         for block in block_group
@@ -965,7 +1036,6 @@ class TeacherScheduleSolver:
         for _, offer in candidates:
             yield offer
 
-    # ------------------------------------------------------------------
     def _classroom_gap_score(
         self,
         classroom_id: UUID,
@@ -1048,7 +1118,6 @@ class TeacherScheduleSolver:
         )
         return (score, gap_count, gap_minutes, used_days, unassigned, restricted_misses, weekend_blocks)
 
-    # ------------------------------------------------------------------
     def _check_deadline(self) -> None:
         if self._deadline_ts is not None and _time.monotonic() > self._deadline_ts:
             raise TimeBudgetExceeded()
