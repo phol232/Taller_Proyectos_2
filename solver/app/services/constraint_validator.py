@@ -42,7 +42,6 @@ class ConstraintValidator:
                 )
                 continue
 
-            # H5 compatibility
             component_classrooms = self._data.classroom_course_components.get(offer.course_component_id)
             if component_classrooms and offer.classroom_id not in component_classrooms:
                 conflicts.append(self._mk(
@@ -64,15 +63,12 @@ class ConstraintValidator:
                     ConflictType.NO_ASSIGNMENT_POSSIBLE, offer.course_id,
                     "classroom room_type mismatch"))
 
-            # H6 teacher competence
             if offer.teacher_id not in self._data.teacher_course_components.get(offer.course_component_id, set()):
                 conflicts.append(self._mk(
                     ConflictType.NO_ASSIGNMENT_POSSIBLE, offer.course_id,
                     "teacher cannot teach this course",
                     resource_type="teacher", resource_id=offer.teacher_id))
 
-            # H7 duration: cada sesión persistible dura 90 min y el total
-            # del componente es la suma de sus bloques maestros.
             offer_blocks = self._blocks_for_offer(offer)
             invalid_block = next(
                 (
@@ -98,7 +94,6 @@ class ConstraintValidator:
                     ConflictType.NO_ASSIGNMENT_POSSIBLE, offer.course_id,
                     "component blocks must be consecutive on the same day"))
 
-            # H8 capacity is checked outside (depends on demand). We only check >0 here.
             if classroom.capacity <= 0:
                 conflicts.append(self._mk(
                     ConflictType.NO_ASSIGNMENT_POSSIBLE, offer.course_id,
@@ -121,8 +116,6 @@ class ConstraintValidator:
                         ConflictType.NO_ASSIGNMENT_POSSIBLE, offer.course_id,
                         "offer block does not match persisted time_slot", time_slot_id=slot.id))
 
-                # H3 + H4 availability: las disponibilidades son ventanas; el
-                # bloque maestro debe estar contenido en alguna ventana válida.
                 if not self._block_in_availability(offer.teacher_id, block, self._data.teacher_availability):
                     conflicts.append(self._mk(
                         ConflictType.NO_ASSIGNMENT_POSSIBLE, offer.course_id,
@@ -134,7 +127,6 @@ class ConstraintValidator:
                         "classroom not available", time_slot_id=block.time_slot_id,
                         resource_type="classroom", resource_id=offer.classroom_id))
 
-            # H1, H2 collisions on actual intervals
             for block in offer_blocks:
                 tkey = (offer.teacher_id, block.day)
                 for placed in teacher_blocks[tkey]:
@@ -156,12 +148,11 @@ class ConstraintValidator:
                         break
                 classroom_blocks[ckey].append(block)
 
-        # H9 travel time per teacher across consecutive slots.
         conflicts += self._check_travel(offers)
         return conflicts
 
     def _check_travel(self, offers: list[CourseOffer]) -> list[Conflict]:
-        # group slots per teacher.
+
         per_teacher: dict[UUID, list[tuple[TimeSlot, CourseOffer]]] = defaultdict(list)
         for offer in offers:
             for sid in offer.time_slot_ids:

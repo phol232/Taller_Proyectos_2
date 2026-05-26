@@ -60,7 +60,6 @@ class SolverOrchestrator:
     def __init__(self) -> None:
         self._loader = SolverInputLoader()
 
-    # ---- progress emission ----
     @staticmethod
     def _emit(run_id: UUID, stage: str, **extra) -> None:
         evt = {"type": "progress", "run_id": str(run_id), "stage": stage}
@@ -77,7 +76,7 @@ class SolverOrchestrator:
             student_id=req.student_id,
             requested_by=req.requested_by,
             time_limit_ms=req.time_limit_ms,
-            input_hash=None,  # filled in once data is loaded
+            input_hash=None,  
             seed=req.seed,
         )
         self._emit(run_id, "created", run_type=req.run_type)
@@ -101,7 +100,6 @@ class SolverOrchestrator:
                        conflict_count=1)
             return SolverRunResult(run_id, "FAILED", str(exc), [conflict])
 
-    # ------------------------------------------------------------------
     def _run_phase1(self, run_id: UUID, req: SolverRunRequest) -> SolverRunResult:
         if req.rate_limit_reservation_id is not None:
             if req.requested_by is None:
@@ -158,7 +156,6 @@ class SolverOrchestrator:
         solver = TeacherScheduleSolver(data, demand, seed=req.seed)
         solution, solver_diagnostics = solver.solve(time_limit_ms=max(1_000, req.time_limit_ms - _SOLVER_OVERHEAD_BUFFER_MS))
 
-        # Final validation.
         validator = ConstraintValidator(data)
         validation_conflicts = validator.validate_offers(solution.offers)
 
@@ -188,7 +185,6 @@ class SolverOrchestrator:
         return SolverRunResult(run_id, "SUCCEEDED",
                                f"{len(solution.offers)} offers", [])
 
-    # ------------------------------------------------------------------
     def _run_phase2(self, run_id: UUID, req: SolverRunRequest) -> SolverRunResult:
         self._emit(run_id, "loading_inputs")
         data = self._loader.load(
@@ -241,9 +237,8 @@ class SolverOrchestrator:
                    conflict_count=len(conflicts))
         return SolverRunResult(run_id, status, summary, conflicts)
 
-    # ------------------------------------------------------------------
     def _tag_input_hash(self, run_id: UUID, data: SolverInput) -> None:
-        # Hash of essential inputs for caching/audit (safe subset; serialised).
+
         payload = {
             "period": str(data.academic_period_id),
             "courses": sorted(str(c) for c in data.courses.keys()),
@@ -366,6 +361,23 @@ class SolverOrchestrator:
         diagnostics: list[Conflict],
     ) -> str:
         metrics = getattr(solution, "metrics", {}) or {}
+        ls_part = ""
+        if "local_search_iters" in metrics:
+            ls_part = (
+                f"; ls_iters={metrics.get('local_search_iters', 0)}"
+                f"; ls_accepted={metrics.get('local_search_accepted', 0)}"
+                f"; ls_rejected={metrics.get('local_search_rejected', 0)}"
+                f"; ls_kicks={metrics.get('local_search_kicks', 0)}"
+                f"; ls_post_kick_improvements={metrics.get('local_search_post_kick_improvements', 0)}"
+                f"; ls_improvement_pct={metrics.get('local_search_improvement_pct', 0.0)}"
+                f"; ls_termination={metrics.get('ls_termination_reason', 'NONE')}"
+            )
+        if "hard_restarts" in metrics:
+            ls_part += (
+                f"; hard_restarts={metrics.get('hard_restarts', 0)}"
+                f"; cycle_scores={metrics.get('cycle_scores', '')}"
+                f"; total_duration_ms={metrics.get('total_duration_ms', 0)}"
+            )
         return (
             f"phase1 generated {len(solution.offers)} offers (DRAFT); "
             f"{len(diagnostics)} diagnostics; "
@@ -378,4 +390,5 @@ class SolverOrchestrator:
             f"room_gap_minutes={metrics.get('room_gap_minutes', 0)}; "
             f"weekend_blocks={metrics.get('weekend_blocks', 0)}; "
             f"termination={metrics.get('termination_reason', 'UNKNOWN')}"
+            f"{ls_part}"
         )
