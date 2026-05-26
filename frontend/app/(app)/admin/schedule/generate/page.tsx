@@ -24,13 +24,13 @@ import { Input } from "@/components/ui/input";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import {
   cancelScheduleOption,
-  confirmScheduleOption,
   generateScheduleOption,
   getScheduleGenerationRun,
   getScheduleOptions,
 } from "@/lib/scheduleApi";
 import { useTranslation } from "@/lib/i18n";
 import { cn, toastError, toastSuccess } from "@/lib/utils";
+import { useAdminEvents } from "@/hooks/useAdminEvents";
 import type { AcademicPeriodAdmin, ClassroomAdmin } from "@/types/admin";
 import type { ScheduleGenerationRun, ScheduleOption } from "@/types/schedule";
 
@@ -142,7 +142,6 @@ export default function AdminGenerateSchedulePage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [typeFilter, setTypeFilter] = useState<string>("TODOS");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [confirmingScheduleId, setConfirmingScheduleId] = useState<string | null>(null);
   const [cancellingScheduleId, setCancellingScheduleId] = useState<string | null>(null);
   const [pendingCancelOption, setPendingCancelOption] = useState<ScheduleOption | null>(null);
   const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
@@ -207,6 +206,8 @@ export default function AdminGenerateSchedulePage() {
   );
 
   const canGenerate = Boolean(academicPeriodId) && selectedClassroomIds.length > 0 && !isGenerating;
+
+  useAdminEvents("schedules.changed", () => { void refreshOptions(); });
 
   useEffect(() => {
     if (!academicPeriodId && activePeriods.length > 0) {
@@ -290,19 +291,6 @@ export default function AdminGenerateSchedulePage() {
       }
     } finally {
       setIsGenerating(false);
-    }
-  }
-
-  async function handleConfirm(scheduleId: string) {
-    setConfirmingScheduleId(scheduleId);
-    try {
-      await confirmScheduleOption(scheduleId);
-      toastSuccess("Horario confirmado", "Los demás borradores fueron cancelados.");
-      await refreshOptions();
-    } catch (error) {
-      toastError("No se pudo confirmar", getApiErrorMessage(error, "Intenta nuevamente."));
-    } finally {
-      setConfirmingScheduleId(null);
     }
   }
 
@@ -414,7 +402,7 @@ export default function AdminGenerateSchedulePage() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Cada generación crea un <span className="font-medium text-foreground/70">borrador independiente</span>.
-                    Confirmar uno cancela los demás del período.
+                    La confirmación se realiza desde el módulo Confirmar Horario.
                   </p>
                 </div>
               </div>
@@ -612,7 +600,7 @@ export default function AdminGenerateSchedulePage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold text-foreground">Opciones generadas</h2>
-            <p className="text-xs text-muted-foreground">Compara borradores y aprueba el elegido</p>
+            <p className="text-xs text-muted-foreground">Compara borradores y revisa el detalle de cada uno</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {lastSlotCount !== null && (
@@ -658,9 +646,7 @@ export default function AdminGenerateSchedulePage() {
                   key={option.id}
                   option={option}
                   index={i}
-                  confirming={confirmingScheduleId === option.id}
                   cancelling={cancellingScheduleId === option.id}
-                  onConfirm={() => handleConfirm(option.id)}
                   onCancel={() => setPendingCancelOption(option)}
                   onView={() => router.push(`/admin/schedule/view?scheduleId=${option.id}`)}
                 />
@@ -862,17 +848,13 @@ function ClassroomToggle({
 function ScheduleOptionRow({
   option,
   index,
-  confirming,
   cancelling,
-  onConfirm,
   onCancel,
   onView,
 }: {
   option: ScheduleOption;
   index: number;
-  confirming: boolean;
   cancelling: boolean;
-  onConfirm: () => void;
   onCancel: () => void;
   onView: () => void;
 }) {
@@ -918,23 +900,6 @@ function ScheduleOptionRow({
               : <Trash2 className="h-3.5 w-3.5" />}
           </button>
         )}
-        <Button
-          type="button"
-          size="sm"
-          onClick={onConfirm}
-          disabled={isConfirmed || confirming}
-          className={cn(
-            "h-8 rounded-lg text-xs",
-            isConfirmed
-              ? "bg-muted text-muted-foreground ring-1 ring-border"
-              : "bg-foreground text-background hover:bg-foreground/80",
-          )}
-        >
-          {confirming
-            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            : <CheckCircle2 className="h-3.5 w-3.5" />}
-          {isConfirmed ? "Aprobado" : "Aprobar"}
-        </Button>
         <button
           type="button"
           aria-label="Ver detalle"
