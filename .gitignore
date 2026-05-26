@@ -228,6 +228,6 @@ $RECYCLE.BIN/
 # Backups de BD (dumps locales y de AWS)
 database/backups/
 
-# Auditorías internas del solver (no se versionan)
+# Auditorías internas del solver
 SOLVER_AUDIT.md
 SOLVER_AUDIT_V2.md
