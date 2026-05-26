@@ -326,7 +326,7 @@ export const en: TranslationDictionary = {
     confirmSchedule: { title: "Confirm Schedule", desc: "Review the draft and publish it so it is visible to students.", phase: "Schedule confirmation — Phase 2" },
     teacherAvailability: { title: "Teacher Availability", desc: "Check and register teacher hourly availability blocks.", phase: "Teacher Availability — Phase 1" },
     mySchedule: { title: "My Schedule", desc: "Check your assigned schedule for the current academic semester.", phase: "Student schedule view — Phase 3" },
-    viewSchedules: { title: "View Schedules", desc: "Explore available schedules from all semester courses.", phase: "Student schedule generation — Phase 3" },
+    viewSchedules: { title: "View Schedules", desc: "Explore available schedules from all semester courses.", phase: "Student schedule generation — Phase 4" },
     buildSchedule: { title: "Build Schedule", desc: "Create your ideal course combination with real-time conflict detection.", phase: "Student schedule builder — Phase 3" },
     schedulesView: { phase: "General Schedule View — Phase 3" },
   },

@@ -326,7 +326,7 @@ export const es: TranslationDictionary = {
     confirmSchedule: { title: "Confirmar Horario", desc: "Revisa el borrador y publícalo para que sea visible a los estudiantes.", phase: "Confirmación de horario — Fase 2" },
     teacherAvailability: { title: "Disponibilidad Docente", desc: "Consulta y registra los bloques de disponibilidad horaria de cada docente.", phase: "Disponibilidad Docente — Fase 1" },
     mySchedule: { title: "Mi Horario", desc: "Consulta tu horario asignado para el ciclo académico actual.", phase: "Visualización de horario del estudiante — Fase 3" },
-    viewSchedules: { title: "Ver Horarios", desc: "Explora los horarios disponibles de todas las secciones del ciclo.", phase: "Generación de horario del estudiante — Fase 3" },
+    viewSchedules: { title: "Ver Horarios", desc: "Explora los horarios disponibles de todas las secciones del ciclo.", phase: "Generación de horario del estudiante — Fase 4" },
     buildSchedule: { title: "Armar Horario", desc: "Crea tu combinación ideal de cursos con detección de conflictos en tiempo real.", phase: "Constructor de horario del estudiante — Fase 3" },
     schedulesView: { phase: "Vista General de Horarios — Fase 3" },
   },

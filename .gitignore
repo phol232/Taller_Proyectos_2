@@ -227,3 +227,7 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/windows,visualstudiocode,mean,react
 # Backups de BD (dumps locales y de AWS)
 database/backups/
+
+# Auditorías internas del solver (no se versionan)
+SOLVER_AUDIT.md
+SOLVER_AUDIT_V2.md
