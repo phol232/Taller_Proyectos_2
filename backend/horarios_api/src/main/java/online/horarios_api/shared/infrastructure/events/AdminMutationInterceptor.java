@@ -14,6 +14,8 @@ import java.util.Map;
 @Slf4j
 public class AdminMutationInterceptor implements HandlerInterceptor {
 
+    private static final String SCHEDULE_VALIDATE_SUFFIX = "/validate";
+
     private static final Map<String, String> PATH_TO_EVENT = Map.of(
             "/api/courses", "courses.changed",
             "/api/teachers", "teachers.changed",
@@ -41,6 +43,8 @@ public class AdminMutationInterceptor implements HandlerInterceptor {
         if (status < 200 || status >= 300) return;
 
         String path = request.getRequestURI();
+        if (isReadOnlyMutationEndpoint(path)) return;
+
         for (Map.Entry<String, String> entry : PATH_TO_EVENT.entrySet()) {
             if (path.startsWith(entry.getKey())) {
                 log.info("AdminMutationInterceptor: {} {} → publish '{}'", method, path, entry.getValue());
@@ -55,5 +59,11 @@ public class AdminMutationInterceptor implements HandlerInterceptor {
                 || "PUT".equalsIgnoreCase(method)
                 || "PATCH".equalsIgnoreCase(method)
                 || "DELETE".equalsIgnoreCase(method);
+    }
+
+    private boolean isReadOnlyMutationEndpoint(String path) {
+        return path != null
+                && path.startsWith("/api/schedules/")
+                && path.endsWith(SCHEDULE_VALIDATE_SUFFIX);
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -53,6 +54,15 @@ public class StudentService implements StudentCommandUseCase, StudentQueryUseCas
     @Transactional(readOnly = true)
     public Student getStudent(UUID studentId) {
         return ensureExists(studentId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Student> findStudentByUserId(UUID userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return studentPort.findByUserId(userId);
     }
 
     @Override

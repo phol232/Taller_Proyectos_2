@@ -21,7 +21,7 @@ public class AdminEventsController {
     private final SseEventPublisher publisher;
 
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
     @Operation(summary = "Stream SSE con eventos de cambio en recursos admin")
     public SseEmitter stream(HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
