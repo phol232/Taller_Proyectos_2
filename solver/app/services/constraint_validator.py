@@ -9,11 +9,27 @@ from app.domain.models import (
     Conflict,
     ConflictType,
     CourseOffer,
+    DayOfWeek,
     ScheduledBlock,
     TimeSlot,
 )
 from app.domain.solver_input import SolverInput
 from app.services.travel_time import TravelTimeChecker
+
+
+_DAY_ORDER: dict[DayOfWeek, int] = {
+    DayOfWeek.MONDAY: 0,
+    DayOfWeek.TUESDAY: 1,
+    DayOfWeek.WEDNESDAY: 2,
+    DayOfWeek.THURSDAY: 3,
+    DayOfWeek.FRIDAY: 4,
+    DayOfWeek.SATURDAY: 5,
+    DayOfWeek.SUNDAY: 6,
+}
+
+_LUNCH_START = time(13, 30)
+_LUNCH_END = time(14, 0)
+_MIN_REST_MINUTES = 1
 
 
 class ConstraintValidator:
@@ -149,6 +165,118 @@ class ConstraintValidator:
                 classroom_blocks[ckey].append(block)
 
         conflicts += self._check_travel(offers)
+        conflicts += self._check_theory_before_practice(offers)
+        conflicts += self._check_section_no_overlap(offers)
+        conflicts += self._check_lunch_window(offers)
+        conflicts += self._check_capacity(offers)
+        conflicts += self._check_teacher_rest(offers)
+        return conflicts
+
+    def _check_theory_before_practice(self, offers: list[CourseOffer]) -> list[Conflict]:
+        theory_end: dict[UUID, tuple[int, time]] = {}
+        practice_start: dict[UUID, tuple[int, time, UUID | None]] = {}
+
+        for offer in offers:
+            component = self._data.course_components.get(offer.course_component_id)
+            if component is None:
+                continue
+            ctype = component.component_type.upper()
+            for block in self._blocks_for_offer(offer):
+                day_idx = _DAY_ORDER.get(block.day, 9)
+                end_key = (day_idx, block.end_time)
+                start_key = (day_idx, block.start_time, block.time_slot_id)
+                if ctype == "THEORY":
+                    cur = theory_end.get(offer.course_id)
+                    if cur is None or end_key > cur:
+                        theory_end[offer.course_id] = end_key
+                elif ctype in ("PRACTICE", "GENERAL"):
+                    cur = practice_start.get(offer.course_id)
+                    if cur is None or (start_key[0], start_key[1]) < (cur[0], cur[1]):
+                        practice_start[offer.course_id] = start_key
+
+        conflicts: list[Conflict] = []
+        for course_id, (p_day, p_start, slot_id) in practice_start.items():
+            t_end = theory_end.get(course_id)
+            if t_end is None:
+                conflicts.append(self._mk(
+                    ConflictType.THEORY_AFTER_PRACTICE, course_id,
+                    "practice scheduled but no theory exists for this course",
+                    time_slot_id=slot_id))
+                continue
+            if (p_day, p_start) < t_end:
+                conflicts.append(self._mk(
+                    ConflictType.THEORY_AFTER_PRACTICE, course_id,
+                    f"practice starts before theory ends "
+                    f"(practice day={p_day} {p_start}, theory ends day={t_end[0]} {t_end[1]})",
+                    time_slot_id=slot_id))
+        return conflicts
+
+    def _check_section_no_overlap(self, offers: list[CourseOffer]) -> list[Conflict]:
+        by_section: dict[tuple[UUID, int], list[tuple[ScheduledBlock, CourseOffer]]] = defaultdict(list)
+        for offer in offers:
+            for block in self._blocks_for_offer(offer):
+                by_section[(offer.course_id, offer.section_number)].append((block, offer))
+
+        conflicts: list[Conflict] = []
+        for (course_id, section_no), items in by_section.items():
+            items.sort(key=lambda it: (_DAY_ORDER.get(it[0].day, 9), it[0].start_time))
+            for (a, oa), (b, ob) in zip(items, items[1:]):
+                if oa.course_component_id == ob.course_component_id:
+                    continue
+                if self._overlaps_blocks(a, b):
+                    conflicts.append(self._mk(
+                        ConflictType.SECTION_OVERLAP, course_id,
+                        f"section {section_no} has overlapping classes "
+                        f"({oa.course_component_id} vs {ob.course_component_id})",
+                        time_slot_id=b.time_slot_id))
+        return conflicts
+
+    def _check_lunch_window(self, offers: list[CourseOffer]) -> list[Conflict]:
+        conflicts: list[Conflict] = []
+        for offer in offers:
+            for block in self._blocks_for_offer(offer):
+                if block.start_time < _LUNCH_END and block.end_time > _LUNCH_START:
+                    conflicts.append(self._mk(
+                        ConflictType.LUNCH_VIOLATION, offer.course_id,
+                        f"class overlaps lunch window {_LUNCH_START}-{_LUNCH_END}",
+                        time_slot_id=block.time_slot_id))
+        return conflicts
+
+    def _check_capacity(self, offers: list[CourseOffer]) -> list[Conflict]:
+        conflicts: list[Conflict] = []
+        for offer in offers:
+            classroom = self._data.classrooms.get(offer.classroom_id)
+            if classroom is None:
+                continue
+            if offer.max_capacity > 0 and classroom.capacity < offer.max_capacity:
+                conflicts.append(self._mk(
+                    ConflictType.CAPACITY_EXCEEDED, offer.course_id,
+                    f"classroom capacity {classroom.capacity} < section size {offer.max_capacity}",
+                    resource_type="classroom", resource_id=offer.classroom_id))
+        return conflicts
+
+    def _check_teacher_rest(self, offers: list[CourseOffer]) -> list[Conflict]:
+        per_teacher_day: dict[tuple[UUID, DayOfWeek], list[ScheduledBlock]] = defaultdict(list)
+        for offer in offers:
+            for block in self._blocks_for_offer(offer):
+                per_teacher_day[(offer.teacher_id, block.day)].append(block)
+
+        conflicts: list[Conflict] = []
+        for (teacher_id, day), blocks in per_teacher_day.items():
+            blocks.sort(key=lambda b: b.start_time)
+            for prev, nxt in zip(blocks, blocks[1:]):
+                if prev.end_time >= nxt.start_time:
+                    continue
+                gap = (nxt.start_time.hour * 60 + nxt.start_time.minute) - (
+                    prev.end_time.hour * 60 + prev.end_time.minute
+                )
+                if gap < _MIN_REST_MINUTES:
+                    conflicts.append(Conflict(
+                        ConflictType.INSUFFICIENT_REST,
+                        f"teacher {teacher_id} has {gap}min rest on {day} "
+                        f"(min {_MIN_REST_MINUTES}min required)",
+                        resource_type="teacher", resource_id=teacher_id,
+                        time_slot_id=nxt.time_slot_id))
         return conflicts
 
     def _check_travel(self, offers: list[CourseOffer]) -> list[Conflict]:

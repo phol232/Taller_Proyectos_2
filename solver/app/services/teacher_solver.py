@@ -206,6 +206,11 @@ class TeacherScheduleSolver:
         self._classroom_authorized_component_cache: dict[UUID, int] | None = None
 
         self._availability_blocks_cache: dict[tuple[UUID, UUID], list[ScheduledBlock]] = {}
+        self._courses_with_theory: set[UUID] = {
+            comp.course_id
+            for comp in self._data.course_components.values()
+            if comp.component_type.upper() == "THEORY"
+        }
         self._metrics: dict[str, int | float | str] = {}
 
         self._deadline_ts: float | None = None
@@ -851,16 +856,31 @@ class TeacherScheduleSolver:
             key=lambda tid: (_teacher_free_minutes(tid), self._rng.random()),
         )
 
+        component_type_upper = component.component_type.upper()
+        if (
+            component_type_upper in ("PRACTICE", "GENERAL")
+            and component.course_id in self._courses_with_theory
+        ):
+            section_theory_end = self._section_theory_end.get(
+                (component.course_id, section_idx)
+            )
+            if section_theory_end is None and not self._course_theory_ends.get(component.course_id):
+                return
+
         for classroom_id in classroom_ids:
             classroom = self._data.classrooms[classroom_id]
 
             for teacher_id in teacher_ids:
                 min_day_idx = None
                 min_start = None
-                if component.component_type.upper() in ("PRACTICE", "GENERAL"):
+                if component_type_upper in ("PRACTICE", "GENERAL"):
                     section_theory_end = self._section_theory_end.get(
                         (component.course_id, section_idx)
                     )
+                    if section_theory_end is None:
+                        course_theory_ends = self._course_theory_ends.get(component.course_id)
+                        if course_theory_ends:
+                            section_theory_end = max(course_theory_ends)
                     if section_theory_end:
                         min_day_idx, min_start = section_theory_end
 

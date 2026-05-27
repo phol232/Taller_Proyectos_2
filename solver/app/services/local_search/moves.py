@@ -64,7 +64,6 @@ def _h8_constraints_for_offer(
 
     target = solution.offers[offer_idx]
     component = solver._data.course_components[target.course_component_id]
-    section_idx = max(0, target.section_number - 1)
     is_theory = component.component_type.upper() == "THEORY"
 
     min_day_idx: int | None = None
@@ -75,8 +74,6 @@ def _h8_constraints_for_offer(
         if i == offer_idx:
             continue
         if o.course_id != target.course_id:
-            continue
-        if (o.section_number - 1) != section_idx:
             continue
         comp_o = solver._data.course_components.get(o.course_component_id)
         if comp_o is None:
