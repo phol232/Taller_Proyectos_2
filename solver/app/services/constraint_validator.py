@@ -1,9 +1,12 @@
 """ConstraintValidator — final hard-constraint cross-check before persistence."""
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from datetime import datetime, time
 from uuid import UUID
+
+_logger = logging.getLogger(__name__)
 
 from app.domain.models import (
     Conflict,
@@ -173,40 +176,48 @@ class ConstraintValidator:
         return conflicts
 
     def _check_theory_before_practice(self, offers: list[CourseOffer]) -> list[Conflict]:
-        theory_end: dict[UUID, tuple[int, time]] = {}
-        practice_start: dict[UUID, tuple[int, time, UUID | None]] = {}
+        # keyed by (course_id, section_number)
+        theory_end: dict[tuple[UUID, int], tuple[int, time]] = {}
+        practice_start: dict[tuple[UUID, int], tuple[int, time, UUID | None]] = {}
 
         for offer in offers:
             component = self._data.course_components.get(offer.course_component_id)
             if component is None:
                 continue
             ctype = component.component_type.upper()
+            sec_key = (offer.course_id, offer.section_number)
             for block in self._blocks_for_offer(offer):
                 day_idx = _DAY_ORDER.get(block.day, 9)
                 end_key = (day_idx, block.end_time)
                 start_key = (day_idx, block.start_time, block.time_slot_id)
                 if ctype == "THEORY":
-                    cur = theory_end.get(offer.course_id)
+                    cur = theory_end.get(sec_key)
                     if cur is None or end_key > cur:
-                        theory_end[offer.course_id] = end_key
+                        theory_end[sec_key] = end_key
                 elif ctype in ("PRACTICE", "GENERAL"):
-                    cur = practice_start.get(offer.course_id)
+                    cur = practice_start.get(sec_key)
                     if cur is None or (start_key[0], start_key[1]) < (cur[0], cur[1]):
-                        practice_start[offer.course_id] = start_key
+                        practice_start[sec_key] = start_key
 
         conflicts: list[Conflict] = []
-        for course_id, (p_day, p_start, slot_id) in practice_start.items():
-            t_end = theory_end.get(course_id)
+        for (course_id, section_no), (p_day, p_start, slot_id) in practice_start.items():
+            t_end = theory_end.get((course_id, section_no))
             if t_end is None:
                 conflicts.append(self._mk(
                     ConflictType.THEORY_AFTER_PRACTICE, course_id,
-                    "practice scheduled but no theory exists for this course",
+                    f"section {section_no}: practice scheduled but no theory exists",
                     time_slot_id=slot_id))
                 continue
             if (p_day, p_start) < t_end:
+                course = self._data.courses.get(course_id)
+                course_code = course.code if course else str(course_id)
+                _logger.warning(
+                    "T->P violation | course=%s (%s) sec=%d | practice day=%d %s | theory ends day=%d %s",
+                    course_code, course_id, section_no, p_day, p_start, t_end[0], t_end[1],
+                )
                 conflicts.append(self._mk(
                     ConflictType.THEORY_AFTER_PRACTICE, course_id,
-                    f"practice starts before theory ends "
+                    f"section {section_no}: practice starts before theory ends "
                     f"(practice day={p_day} {p_start}, theory ends day={t_end[0]} {t_end[1]})",
                     time_slot_id=slot_id))
         return conflicts

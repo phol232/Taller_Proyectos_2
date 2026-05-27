@@ -111,6 +111,7 @@ class LocalSearchImprover:
         no_improvement = 0
         kicks_done = 0
         improved_since_last_kick = False
+        unproductive_kicks_streak = 0
         total_iters = 0
 
         while total_iters < self._max_iters:
@@ -163,10 +164,15 @@ class LocalSearchImprover:
 
             if no_improvement >= self._patience:
                 remaining_ms = (deadline_ts - _time.monotonic()) * 1000
+                if kicks_done > 0 and not improved_since_last_kick:
+                    unproductive_kicks_streak += 1
+                else:
+                    unproductive_kicks_streak = 0
                 if (
                     kicks_done < self._max_kicks
                     and remaining_ms >= _KICK_MIN_BUDGET_MS
                     and len(self._current_solution.offers) > 0
+                    and unproductive_kicks_streak < 2
                 ):
                     if kicks_done > 0 and improved_since_last_kick:
                         self.metrics["local_search_post_kick_improvements"] = (

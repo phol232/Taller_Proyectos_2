@@ -38,9 +38,15 @@ class Settings(BaseSettings):
 
     local_search_max_kicks: int = Field(default=6)
 
-    local_search_max_hard_restarts: int = Field(default=2)
-    local_search_hard_restart_min_budget_ms: int = Field(default=15_000)
-    local_search_hard_restart_first_ratio: float = Field(default=1.0)
+    local_search_max_hard_restarts: int = Field(default=3)
+    local_search_hard_restart_min_budget_ms: int = Field(default=8_000)
+    local_search_hard_restart_first_ratio: float = Field(default=0.55)
+
+    redis_enabled: bool = Field(default=False)
+    redis_host: str = Field(default="redis")
+    redis_port: int = Field(default=6379)
+    redis_db: int = Field(default=0)
+    redis_cache_ttl_seconds: int = Field(default=86_400)
 
 
 @lru_cache

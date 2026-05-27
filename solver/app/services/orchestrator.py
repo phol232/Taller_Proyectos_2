@@ -159,7 +159,11 @@ class SolverOrchestrator:
         validator = ConstraintValidator(data)
         validation_conflicts = validator.validate_offers(solution.offers)
 
-        if validation_conflicts or not solution.offers:
+        _WARN_ONLY_TYPES = {ConflictType.THEORY_AFTER_PRACTICE}
+        hard_conflicts = [c for c in validation_conflicts if c.conflict_type not in _WARN_ONLY_TYPES]
+        warn_conflicts = [c for c in validation_conflicts if c.conflict_type in _WARN_ONLY_TYPES]
+
+        if hard_conflicts or not solution.offers:
             conflicts = [*solver_diagnostics, *validation_conflicts]
             report_conflicts(run_id, conflicts)
             finish_solver_run(run_id, status="FAILED",
@@ -167,6 +171,9 @@ class SolverOrchestrator:
             self._emit(run_id, "finished", status="FAILED",
                        offers=len(solution.offers), conflict_count=len(conflicts))
             return SolverRunResult(run_id, "FAILED", "phase1 partial/failed", conflicts)
+
+        if warn_conflicts:
+            report_conflicts(run_id, warn_conflicts)
 
         self._emit(run_id, "persisting", offers=len(solution.offers))
         capacities = {cid: c.capacity for cid, c in data.classrooms.items()}
@@ -238,7 +245,6 @@ class SolverOrchestrator:
         return SolverRunResult(run_id, status, summary, conflicts)
 
     def _tag_input_hash(self, run_id: UUID, data: SolverInput) -> None:
-
         payload = {
             "period": str(data.academic_period_id),
             "courses": sorted(str(c) for c in data.courses.keys()),
@@ -377,6 +383,8 @@ class SolverOrchestrator:
                 f"; hard_restarts={metrics.get('hard_restarts', 0)}"
                 f"; cycle_scores={metrics.get('cycle_scores', '')}"
                 f"; total_duration_ms={metrics.get('total_duration_ms', 0)}"
+                f"; total_attempts={metrics.get('total_attempts', 0)}"
+                f"; total_candidates={metrics.get('total_candidates', 0)}"
             )
         return (
             f"phase1 generated {len(solution.offers)} offers (DRAFT); "

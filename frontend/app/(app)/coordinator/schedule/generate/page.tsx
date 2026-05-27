@@ -91,19 +91,28 @@ function parseSolverSummary(summary: string | null): SolverSummaryMetrics {
     termination: null,
   };
   if (!summary) return metrics;
+  let totalDurationMs: number | null = null;
+  let totalAttempts: number | null = null;
+  let totalCandidates: number | null = null;
   for (const part of summary.split(";")) {
     const [rawKey, rawValue] = part.trim().split("=");
     if (!rawKey || rawValue === undefined) continue;
     const key = rawKey.trim();
     const value = rawValue.trim();
     if (key === "duration_ms") metrics.durationMs = Number(value);
+    if (key === "total_duration_ms") totalDurationMs = Number(value);
     if (key === "attempts") metrics.attempts = Number(value);
+    if (key === "total_attempts") totalAttempts = Number(value);
     if (key === "candidates") metrics.candidates = Number(value);
+    if (key === "total_candidates") totalCandidates = Number(value);
     if (key === "room_gaps") metrics.roomGaps = Number(value);
     if (key === "room_gap_minutes") metrics.roomGapMinutes = Number(value);
     if (key === "weekend_blocks") metrics.weekendBlocks = Number(value);
     if (key === "termination") metrics.termination = value;
   }
+  if (totalDurationMs !== null) metrics.durationMs = totalDurationMs;
+  if (totalAttempts !== null) metrics.attempts = totalAttempts;
+  if (totalCandidates !== null) metrics.candidates = totalCandidates;
   return metrics;
 }
 
