@@ -26,7 +26,7 @@ public class AcademicPeriodController {
     private final AcademicPeriodQueryUseCase academicPeriodQueryUseCase;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR', 'STUDENT', 'TEACHER')")
     @Operation(summary = "Listar períodos académicos")
     public ResponseEntity<List<AcademicPeriodResponse>> listAll() {
         return ResponseEntity.ok(academicPeriodQueryUseCase.listAcademicPeriods().stream()
@@ -35,7 +35,7 @@ public class AcademicPeriodController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR', 'STUDENT', 'TEACHER')")
     @Operation(summary = "Obtener período académico por ID")
     public ResponseEntity<AcademicPeriodResponse> findById(@PathVariable UUID id) {
         return ResponseEntity.ok(AcademicPeriodResponse.from(academicPeriodQueryUseCase.getAcademicPeriod(id)));
@@ -60,7 +60,8 @@ public class AcademicPeriodController {
                 request.startsAt(),
                 request.endsAt(),
                 request.status(),
-                request.maxStudentCredits()
+                request.maxStudentCredits(),
+                request.isActive()
         );
         return ResponseEntity.ok(AcademicPeriodResponse.from(
                 academicPeriodCommandUseCase.createAcademicPeriod(command)
@@ -78,11 +79,20 @@ public class AcademicPeriodController {
                 request.startsAt(),
                 request.endsAt(),
                 request.status(),
-                request.maxStudentCredits()
+                request.maxStudentCredits(),
+                request.isActive()
         );
         return ResponseEntity.ok(AcademicPeriodResponse.from(
                 academicPeriodCommandUseCase.updateAcademicPeriod(id, command)
         ));
+    }
+
+    @PostMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Activar período académico")
+    public ResponseEntity<Void> activate(@PathVariable UUID id) {
+        academicPeriodCommandUseCase.activateAcademicPeriod(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/deactivate")

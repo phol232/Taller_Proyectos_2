@@ -1,27 +1,6 @@
-"""Unit tests for solver components that don't depend on the database.
-
-Cobertura por restricción según Diseno_Microservicio_Solver_CSP.md:
-  H1  — Sin solapamiento de docente
-  H2  — Sin solapamiento de aula
-  H3  — Disponibilidad del docente
-  H4  — Disponibilidad del aula
-  H5  — Compatibilidad aula-componente (room_type + classroom_courses)
-  H6  — Competencia del docente por componente
-  H7  — Horas exactas por componente
-  H9  — Tiempo de traslado del docente
-  H10 — Prerrequisitos aprobados
-  H11 — Límite de créditos
-  H12 — Vacantes por oferta (VacancyTracker)
-  H13 — Turno del estudiante (ShiftFilter)
-  H14 — Curso compuesto indivisible (via CorequisiteGrouper)
-  H15 — Corequisitos
-       — DemandProjector: cálculo de demanda y fallback
-       — SolverInput: campo classroom_course_components
-       — TeacherScheduleSolver: integración mínima en memoria
-       — ConstraintValidator: pipeline completo H1-H9
-"""
 from __future__ import annotations
 
+import random
 from datetime import time
 from uuid import uuid4
 
@@ -37,6 +16,7 @@ from app.domain.models import (
     Shift,
     Student,
     Teacher,
+    TeachingScheduleSolution,
     TimeSlot,
     CourseSchedulingRule,
 )
@@ -51,6 +31,15 @@ from app.services.shift_filter import ShiftFilter
 from app.services.teacher_solver import TeacherScheduleSolver
 from app.services.travel_time import TravelTimeChecker
 from app.services.vacancy_tracker import VacancyTracker
+from app.services.local_search.improver import LocalSearchImprover
+from app.services.local_search.moves import (
+    RetimeMove,
+    RoomReassignMove,
+    RuinAndRecreateMove,
+    TeacherReassignMove,
+    _restore_solver_state,
+    _snapshot_solver_state,
+)
 
 
 # ---------------------- VacancyTracker ----------------------
@@ -1418,3 +1407,336 @@ def test_teacher_solver_fails_without_competent_teacher():
     solution, conflicts = solver.solve(time_limit_ms=5_000)
     assert len(solution.offers) == 0
     assert len(conflicts) >= 1
+
+
+# ──────────────────────────────────────────────────────────────────
+# Local Search (Hill Climbing / Mejora Local)
+# ──────────────────────────────────────────────────────────────────
+
+def _master_slots_for(day: DayOfWeek) -> list[TimeSlot]:
+    """Devuelve los time_slots maestros del solver para `day`."""
+    starts = [
+        time(7, 0), time(8, 40), time(10, 20), time(12, 0),
+        time(14, 0), time(15, 40), time(17, 20), time(19, 0), time(20, 40),
+    ]
+    slots: list[TimeSlot] = []
+    for start in starts:
+        end_minutes = start.hour * 60 + start.minute + 90
+        end = time(end_minutes // 60, end_minutes % 60)
+        slots.append(
+            TimeSlot(uuid4(), day, start, end, start.hour * 60 + start.minute)
+        )
+    return slots
+
+
+def _make_minimal_input(
+    *, days: list[DayOfWeek] | None = None,
+    classroom_count: int = 1,
+    teacher_count: int = 1,
+) -> tuple[SolverInput, dict]:
+    """Construye un SolverInput sintético con 1 curso, 1 componente y N aulas/docentes."""
+    days = days or [DayOfWeek.MONDAY]
+
+    course_id = uuid4()
+    comp_id = uuid4()
+
+    data = SolverInput(academic_period_id=uuid4(), period_max_credits=22)
+    data.courses[course_id] = Course(
+        course_id, "TST-1", "Test course", 1, 4, 0, 1.5, "AULA"
+    )
+    data.course_components[comp_id] = CourseComponent(
+        comp_id, course_id, "THEORY", 1.5, "AULA", 1
+    )
+
+    teacher_ids = [uuid4() for _ in range(teacher_count)]
+    classroom_ids = [uuid4() for _ in range(classroom_count)]
+
+    for i, tid in enumerate(teacher_ids):
+        data.teachers[tid] = Teacher(tid, f"T-{i}", f"Docente {i}")
+    for i, cid in enumerate(classroom_ids):
+        data.classrooms[cid] = Classroom(cid, f"A{i:03d}", f"A{i:03d}", 40, "AULA", "A")
+
+    slot_ids: list = []
+    for day in days:
+        for slot in _master_slots_for(day):
+            data.time_slots[slot.id] = slot
+            slot_ids.append(slot.id)
+
+    all_slots = set(slot_ids)
+    data.teacher_course_components[comp_id] = set(teacher_ids)
+    for tid in teacher_ids:
+        data.teacher_availability[tid] = all_slots
+    for cid in classroom_ids:
+        data.classroom_course_components.setdefault(comp_id, set()).add(cid)
+        data.classroom_availability[cid] = all_slots
+
+    return data, {
+        "course_id": course_id,
+        "comp_id": comp_id,
+        "teacher_ids": teacher_ids,
+        "classroom_ids": classroom_ids,
+        "slot_ids": slot_ids,
+    }
+
+
+def test_local_search_runs_and_records_metrics():
+    """Tras solve() con ratio > 0, las métricas de LS deben estar presentes."""
+    data, ids = _make_minimal_input()
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+
+    solution, conflicts = TeacherScheduleSolver(data, demand, seed=1).solve(time_limit_ms=3_000)
+
+    assert conflicts == []
+    assert len(solution.offers) == 1
+
+    assert "local_search_iters" in solution.metrics
+    assert "ls_termination_reason" in solution.metrics
+    assert solution.metrics["local_search_iters"] >= 1
+
+
+def test_local_search_preserves_feasibility():
+    """La solución post-LS debe seguir cumpliendo H1-H9 (ConstraintValidator OK)."""
+    data, ids = _make_minimal_input(classroom_count=2, teacher_count=2)
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+
+    solution, _ = TeacherScheduleSolver(data, demand, seed=42).solve(time_limit_ms=3_000)
+
+    validator = ConstraintValidator(data)
+    violations = validator.validate_offers(solution.offers)
+    assert violations == [], f"LS introduced violations: {violations}"
+
+
+def test_retime_move_proposes_different_blocks():
+    """RetimeMove debe producir un offer con bloques distintos al original."""
+    data, ids = _make_minimal_input()
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+    solver = TeacherScheduleSolver(data, demand, seed=1)
+
+    slot = next(s for s in data.time_slots.values() if s.start_time == time(7, 0))
+
+    initial = CourseOffer(
+        course_id=ids["course_id"],
+        course_component_id=ids["comp_id"],
+        teacher_id=ids["teacher_ids"][0],
+        classroom_id=ids["classroom_ids"][0],
+        max_capacity=40,
+        section_number=1,
+        blocks=[
+            ScheduledBlock(slot.id, slot.day_of_week, slot.start_time, slot.end_time, 0)
+        ],
+    )
+    solution = TeachingScheduleSolution(offers=[initial])
+
+    rng = random.Random(7)
+    proposal = RetimeMove().propose(solver, solution, rng)
+    assert proposal is not None
+    new_offer = proposal.replacements[0][1]
+    assert new_offer.blocks[0].start_time != time(7, 0)
+
+
+def test_room_reassign_uses_different_classroom():
+    """RoomReassignMove debe proponer un aula diferente cuando hay alternativas."""
+    data, ids = _make_minimal_input(classroom_count=2)
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+    solver = TeacherScheduleSolver(data, demand, seed=1)
+    slot = next(s for s in data.time_slots.values() if s.start_time == time(7, 0))
+
+    initial = CourseOffer(
+        course_id=ids["course_id"],
+        course_component_id=ids["comp_id"],
+        teacher_id=ids["teacher_ids"][0],
+        classroom_id=ids["classroom_ids"][0],
+        max_capacity=40,
+        section_number=1,
+        blocks=[
+            ScheduledBlock(slot.id, slot.day_of_week, slot.start_time, slot.end_time, 0)
+        ],
+    )
+    solution = TeachingScheduleSolution(offers=[initial])
+
+    rng = random.Random(1)
+    proposal = RoomReassignMove().propose(solver, solution, rng)
+    assert proposal is not None
+    assert proposal.replacements[0][1].classroom_id != ids["classroom_ids"][0]
+
+
+def test_teacher_reassign_uses_different_teacher():
+    """TeacherReassignMove debe proponer un docente diferente cuando hay alternativas."""
+    data, ids = _make_minimal_input(teacher_count=2)
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+    solver = TeacherScheduleSolver(data, demand, seed=1)
+    slot = next(s for s in data.time_slots.values() if s.start_time == time(7, 0))
+
+    initial = CourseOffer(
+        course_id=ids["course_id"],
+        course_component_id=ids["comp_id"],
+        teacher_id=ids["teacher_ids"][0],
+        classroom_id=ids["classroom_ids"][0],
+        max_capacity=40,
+        section_number=1,
+        blocks=[
+            ScheduledBlock(slot.id, slot.day_of_week, slot.start_time, slot.end_time, 0)
+        ],
+    )
+    solution = TeachingScheduleSolution(offers=[initial])
+
+    rng = random.Random(1)
+    proposal = TeacherReassignMove().propose(solver, solution, rng)
+    assert proposal is not None
+    assert proposal.replacements[0][1].teacher_id != ids["teacher_ids"][0]
+
+
+def test_multi_start_runs_at_least_one_cycle():
+    """solve() debe ejecutar ≥1 ciclo y poblar métricas de multi-start."""
+    data, ids = _make_minimal_input(classroom_count=2)
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+    solution, conflicts = TeacherScheduleSolver(data, demand, seed=11).solve(time_limit_ms=4_000)
+
+    assert conflicts == []
+    assert "cycles_run" in solution.metrics
+    assert int(solution.metrics["cycles_run"]) >= 1
+    assert "cycle_scores" in solution.metrics
+    assert "hard_restarts" in solution.metrics
+
+    assert int(solution.metrics["hard_restarts"]) == int(solution.metrics["cycles_run"]) - 1
+
+
+def test_ruin_recreate_preserves_state_on_failure():
+    """Si RuinAndRecreate no encuentra rebuild, el estado del solver debe quedar igual."""
+    import copy as _copy
+
+    data, ids = _make_minimal_input()
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+    solver = TeacherScheduleSolver(data, demand, seed=2)
+    solution, _ = solver.solve(time_limit_ms=2_000)
+
+    assert len(solution.offers) == 1
+
+    before_snap = _snapshot_solver_state(solver)
+    rng = random.Random(0)
+    result = RuinAndRecreateMove().propose(solver, solution, rng)
+    assert result is None
+
+    after_snap = _snapshot_solver_state(solver)
+    assert before_snap.keys() == after_snap.keys()
+    for k in before_snap:
+        if k == "metrics":
+            continue
+        assert before_snap[k] == after_snap[k], f"state field {k} changed"
+
+
+def test_ruin_recreate_produces_feasible_solution():
+    """LNS sobre un problema con varios offers no debe introducir violaciones."""
+    period_id = uuid4()
+    data = SolverInput(academic_period_id=period_id, period_max_credits=22)
+    teacher_id = uuid4()
+    classroom_a = uuid4()
+    classroom_b = uuid4()
+
+    course_ids = [uuid4() for _ in range(3)]
+    comp_ids = [uuid4() for _ in range(3)]
+    for i, (cid, kid) in enumerate(zip(course_ids, comp_ids)):
+        data.courses[cid] = Course(cid, f"C-{i}", f"Curso {i}", 1, 4, 0, 1.5, "AULA")
+        data.course_components[kid] = CourseComponent(kid, cid, "THEORY", 1.5, "AULA", 1)
+        data.teacher_course_components[kid] = {teacher_id}
+        data.classroom_course_components[kid] = {classroom_a, classroom_b}
+
+    data.teachers[teacher_id] = Teacher(teacher_id, "T", "Docente único")
+    data.classrooms[classroom_a] = Classroom(classroom_a, "A", "A", 40, "AULA", "A")
+    data.classrooms[classroom_b] = Classroom(classroom_b, "B", "B", 40, "AULA", "B")
+
+    for slot in _master_slots_for(DayOfWeek.MONDAY) + _master_slots_for(DayOfWeek.TUESDAY):
+        data.time_slots[slot.id] = slot
+    all_slots = set(data.time_slots.keys())
+    data.teacher_availability[teacher_id] = all_slots
+    data.classroom_availability[classroom_a] = all_slots
+    data.classroom_availability[classroom_b] = all_slots
+
+    demand = {
+        kid: CourseDemand(cid, kid, 0, 40, 1)
+        for kid, cid in zip(comp_ids, course_ids)
+    }
+
+    solver = TeacherScheduleSolver(data, demand, seed=5)
+    solution, conflicts = solver.solve(time_limit_ms=3_000)
+    assert conflicts == []
+    assert len(solution.offers) == 3
+
+    validator = ConstraintValidator(data)
+    assert validator.validate_offers(solution.offers) == []
+
+
+def test_improver_returns_best_ever_after_kicks():
+    """Tras kicks que empeoran la solución temporalmente, debe devolverse el best-ever."""
+    import time as _time
+
+    data, ids = _make_minimal_input(classroom_count=2, teacher_count=2)
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+    solver = TeacherScheduleSolver(data, demand, seed=3)
+    solution, _ = solver.solve(time_limit_ms=2_000)
+    assert solution.offers
+
+    initial_score = (
+        int(solution.metrics["score"]),
+        int(solution.metrics["room_gap_count"]),
+        int(solution.metrics["room_gap_minutes"]),
+        int(solution.metrics["used_days"]),
+        int(solution.metrics["unassigned_variables"]),
+        0,
+        int(solution.metrics["weekend_blocks"]),
+    )
+
+    improver = LocalSearchImprover(
+        solver=solver,
+        solution=solution,
+        score=initial_score,
+        rng=random.Random(0),
+        max_iters=200,
+        patience=10,
+        max_kicks=2,
+    )
+    deadline = _time.monotonic() + 5.0
+    best_solution, best_score = improver.run(deadline_ts=deadline)
+
+    assert best_score <= initial_score
+    validator = ConstraintValidator(data)
+    assert validator.validate_offers(best_solution.offers) == []
+    assert improver.metrics["local_search_kicks"] >= 1
+
+
+def test_improver_respects_deadline():
+    """El improver debe terminar antes del deadline aún si tiene presupuesto restante."""
+    import time as _time
+
+    data, ids = _make_minimal_input()
+    demand = {ids["comp_id"]: CourseDemand(ids["course_id"], ids["comp_id"], 0, 40, 1)}
+    solver = TeacherScheduleSolver(data, demand, seed=1)
+
+    solution, _ = solver.solve(time_limit_ms=2_000)
+    assert solution.offers
+
+    initial_score = (
+        int(solution.metrics["score"]),
+        int(solution.metrics["room_gap_count"]),
+        int(solution.metrics["room_gap_minutes"]),
+        int(solution.metrics["used_days"]),
+        int(solution.metrics["unassigned_variables"]),
+        0,
+        int(solution.metrics["weekend_blocks"]),
+    )
+
+    improver = LocalSearchImprover(
+        solver=solver,
+        solution=solution,
+        score=initial_score,
+        rng=random.Random(1),
+        max_iters=1_000_000,
+        patience=10_000,
+    )
+    deadline = _time.monotonic() - 1.0  # ya vencido
+    start = _time.monotonic()
+    improver.run(deadline_ts=deadline)
+    elapsed_ms = (_time.monotonic() - start) * 1000
+
+    assert elapsed_ms < 500, f"improver ignored deadline: took {elapsed_ms:.0f}ms"
+    assert improver.metrics["ls_termination_reason"] == "BUDGET_EXCEEDED"

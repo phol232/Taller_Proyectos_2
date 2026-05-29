@@ -293,6 +293,14 @@ export type TranslationDictionary = {
     sexPreferNotToSay: string;
     ageLabel: string;
     agePlaceholder: string;
+    sectionPreferences: string;
+    preferredShiftLabel: string;
+    preferredShiftHelp: string;
+    preferredShiftMaxReached: string;
+    shiftMorning: string;
+    shiftAfternoon: string;
+    shiftEvening: string;
+    shiftFlexible: string;
     saveChanges: string;
     saving: string;
     editProfile: string;

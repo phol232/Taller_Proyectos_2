@@ -1,10 +1,3 @@
-"""REST + WebSocket API for the solver microservice.
-
-* ``POST /api/solver/run``                  — fires a run asynchronously, returns 202.
-* ``GET  /api/solver/runs/{run_id}``        — current state + conflicts.
-* ``WS   /api/solver/ws/runs/{run_id}``     — live progress for a single run.
-* ``WS   /api/solver/ws/inputs``            — live notifications when DB inputs change.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -95,8 +88,7 @@ async def trigger_run(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="invalid or expired generation reservation",
             )
-    # Pre-create the solver_run row so we can return its id immediately and
-    # the client can subscribe to the WebSocket before the worker starts.
+
     run_id = await run_in_threadpool(
         create_solver_run,
         run_type=body.run_type,
@@ -131,13 +123,10 @@ async def trigger_run(
 async def _run_in_background(run_id: UUID, req: SolverRunRequest) -> None:
     try:
         await run_in_threadpool(_orchestrator.run_existing, run_id, req)
-    except Exception:  # noqa: BLE001
+    except Exception:  
         log.exception("background solver run %s failed", run_id)
 
 
-# --------------------------------------------------------------------------
-# Run state
-# --------------------------------------------------------------------------
 @router.get("/runs/{run_id}", response_model=RunDetailResponse)
 async def get_run(run_id: UUID) -> RunDetailResponse:
     data = await run_in_threadpool(get_solver_run, run_id)
@@ -174,9 +163,6 @@ def _authorize_internal_request(header_token: str | None) -> None:
         )
 
 
-# --------------------------------------------------------------------------
-# WebSocket — per-run progress
-# --------------------------------------------------------------------------
 @router.websocket("/ws/runs/{run_id}")
 async def ws_run_progress(websocket: WebSocket, run_id: UUID) -> None:
     await websocket.accept()
@@ -210,9 +196,6 @@ async def ws_run_progress(websocket: WebSocket, run_id: UUID) -> None:
             pass
 
 
-# --------------------------------------------------------------------------
-# WebSocket — global input changes
-# --------------------------------------------------------------------------
 @router.websocket("/ws/inputs")
 async def ws_inputs_changed(websocket: WebSocket) -> None:
     await websocket.accept()

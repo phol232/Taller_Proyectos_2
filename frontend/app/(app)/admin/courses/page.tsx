@@ -560,7 +560,7 @@ export default function CoursesPage() {
                 <FormField label="Código" error={errors.code}>
                   <Input
                     value={form.code}
-                    onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, code: e.target.value })); if (errors.code) setErrors((prev) => { const next = { ...prev }; delete next.code; return next; }); }}
                   />
                 </FormField>
                 <FormField label="Activo">
@@ -574,7 +574,7 @@ export default function CoursesPage() {
               <FormField label="Nombre" error={errors.name}>
                 <Input
                   value={form.name}
-                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  onChange={(e) => { setForm((p) => ({ ...p, name: e.target.value })); if (errors.name) setErrors((prev) => { const next = { ...prev }; delete next.name; return next; }); }}
                 />
               </FormField>
               <div className="grid grid-cols-2 gap-4">
@@ -592,7 +592,7 @@ export default function CoursesPage() {
                     max={6}
                     step={1}
                     value={form.credits}
-                    onChange={(e) => setForm((p) => ({ ...p, credits: parseNumericInput(e.target.value) }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, credits: parseNumericInput(e.target.value) })); if (errors.credits) setErrors((prev) => { const next = { ...prev }; delete next.credits; return next; }); }}
                   />
                 </FormField>
               </div>
@@ -603,7 +603,7 @@ export default function CoursesPage() {
                     min={0.1}
                     step={DECIMAL_STEP}
                     value={formatDecimal(form.weeklyHours)}
-                    onChange={(e) => setForm((p) => ({ ...p, weeklyHours: parseNumericInput(e.target.value) }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, weeklyHours: parseNumericInput(e.target.value) })); if (errors.weeklyHours) setErrors((prev) => { const next = { ...prev }; delete next.weeklyHours; return next; }); }}
                   />
                 </FormField>
                 <FormField label="Créditos requeridos" error={errors.requiredCredits}>
@@ -612,14 +612,14 @@ export default function CoursesPage() {
                     min={0}
                     step={DECIMAL_STEP}
                     value={formatDecimal(form.requiredCredits)}
-                    onChange={(e) => setForm((p) => ({ ...p, requiredCredits: parseNumericInput(e.target.value) }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, requiredCredits: parseNumericInput(e.target.value) })); if (errors.requiredCredits) setErrors((prev) => { const next = { ...prev }; delete next.requiredCredits; return next; }); }}
                   />
                 </FormField>
               </div>
               <FormField label="Tipo de aula requerido" error={errors.requiredRoomType}>
                 <Input
                   value={form.requiredRoomType}
-                  onChange={(e) => setForm((p) => ({ ...p, requiredRoomType: e.target.value }))}
+                  onChange={(e) => { setForm((p) => ({ ...p, requiredRoomType: e.target.value })); if (errors.requiredRoomType) setErrors((prev) => { const next = { ...prev }; delete next.requiredRoomType; return next; }); }}
                 />
               </FormField>
             </div>

@@ -75,10 +75,15 @@ services:
     environment:
       TZ: America/Lima
       SOLVER_DB_DSN: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/horarios_db
+      SOLVER_REDIS_ENABLED: "true"
+      SOLVER_REDIS_HOST: redis
+      SOLVER_REDIS_PORT: 6379
     ports:
       - "8090:8090"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/healthz')"]

@@ -37,6 +37,13 @@ public class AcademicPeriodService implements AcademicPeriodCommandUseCase, Acad
 
     @Override
     @Transactional
+    public void activateAcademicPeriod(UUID periodId) {
+        ensureExists(periodId);
+        academicPeriodPort.activate(periodId);
+    }
+
+    @Override
+    @Transactional
     public void deactivateAcademicPeriod(UUID periodId) {
         ensureExists(periodId);
         academicPeriodPort.deactivate(periodId);
@@ -97,7 +104,8 @@ public class AcademicPeriodService implements AcademicPeriodCommandUseCase, Acad
                 command.startsAt(),
                 command.endsAt(),
                 status,
-                maxCredits
+                maxCredits,
+                command.isActive()
         );
     }
 

@@ -51,7 +51,18 @@ function LoginContent() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    const error = searchParams.get("error");
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    if (!error) return;
+
+    const consumedKey = `login_error_consumed:${error}`;
+    if (sessionStorage.getItem(consumedKey)) {
+      window.history.replaceState(null, "", "/login");
+      return;
+    }
+    sessionStorage.setItem(consumedKey, "1");
+    window.history.replaceState(null, "", "/login");
+
     if (error === "domain_not_allowed") {
       setDomainModalOpen(true);
     } else if (error === "oauth2_failed") {
@@ -60,6 +71,8 @@ function LoginContent() {
   }, [searchParams, t]);
 
   function handleGoogleLogin() {
+    sessionStorage.removeItem("login_error_consumed:domain_not_allowed");
+    sessionStorage.removeItem("login_error_consumed:oauth2_failed");
     const redirectUri = encodeURIComponent(window.location.origin);
     window.location.href = `${BACKEND_URL}/oauth2/authorization/google?redirect_uri=${redirectUri}`;
   }

@@ -48,6 +48,9 @@ public class ProfileEntity {
     @Column(name = "carrera_id")
     private UUID carreraId;
 
+    @Column(name = "preferred_shift", length = 20)
+    private String preferredShift;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -59,7 +62,7 @@ public class ProfileEntity {
     // ── Mappers ───────────────────────────────────────────────────────
 
     public Profile toDomain() {
-        return new Profile(id, userId, dni, phone, sex, age, facultadId, carreraId, createdAt, updatedAt);
+        return new Profile(id, userId, dni, phone, sex, age, facultadId, carreraId, preferredShift, createdAt, updatedAt);
     }
 
     public static ProfileEntity fromDomain(Profile profile) {
@@ -72,6 +75,7 @@ public class ProfileEntity {
                 .age(profile.getAge())
                 .facultadId(profile.getFacultadId())
                 .carreraId(profile.getCarreraId())
+                .preferredShift(profile.getPreferredShift())
                 .createdAt(profile.getCreatedAt())
                 .updatedAt(profile.getUpdatedAt())
                 .build();

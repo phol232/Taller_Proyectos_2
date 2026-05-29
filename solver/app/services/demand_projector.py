@@ -18,18 +18,8 @@ class CourseDemand:
 
 
 class DemandProjector:
-    """Computes N_aulas per course component before the CSP starts.
-
-    N_aulas = CEIL(eligible_students / avg_compatible_classroom_capacity).
-    Falls back to 1 if no information is available so the solver still attempts
-    to place every active course.
-    """
 
     def project(self, data: SolverInput) -> dict[UUID, CourseDemand]:
-        # eligible_students(course) = active students with cycle >= course.cycle,
-        # course not in completed, and all prerequisites approved.
-        # We approximate without loading every student — instead, we count from the
-        # already-loaded student set. If students are not loaded, we fall back to 1 offer.
         out: dict[UUID, CourseDemand] = {}
 
         for component in data.course_components.values():
@@ -45,7 +35,6 @@ class DemandProjector:
                 n = 1
             else:
                 n = max(1, math.ceil(eligible / avg_cap)) if eligible > 0 else 1
-            # Mínimo 1 sección, máximo 3 para dar opciones de horario sin choques
             n = min(max(n, 1), 3)
             out[component.id] = CourseDemand(
                 course_id=course.id,
@@ -55,8 +44,6 @@ class DemandProjector:
                 n_classrooms=n,
             )
         return out
-
-    # ---------- helpers ----------
 
     def _count_eligible_students(self, data: SolverInput, course_id: UUID, cycle: int) -> int:
         if not data.students:

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 @Getter
 @AllArgsConstructor
@@ -17,11 +18,12 @@ public class Profile {
     private Short age;
     private UUID facultadId;
     private UUID carreraId;
+    private String preferredShift;
     private Instant createdAt;
     private Instant updatedAt;
 
     public static Profile createForUser(UUID userId) {
-        return new Profile(null, userId, null, null, null, null, null, null, null, null);
+        return new Profile(null, userId, null, null, null, null, null, null, null, null, null);
     }
 
     public void updateData(ProfileData data) {
@@ -31,6 +33,11 @@ public class Profile {
         this.age = data.age() != null ? data.age().shortValue() : null;
         this.facultadId = data.facultadId();
         this.carreraId = data.carreraId();
+        this.preferredShift = PreferredShiftCodec.encode(data.preferredShifts());
+    }
+
+    public List<PreferredShift> getPreferredShifts() {
+        return PreferredShiftCodec.decode(this.preferredShift);
     }
 
     private String normalizeBlank(String value) {

@@ -54,7 +54,8 @@ public class ProfileController {
                 request.sex(),
                 request.age(),
                 request.facultadId(),
-                request.carreraId()
+                request.carreraId(),
+                request.preferredShifts()
         );
         return ResponseEntity.ok(upsertProfileUseCase.upsertProfile(userId, command));
     }
