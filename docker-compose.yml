@@ -82,12 +82,17 @@ services:
     environment:
       SOLVER_DB_DSN: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/horarios_db_prueba
       TZ: America/Lima
+      # Paralelismo de la Fase 1 (portafolio de ciclos). 2 workers = 2 vCPU.
+      SOLVER_PARALLEL_ENABLED: "true"
+      SOLVER_PARALLEL_WORKERS: "2"
+      SOLVER_PARALLEL_CYCLES: "2"
+      SOLVER_PARALLEL_TIME_FACTOR: "0.4"
     ports:
       - "8090:8090"
     depends_on:
       db:
         condition: service_healthy
-
+        
 volumes:
   postgres_data:
   redis_data:
