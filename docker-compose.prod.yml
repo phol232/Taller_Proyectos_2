@@ -111,4 +111,5 @@ volumes:
 
 networks:
   app-network:
-    driver: bridge
+    driver: overlay
+    attachable: true
