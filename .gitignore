@@ -231,4 +231,3 @@ database/backups/
 # Auditorías internas del solver
 SOLVER_AUDIT.md
 SOLVER_AUDIT_V2.md
-Auditoria_Solver.md

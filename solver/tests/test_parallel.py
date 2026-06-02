@@ -69,6 +69,9 @@ def test_parallel_produces_complete_solution_and_metrics():
     assert solution.metrics.get("parallel_cycles") == 2
     assert solution.metrics.get("parallel_waves_run", 0) >= 1
     assert solution.metrics.get("missing_offers") == 0
+    # Agregados: cuentan el trabajo de TODOS los ciclos, no solo el ganador.
+    assert solution.metrics.get("total_attempts", 0) >= int(solution.metrics.get("attempts", 0))
+    assert solution.metrics.get("hard_restarts") == solution.metrics.get("parallel_cycles") - 1
 
 
 def test_parallel_falls_back_to_sequential_when_single_cycle():

@@ -82,7 +82,10 @@ services:
       SOLVER_PARALLEL_ENABLED: "true"
       SOLVER_PARALLEL_WORKERS: "2"
       SOLVER_PARALLEL_CYCLES: "2"
-      SOLVER_PARALLEL_TIME_FACTOR: "0.4"
+      SOLVER_PARALLEL_TIME_FACTOR: "1.0"
+      # Búsqueda local converge más rápido (menos espera entre kicks) → menor wall, sigue CONVERGED.
+      SOLVER_LOCAL_SEARCH_PATIENCE: "200"
+      SOLVER_LOCAL_SEARCH_MAX_KICKS: "3"
     ports:
       - "8090:8090"
     depends_on:

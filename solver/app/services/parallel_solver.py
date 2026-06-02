@@ -86,6 +86,8 @@ def solve_phase1_parallel(
     cycle_scores: list[int] = []
     waves_run = 0
     cycles_launched = 0
+    agg_attempts = 0
+    agg_candidates = 0
     early_stop_reason = "NONE"
 
     n_waves = math.ceil(effective_cycles / effective_workers)
@@ -125,6 +127,9 @@ def solve_phase1_parallel(
                     except Exception:  # noqa: BLE001
                         log.exception("[Phase 1] ciclo paralelo falló; se ignora")
                         continue
+                    # Acumular el trabajo de TODOS los ciclos, no solo el ganador.
+                    agg_attempts += int(solution.metrics.get("attempts", 0))
+                    agg_candidates += int(solution.metrics.get("candidates_evaluated", 0))
                     if not solution.offers:
                         continue
                     key = _cycle_key(solution, expected_offers)
@@ -173,11 +178,11 @@ def solve_phase1_parallel(
     global_best.metrics["cycle_scores"] = ",".join(str(s) for s in cycle_scores)
     global_best.metrics["total_duration_ms"] = total_elapsed_ms
     # Compatibilidad con orchestrator._phase1_summary (espera estas claves).
-    global_best.metrics.setdefault("hard_restarts", waves_run - 1)
-    global_best.metrics.setdefault("total_attempts", int(global_best.metrics.get("attempts", 0)))
-    global_best.metrics.setdefault(
-        "total_candidates", int(global_best.metrics.get("candidates_evaluated", 0))
-    )
+    # hard_restarts = ciclos independientes adicionales al primero (análogo al
+    # multi-start secuencial); total_* agregan el trabajo de todos los ciclos.
+    global_best.metrics["hard_restarts"] = max(0, cycles_launched - 1)
+    global_best.metrics["total_attempts"] = agg_attempts
+    global_best.metrics["total_candidates"] = agg_candidates
 
     log.info(
         "[Phase 1] portafolio paralelo: %d ciclos en %d oleadas | workers=%d | scores=%s | best=%s | wall=%dms | stop=%s",
