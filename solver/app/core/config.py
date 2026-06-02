@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     local_search_hard_restart_min_budget_ms: int = Field(default=8_000)
     local_search_hard_restart_first_ratio: float = Field(default=0.55)
 
+    # Paralelismo de la Fase 1: portafolio de ciclos en procesos (fork + COW).
+    parallel_enabled: bool = Field(default=False)
+    parallel_workers: int = Field(default=2)
+    parallel_cycles: int = Field(default=2)
+    parallel_time_factor: float = Field(default=0.6)
+
     redis_enabled: bool = Field(default=False)
     redis_host: str = Field(default="redis")
     redis_port: int = Field(default=6379)
