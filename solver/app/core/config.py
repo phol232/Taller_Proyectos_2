@@ -21,13 +21,38 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
     internal_token: str = Field(default="")
 
-    # Default shift definitions (24h clock).
-    shift_morning_start: str = Field(default="06:00")
-    shift_morning_end: str = Field(default="13:00")
-    shift_afternoon_start: str = Field(default="13:00")
+    shift_morning_start: str = Field(default="07:00")
+    shift_morning_end: str = Field(default="12:00")
+    shift_afternoon_start: str = Field(default="12:00")
     shift_afternoon_end: str = Field(default="19:00")
     shift_evening_start: str = Field(default="19:00")
     shift_evening_end: str = Field(default="22:10")
+
+    local_search_ratio: float = Field(default=0.45)
+
+    local_search_max_iters: int = Field(default=10_000)
+
+    local_search_patience: int = Field(default=400)
+
+    local_search_min_budget_ms: int = Field(default=1_500)
+
+    local_search_max_kicks: int = Field(default=6)
+
+    local_search_max_hard_restarts: int = Field(default=3)
+    local_search_hard_restart_min_budget_ms: int = Field(default=8_000)
+    local_search_hard_restart_first_ratio: float = Field(default=0.55)
+
+    # Paralelismo de la Fase 1: portafolio de ciclos en procesos (fork + COW).
+    parallel_enabled: bool = Field(default=False)
+    parallel_workers: int = Field(default=2)
+    parallel_cycles: int = Field(default=2)
+    parallel_time_factor: float = Field(default=0.6)
+
+    redis_enabled: bool = Field(default=False)
+    redis_host: str = Field(default="redis")
+    redis_port: int = Field(default=6379)
+    redis_db: int = Field(default=0)
+    redis_cache_ttl_seconds: int = Field(default=86_400)
 
 
 @lru_cache

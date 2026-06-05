@@ -12,9 +12,6 @@ from app.domain.models import (
     TeachingScheduleSolution,
 )
 
-
-# ---------------- solver_runs ----------------
-
 def create_solver_run(
     *,
     run_type: str,
@@ -32,7 +29,6 @@ def create_solver_run(
         )
         return cur.fetchone()["id"]
 
-
 def finish_solver_run(
     run_id: UUID,
     *,
@@ -46,14 +42,12 @@ def finish_solver_run(
             (run_id, status, summary, teaching_schedule_id),
         )
 
-
 def set_solver_run_input_hash(run_id: UUID, digest: str) -> None:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             "SELECT fn_solver_set_run_input_hash(%s, %s)",
             (run_id, digest),
         )
-
 
 def report_conflicts(run_id: UUID, conflicts: Iterable[Conflict]) -> None:
     payload = [
@@ -76,9 +70,6 @@ def report_conflicts(run_id: UUID, conflicts: Iterable[Conflict]) -> None:
             (run_id, json.dumps(payload)),
         )
 
-
-# ---------------- Phase 1: teaching schedule ----------------
-
 def persist_teaching_schedule(
     *,
     academic_period_id: UUID,
@@ -87,11 +78,7 @@ def persist_teaching_schedule(
     classroom_capacities: dict[UUID, int],
     keep_existing_drafts: bool = False,
 ) -> UUID:
-    """Persist a DRAFT teaching schedule + assignments + slots via PL/pgSQL.
 
-    After insertion, re-loads the assignment ids and stamps them onto the
-    in-memory CourseOffer objects so the caller can build student schedules.
-    """
     offers_payload = []
     for offer in solution.offers:
         capacity = classroom_capacities.get(offer.classroom_id, offer.max_capacity)
@@ -121,7 +108,6 @@ def persist_teaching_schedule(
         schedule_id: UUID = cur.fetchone()["id"]
         solution.teaching_schedule_id = schedule_id
 
-        # Stamp assignment_ids back onto the offers.
         cur.execute(
             "SELECT * FROM fn_solver_list_offer_vacancies(%s)",
             (schedule_id,),
@@ -129,7 +115,7 @@ def persist_teaching_schedule(
         rows = cur.fetchall()
 
         index: dict[tuple, UUID] = {}
-        index_section: dict[tuple, tuple] = {}  # key -> (section_id, nrc)
+        index_section: dict[tuple, tuple] = {}  
         for r in rows:
             key = (r["course_component_id"], r["section_number"])
             index[key] = r["assignment_id"]
@@ -158,9 +144,6 @@ def consume_generation_reservation(
         row = cur.fetchone()
         return bool(row and row["accepted"])
 
-
-# ---------------- Phase 2: student schedule ----------------
-
 def persist_student_schedule(
     *,
     student_id: UUID,
@@ -188,9 +171,6 @@ def persist_student_schedule(
         )
         return cur.fetchone()["id"]
 
-
-# ---------------- Phase 2: vacancy snapshot ----------------
-
 def load_offer_vacancies(teaching_schedule_id: UUID) -> dict[UUID, dict]:
     """Returns assignment_id -> dict(course_id, teacher_id, classroom_id,
     max_capacity, enrolled_count, time_slot_ids)."""
@@ -213,9 +193,6 @@ def load_offer_vacancies(teaching_schedule_id: UUID) -> dict[UUID, dict]:
                 "slot_end_times": list(r.get("slot_end_times") or []),
             }
         return out
-
-
-# ---------------- Run lookup (used by REST GET /runs/{id}) ----------------
 
 def get_solver_run(run_id: UUID) -> dict | None:
     """Fetch a solver run + its conflicts. Reads via fn_solver_* functions."""

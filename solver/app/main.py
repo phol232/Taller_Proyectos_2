@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
         listener_task.cancel()
         try:
             await listener_task
-        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+        except (asyncio.CancelledError, Exception): 
             pass
         close_pool()
 

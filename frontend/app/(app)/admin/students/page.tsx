@@ -488,7 +488,7 @@ export default function StudentsPage() {
                 <FormField label="Código" error={errors.code}>
                   <Input
                     value={form.code}
-                    onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, code: e.target.value })); if (errors.code) setErrors((prev) => { const next = { ...prev }; delete next.code; return next; }); }}
                   />
                 </FormField>
                 <FormField label="Activo">
@@ -503,14 +503,14 @@ export default function StudentsPage() {
                 <FormField label="Nombres" error={errors.nombres ?? errors.fullName}>
                   <Input
                     value={form.nombres}
-                    onChange={(e) => setForm((p) => ({ ...p, nombres: e.target.value }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, nombres: e.target.value })); if (errors.nombres ?? errors.fullName) setErrors((prev) => { const next = { ...prev }; delete next.nombres; delete next.fullName; return next; }); }}
                     placeholder="Nombres"
                   />
                 </FormField>
                 <FormField label="Apellidos" error={errors.apellidos}>
                   <Input
                     value={form.apellidos}
-                    onChange={(e) => setForm((p) => ({ ...p, apellidos: e.target.value }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, apellidos: e.target.value })); if (errors.apellidos) setErrors((prev) => { const next = { ...prev }; delete next.apellidos; return next; }); }}
                     placeholder="Apellido paterno materno"
                   />
                 </FormField>
@@ -520,14 +520,14 @@ export default function StudentsPage() {
                   <Input
                     type="number"
                     value={form.cycle}
-                    onChange={(e) => setForm((p) => ({ ...p, cycle: Number(e.target.value) }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, cycle: Number(e.target.value) })); if (errors.cycle) setErrors((prev) => { const next = { ...prev }; delete next.cycle; return next; }); }}
                   />
                 </FormField>
                 <FormField label="Límite créditos" error={errors.creditLimit}>
                   <Input
                     type="number"
                     value={form.creditLimit}
-                    onChange={(e) => setForm((p) => ({ ...p, creditLimit: Number(e.target.value) }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, creditLimit: Number(e.target.value) })); if (errors.creditLimit) setErrors((prev) => { const next = { ...prev }; delete next.creditLimit; return next; }); }}
                   />
                 </FormField>
               </div>

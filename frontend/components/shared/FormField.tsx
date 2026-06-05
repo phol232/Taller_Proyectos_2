@@ -21,6 +21,25 @@ export function FormField({
   description,
   children,
 }: FormFieldProps) {
+  const errorId = React.useId();
+  const errorMessageId = error ? errorId : undefined;
+
+  const clonedChildren = React.useMemo(() => {
+    if (!error) return children;
+    if (!React.isValidElement(children)) return children;
+
+    const el = children as React.ReactElement<Record<string, unknown>>;
+    const isNativeWrapper =
+      typeof el.type === "string" &&
+      !["input", "select", "textarea"].includes(el.type);
+    if (isNativeWrapper) return children;
+
+    return React.cloneElement(el, {
+      "aria-invalid": true,
+      "aria-describedby": errorMessageId,
+    });
+  }, [children, error, errorMessageId]);
+
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-3">
@@ -38,9 +57,9 @@ export function FormField({
       </div>
 
       <div className="space-y-2">
-        {children}
+        {clonedChildren}
         {error && (
-          <p className="flex items-center gap-1.5 text-xs text-red-500">
+          <p id={errorMessageId} className="flex items-center gap-1.5 text-xs text-red-500">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             {error}
           </p>

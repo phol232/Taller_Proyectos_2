@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SelectField } from "@/components/admin/SelectField";
 import { adminApi, getApiErrorMessage } from "@/lib/adminApi";
 import { cn, toastError, toastSuccess } from "@/lib/utils";
 import type { CreateUserInput, UserAdmin } from "@/types/admin";
@@ -440,7 +441,7 @@ export default function AdminUsersPage() {
               value={form.email}
               onChange={(event) => {
                 setForm((prev) => ({ ...prev, email: event.target.value }));
-                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+                if (errors.email) setErrors((prev) => { const next = { ...prev }; delete next.email; return next; });
               }}
               placeholder="usuario@continental.edu.pe"
               autoComplete="email"
@@ -452,7 +453,7 @@ export default function AdminUsersPage() {
               value={form.fullName}
               onChange={(event) => {
                 setForm((prev) => ({ ...prev, fullName: event.target.value }));
-                if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined }));
+                if (errors.fullName) setErrors((prev) => { const next = { ...prev }; delete next.fullName; return next; });
               }}
               placeholder="Nombres y apellidos"
               autoComplete="name"
@@ -461,18 +462,16 @@ export default function AdminUsersPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Rol">
-              <select
+              <SelectField
                 value={form.role}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, role: event.target.value as UserAdmin["role"] }))
-                }
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-[3px] focus:ring-ring/50"
-              >
-                <option value="ADMIN">Admin</option>
-                <option value="COORDINATOR">Coordinador</option>
-                <option value="TEACHER">Docente</option>
-                <option value="STUDENT">Estudiante</option>
-              </select>
+                onChange={(value) => setForm((prev) => ({ ...prev, role: value as UserAdmin["role"] }))}
+                options={[
+                  { value: "ADMIN", label: "Admin" },
+                  { value: "COORDINATOR", label: "Coordinador" },
+                  { value: "TEACHER", label: "Docente" },
+                  { value: "STUDENT", label: "Estudiante" },
+                ]}
+              />
             </FormField>
 
             <FormField label="Contraseña" error={errors.password}>
@@ -481,12 +480,13 @@ export default function AdminUsersPage() {
                   value={form.password}
                   onChange={(event) => {
                     setForm((prev) => ({ ...prev, password: event.target.value }));
-                    if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+                    if (errors.password) setErrors((prev) => { const next = { ...prev }; delete next.password; return next; });
                   }}
                   type={showPassword ? "text" : "password"}
                   placeholder="Mínimo 8 caracteres"
                   autoComplete="new-password"
                   className="pr-10"
+                  aria-invalid={!!errors.password}
                 />
                 <button
                   type="button"

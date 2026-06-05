@@ -40,3 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .open-next/
+
+tests/e2e/.auth
+playwright-report/
+test-results/

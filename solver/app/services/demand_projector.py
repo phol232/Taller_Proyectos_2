@@ -35,7 +35,6 @@ class DemandProjector:
                 n = 1
             else:
                 n = max(1, math.ceil(eligible / avg_cap)) if eligible > 0 else 1
-            # Mínimo 1 sección, máximo 3 para dar opciones de horario sin choques
             n = min(max(n, 1), 3)
             out[component.id] = CourseDemand(
                 course_id=course.id,
@@ -45,8 +44,6 @@ class DemandProjector:
                 n_classrooms=n,
             )
         return out
-
-    # ---------- helpers ----------
 
     def _count_eligible_students(self, data: SolverInput, course_id: UUID, cycle: int) -> int:
         if not data.students:

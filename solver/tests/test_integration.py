@@ -1,16 +1,3 @@
-"""Tests de integración: solver contra la base de datos real (horarios_db_prueba).
-
-Para correrlos necesitas que el container planner-db esté levantado y que
-solver/.env apunte a horarios_db_prueba (ya está configurado por defecto).
-
-Ejecutar sólo estos tests:
-    .venv/bin/python -m pytest tests/test_integration.py -v
-
-Saltar estos tests (p.ej. en CI sin BD):
-    .venv/bin/python -m pytest tests/test_components.py -v
-
-Los tests están marcados con @pytest.mark.integration para poder filtrar.
-"""
 from __future__ import annotations
 
 import os

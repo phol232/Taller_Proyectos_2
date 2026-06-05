@@ -114,6 +114,8 @@ function getNavGroups(t: TranslationDictionary): Record<Role, NavGroup[]> {
         group: t.sidebar.nav.schedules,
         items: [
           { label: t.sidebar.nav.generate, href: "/admin/schedule/generate", icon: <CalendarCheck className="h-4 w-4" />, color: "#16a34a", bgColor: "rgba(22,163,74,0.15)" },
+          { label: t.sidebar.nav.builder, href: "/admin/schedule/builder", icon: <Sparkles className="h-4 w-4" />, color: "#b45309", bgColor: "rgba(180,83,9,0.15)" },
+          { label: t.sidebar.nav.confirmSchedule, href: "/admin/schedule/confirm", icon: <CalendarDays className="h-4 w-4" />, color: "#0369a1", bgColor: "rgba(3,105,161,0.15)" },
         ],
       },
     ],

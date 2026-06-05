@@ -88,7 +88,11 @@ class StudentScheduleSolver:
         used_slots: set[UUID] = set()
         used_offers: list[tuple[UUID, list[TimeSlot]]] = []  # (assignment_id, slots) for travel-check
 
-        shift = student.preferred_shift or Shift.FLEXIBLE
+        shifts: frozenset[Shift] = (
+            student.preferred_shifts
+            if student.preferred_shifts
+            else frozenset({Shift.FLEXIBLE})
+        )
 
         for group in groups:
             group_credits = sum(self._data.courses[c].credits for c in group)
@@ -96,21 +100,28 @@ class StudentScheduleSolver:
                 continue
 
             assigned = self._try_assign_group(
-                group, student, shift, used_slots, used_offers, conflicts,
+                group, student, shifts, used_slots, used_offers, conflicts,
             )
             if assigned is None:
                 # Try adjacent shifts as fallback for shift-bound groups.
                 fallback = None
-                for alt_shift in self._shift_filter.adjacent_shifts(shift):
+                tried: set[Shift] = set(shifts)
+                adjacent_pool: list[Shift] = []
+                for sh in shifts:
+                    for adj in self._shift_filter.adjacent_shifts(sh):
+                        if adj not in tried and adj not in adjacent_pool:
+                            adjacent_pool.append(adj)
+                for alt_shift in adjacent_pool:
+                    alt_shifts = frozenset({alt_shift})
                     fallback = self._try_assign_group(
-                        group, student, alt_shift, used_slots, used_offers, conflicts,
+                        group, student, alt_shifts, used_slots, used_offers, conflicts,
                     )
                     if fallback is not None:
                         conflicts.append(Conflict(
                             ConflictType.SHIFT_OVERFLOW,
                             f"student {student.code} placed in shift {alt_shift.value} for course group",
                             details={"group": [str(c) for c in group],
-                                     "preferred_shift": shift.value,
+                                     "preferred_shifts": sorted(s.value for s in shifts),
                                      "used_shift": alt_shift.value},
                         ))
                         assigned = fallback
@@ -167,7 +178,7 @@ class StudentScheduleSolver:
         self,
         group: list[UUID],
         student: Student,
-        shift: Shift,
+        shifts: frozenset[Shift],
         used_slots: set[UUID],
         used_offers: list[tuple[UUID, list[TimeSlot]]],
         conflicts: list[Conflict],
@@ -183,7 +194,7 @@ class StudentScheduleSolver:
 
         for course_id in group:
             picked = self._pick_offers_for_course(
-                course_id, shift, local_used_slots, local_used_offers,
+                course_id, shifts, local_used_slots, local_used_offers,
             )
             if picked is None:
                 # Roll back reservations for this group.
@@ -204,7 +215,7 @@ class StudentScheduleSolver:
     def _pick_offers_for_course(
         self,
         course_id: UUID,
-        shift: Shift,
+        shifts: frozenset[Shift],
         used_slots: set[UUID],
         used_offers: list[tuple[UUID, list[TimeSlot]]],
     ) -> list[tuple[UUID, UUID, list[TimeSlot]]] | None:
@@ -215,7 +226,7 @@ class StudentScheduleSolver:
 
         for component_id in self._components_for_course(course_id):
             offer_id, slots = self._pick_offer_for_component(
-                component_id, shift, local_used_slots, local_used_offers,
+                component_id, shifts, local_used_slots, local_used_offers,
             )
             if offer_id is None:
                 for reservation in reservations:
@@ -232,7 +243,7 @@ class StudentScheduleSolver:
     def _pick_offer_for_component(
         self,
         component_id: UUID,
-        shift: Shift,
+        shifts: frozenset[Shift],
         used_slots: set[UUID],
         used_offers: list[tuple[UUID, list[TimeSlot]]],
     ) -> tuple[UUID | None, list[TimeSlot]]:
@@ -247,8 +258,8 @@ class StudentScheduleSolver:
             slots = [self._data.time_slots[sid] for sid in slot_ids if sid in self._data.time_slots]
             if not slots:
                 continue
-            # H13 shift
-            if not all(self._shift_filter.slot_in_shift(s, shift) for s in slots):
+            # H13 shift: cada slot debe entrar en alguno de los turnos preferidos.
+            if not all(self._shift_filter.slot_in_any_shift(s, shifts) for s in slots):
                 continue
             # H1/H2 student-side: no overlap with already used slots (also H12 indirectly).
             if any(s.id in used_slots for s in slots):

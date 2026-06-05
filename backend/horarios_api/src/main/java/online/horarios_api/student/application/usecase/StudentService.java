@@ -10,11 +10,14 @@ import online.horarios_api.student.domain.port.in.StudentCommandUseCase;
 import online.horarios_api.student.domain.port.in.StudentProvisioningUseCase;
 import online.horarios_api.student.domain.port.in.StudentQueryUseCase;
 import online.horarios_api.student.domain.port.out.StudentPort;
+import online.horarios_api.shared.infrastructure.cache.CacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -57,6 +60,16 @@ public class StudentService implements StudentCommandUseCase, StudentQueryUseCas
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<Student> findStudentByUserId(UUID userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return studentPort.findByUserId(userId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.STUDENTS, key = "'all'")
     public List<Student> listStudents() {
         return studentPort.findAll();
     }
@@ -72,6 +85,7 @@ public class StudentService implements StudentCommandUseCase, StudentQueryUseCas
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.STUDENTS, key = "'paged-' + #page + '-' + #pageSize")
     public Page<Student> listStudentsPaged(int page, int pageSize) {
         return studentPort.findAllPaged(page, pageSize);
     }

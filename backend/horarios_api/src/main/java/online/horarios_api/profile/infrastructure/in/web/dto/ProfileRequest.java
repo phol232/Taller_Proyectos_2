@@ -3,8 +3,11 @@ package online.horarios_api.profile.infrastructure.in.web.dto;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import online.horarios_api.profile.domain.model.PreferredShift;
 import online.horarios_api.profile.domain.model.SexType;
 
+import java.util.List;
 import java.util.UUID;
 
 public record ProfileRequest(
@@ -24,5 +27,8 @@ public record ProfileRequest(
     Integer age,
 
     UUID facultadId,
-    UUID carreraId
+    UUID carreraId,
+
+    @Size(max = 2, message = "Solo puedes elegir hasta 2 turnos preferidos")
+    List<PreferredShift> preferredShifts
 ) {}

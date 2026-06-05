@@ -75,10 +75,23 @@ services:
     environment:
       TZ: America/Lima
       SOLVER_DB_DSN: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/horarios_db
+      SOLVER_REDIS_ENABLED: "true"
+      SOLVER_REDIS_HOST: redis
+      SOLVER_REDIS_PORT: 6379
+      # Paralelismo de la Fase 1 (portafolio de ciclos). 2 workers = 2 vCPU del VPS.
+      SOLVER_PARALLEL_ENABLED: "true"
+      SOLVER_PARALLEL_WORKERS: "2"
+      SOLVER_PARALLEL_CYCLES: "2"
+      SOLVER_PARALLEL_TIME_FACTOR: "1.0"
+      # Búsqueda local converge más rápido (menos espera entre kicks) → menor wall, sigue CONVERGED.
+      SOLVER_LOCAL_SEARCH_PATIENCE: "200"
+      SOLVER_LOCAL_SEARCH_MAX_KICKS: "3"
     ports:
       - "8090:8090"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/healthz')"]
@@ -86,6 +99,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    # Límites para proteger al resto del stack (4 GB / 2 vCPU compartidos).
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1280M
     networks:
       - app-network
 

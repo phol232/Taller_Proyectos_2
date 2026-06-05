@@ -53,7 +53,8 @@ jobs:
 
       - name: Run tests
         working-directory: solver
-        run: python -m pytest tests/test_components.py -v
+        # test_integration.py se omite: requiere una base de datos PostgreSQL.
+        run: python -m pytest tests/test_components.py tests/test_parallel.py -v
 
   # ── Frontend (Next.js / Vitest) ────────────────────────────────────────────
   frontend-tests:

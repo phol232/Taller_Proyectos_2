@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.horarios_api.shared.domain.exception.NotFoundException;
 import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.student.domain.model.StudentData;
 import online.horarios_api.student.domain.port.in.StudentCommandUseCase;
@@ -12,6 +13,8 @@ import online.horarios_api.student.infrastructure.in.web.dto.StudentRequest;
 import online.horarios_api.student.infrastructure.in.web.dto.StudentResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -32,6 +35,17 @@ public class StudentController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "12") int pageSize) {
         return ResponseEntity.ok(studentQueryUseCase.listStudentsPaged(page, pageSize).map(StudentResponse::from));
+    }
+
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Obtener el estudiante asociado al usuario autenticado")
+    public ResponseEntity<StudentResponse> findCurrent(@AuthenticationPrincipal Jwt jwt) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        return ResponseEntity.ok(StudentResponse.from(
+                studentQueryUseCase.findStudentByUserId(userId)
+                        .orElseThrow(() -> new NotFoundException("No se encontró el estudiante para este usuario."))
+        ));
     }
 
     @GetMapping("/{id}")

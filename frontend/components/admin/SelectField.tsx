@@ -23,6 +23,7 @@ interface SelectFieldProps {
   className?: string;
   disabled?: boolean;
   triggerClassName?: string;
+  "aria-invalid"?: boolean;
 }
 
 export function SelectField({
@@ -33,6 +34,7 @@ export function SelectField({
   className,
   disabled,
   triggerClassName,
+  "aria-invalid": ariaInvalid,
 }: SelectFieldProps) {
   const items = React.useMemo(() => {
     const map: Record<string, React.ReactNode> = {};
@@ -54,6 +56,7 @@ export function SelectField({
       disabled={disabled}
     >
       <SelectTrigger
+        aria-invalid={ariaInvalid}
         className={cn(
           "!h-12 w-full min-w-0 justify-between gap-2 rounded-lg border border-input bg-transparent px-3 py-1 text-base leading-6 transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate [&_[data-slot=select-value]]:text-left [&_[data-slot=select-value]]:text-inherit [&_[data-slot=select-value]]:leading-6 [&_[data-slot=select-value][data-placeholder]]:text-muted-foreground",
           triggerClassName,

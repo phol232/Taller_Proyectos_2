@@ -99,7 +99,7 @@ class Student:
     cycle: int
     credit_limit: int
     gpa: float | None
-    preferred_shift: Shift | None
+    preferred_shifts: frozenset[Shift]
     completed_course_ids: frozenset[UUID]
 
 
@@ -206,6 +206,11 @@ class ConflictType(str, Enum):
     TRAVEL_TIME_VIOLATION = "TRAVEL_TIME_VIOLATION"
     TIME_LIMIT_EXCEEDED = "TIME_LIMIT_EXCEEDED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+    THEORY_AFTER_PRACTICE = "THEORY_AFTER_PRACTICE"
+    SECTION_OVERLAP = "SECTION_OVERLAP"
+    LUNCH_VIOLATION = "LUNCH_VIOLATION"
+    CAPACITY_EXCEEDED = "CAPACITY_EXCEEDED"
+    INSUFFICIENT_REST = "INSUFFICIENT_REST"
 
 
 @dataclass

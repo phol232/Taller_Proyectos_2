@@ -464,7 +464,7 @@ export default function ClassroomsPage() {
               <h3 className="text-sm font-semibold text-foreground">Ficha del aula</h3>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Código" error={errors.code}>
-                  <Input value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))} />
+                  <Input value={form.code} onChange={(e) => { setForm((p) => ({ ...p, code: e.target.value })); if (errors.code) setErrors((prev) => { const next = { ...prev }; delete next.code; return next; }); }} />
                 </FormField>
                 <FormField label="Activo">
                   <SelectField
@@ -475,18 +475,18 @@ export default function ClassroomsPage() {
                 </FormField>
               </div>
               <FormField label="Nombre" error={errors.name}>
-                <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+                <Input value={form.name} onChange={(e) => { setForm((p) => ({ ...p, name: e.target.value })); if (errors.name) setErrors((prev) => { const next = { ...prev }; delete next.name; return next; }); }} />
               </FormField>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Capacidad" error={errors.capacity}>
                   <Input
                     type="number"
                     value={form.capacity}
-                    onChange={(e) => setForm((p) => ({ ...p, capacity: Number(e.target.value) }))}
+                    onChange={(e) => { setForm((p) => ({ ...p, capacity: Number(e.target.value) })); if (errors.capacity) setErrors((prev) => { const next = { ...prev }; delete next.capacity; return next; }); }}
                   />
                 </FormField>
                 <FormField label="Tipo" error={errors.type}>
-                  <Input value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))} />
+                  <Input value={form.type} onChange={(e) => { setForm((p) => ({ ...p, type: e.target.value })); if (errors.type) setErrors((prev) => { const next = { ...prev }; delete next.type; return next; }); }} />
                 </FormField>
               </div>
             </div>

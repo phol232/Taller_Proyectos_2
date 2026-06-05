@@ -7,6 +7,8 @@ import online.horarios_api.catalog.domain.port.in.CatalogCommandUseCase;
 import online.horarios_api.catalog.domain.port.in.CatalogQueryUseCase;
 import online.horarios_api.catalog.domain.port.out.CatalogPort;
 import online.horarios_api.shared.domain.exception.BadRequestException;
+import online.horarios_api.shared.infrastructure.cache.CacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -19,12 +21,14 @@ public class CatalogService implements CatalogQueryUseCase, CatalogCommandUseCas
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.CATALOG_FACULTADES, key = "'active'")
     public List<Facultad> listFacultades() {
         return catalogPort.listFacultades();
     }
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.CATALOG_CARRERAS, key = "#facultadId == null ? 'active-all' : 'active-' + #facultadId")
     public List<Carrera> listCarreras(UUID facultadId) {
         if (facultadId == null) {
             return catalogPort.listCarreras();
@@ -34,12 +38,14 @@ public class CatalogService implements CatalogQueryUseCase, CatalogCommandUseCas
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.CATALOG_FACULTADES, key = "'all'")
     public List<Facultad> listAllFacultades() {
         return catalogPort.listAllFacultades();
     }
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.CATALOG_CARRERAS, key = "'all-' + #facultadId")
     public List<Carrera> listAllCarrerasByFacultad(UUID facultadId) {
         if (facultadId == null) {
             throw new BadRequestException("facultadId es obligatorio.");
