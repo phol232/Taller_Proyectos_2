@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from uuid import UUID
 
+from app.core.config import get_settings
 from app.core.events import bus
 from app.core.logging import get_logger
 from app.domain.models import Conflict, ConflictType, TeachingScheduleSolution
@@ -152,9 +153,26 @@ class SolverOrchestrator:
         self._emit(run_id, "projecting_demand")
         demand = DemandProjector().project(data)
         self._apply_phase1_section_rules(data, demand)
-        self._emit(run_id, "solving_phase1")
-        solver = TeacherScheduleSolver(data, demand, seed=req.seed)
-        solution, solver_diagnostics = solver.solve(time_limit_ms=max(1_000, req.time_limit_ms - _SOLVER_OVERHEAD_BUFFER_MS))
+        solve_budget_ms = max(1_000, req.time_limit_ms - _SOLVER_OVERHEAD_BUFFER_MS)
+
+        settings = get_settings()
+        if settings.parallel_enabled:
+            from app.services.parallel_solver import solve_phase1_parallel
+
+            self._emit(run_id, "solving_phase1",
+                       workers=settings.parallel_workers, cycles=settings.parallel_cycles)
+            solution, solver_diagnostics = solve_phase1_parallel(
+                data, demand,
+                time_limit_ms=solve_budget_ms,
+                seed=req.seed,
+                n_workers=settings.parallel_workers,
+                n_cycles=settings.parallel_cycles,
+                time_factor=settings.parallel_time_factor,
+            )
+        else:
+            self._emit(run_id, "solving_phase1")
+            solver = TeacherScheduleSolver(data, demand, seed=req.seed)
+            solution, solver_diagnostics = solver.solve(time_limit_ms=solve_budget_ms)
 
         validator = ConstraintValidator(data)
         validation_conflicts = validator.validate_offers(solution.offers)

@@ -582,6 +582,16 @@ class TeacherScheduleSolver:
 
         return global_best, global_best_conflicts
 
+    def solve_single_pass(self, *, time_limit_ms: int) -> tuple[TeachingScheduleSolution, list[Conflict]]:
+        """Ejecuta un único ciclo (greedy multi-restart + búsqueda local).
+
+        Punto de entrada reutilizable para el portafolio paralelo: cada worker
+        instancia su propio solver con una semilla distinta y ejecuta un ciclo
+        independiente. `_solve_one_pass` ya reinicia el estado de búsqueda en
+        cada intento, por lo que es seguro invocarlo sobre una instancia nueva.
+        """
+        return self._solve_one_pass(time_limit_ms)
+
     def _solve_one_pass(self, time_limit_ms: int) -> tuple[TeachingScheduleSolution, list[Conflict]]:
         """Un ciclo: greedy multi-restart + fase de mejora local."""
         start_ts = _time.monotonic()
