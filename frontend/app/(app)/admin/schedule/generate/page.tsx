@@ -36,6 +36,7 @@ import type { ScheduleGenerationRun, ScheduleOption } from "@/types/schedule";
 
 const DEFAULT_TIME_LIMIT_MS = 20_000;
 const RUN_POLL_INTERVAL_MS = 1_000;
+const RUN_POLL_MAX_INTERVAL_MS = 3_000;
 const RUN_STATUS_TIMEOUT_BUFFER_MS = 10_000;
 const TERMINAL_RUN_STATUSES = new Set<ScheduleGenerationRun["status"]>([
   "SUCCEEDED",
@@ -128,13 +129,16 @@ async function waitForGenerationRun(
 ): Promise<ScheduleGenerationRun> {
   const deadline = Date.now() + timeoutMs;
   let latestRun: ScheduleGenerationRun | null = null;
+  let pollInterval = RUN_POLL_INTERVAL_MS;
 
   while (Date.now() <= deadline) {
     latestRun = await getScheduleGenerationRun(runId);
     if (TERMINAL_RUN_STATUSES.has(latestRun.status)) {
       return latestRun;
     }
-    await delay(RUN_POLL_INTERVAL_MS);
+    await delay(pollInterval);
+    // Backoff progresivo: empieza en 1s y sube hasta 3s para reducir el nº de peticiones.
+    pollInterval = Math.min(pollInterval + 500, RUN_POLL_MAX_INTERVAL_MS);
   }
 
   if (latestRun) return latestRun;

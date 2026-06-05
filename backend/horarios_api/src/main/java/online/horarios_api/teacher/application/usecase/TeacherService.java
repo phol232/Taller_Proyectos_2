@@ -10,6 +10,8 @@ import online.horarios_api.teacher.domain.model.TeacherData;
 import online.horarios_api.teacher.domain.port.in.TeacherCommandUseCase;
 import online.horarios_api.teacher.domain.port.in.TeacherQueryUseCase;
 import online.horarios_api.teacher.domain.port.out.TeacherPort;
+import online.horarios_api.shared.infrastructure.cache.CacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
@@ -59,6 +61,7 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.TEACHERS, key = "'all'")
     public List<Teacher> listTeachers() {
         return teacherPort.findAll();
     }
@@ -74,6 +77,7 @@ public class TeacherService implements TeacherCommandUseCase, TeacherQueryUseCas
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.TEACHERS, key = "'paged-' + #page + '-' + #pageSize")
     public Page<Teacher> listTeachersPaged(int page, int pageSize) {
         return teacherPort.findAllPaged(page, pageSize);
     }

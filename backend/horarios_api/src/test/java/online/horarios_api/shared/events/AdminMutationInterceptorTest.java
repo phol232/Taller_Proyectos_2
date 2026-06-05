@@ -6,6 +6,8 @@ import online.horarios_api.shared.infrastructure.events.AdminMutationInterceptor
 import online.horarios_api.shared.infrastructure.events.SseEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.cache.CacheManager;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -16,7 +18,10 @@ import static org.mockito.Mockito.when;
 class AdminMutationInterceptorTest {
 
     private final SseEventPublisher publisher = mock(SseEventPublisher.class);
-    private final AdminMutationInterceptor interceptor = new AdminMutationInterceptor(publisher);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<CacheManager> cacheManagerProvider = mock(ObjectProvider.class);
+    private final AdminMutationInterceptor interceptor =
+            new AdminMutationInterceptor(publisher, cacheManagerProvider);
 
     @Test
     @DisplayName("publica schedules.changed para mutaciones reales del constructor de horarios")
