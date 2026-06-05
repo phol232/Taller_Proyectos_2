@@ -10,6 +10,8 @@ import online.horarios_api.course.domain.port.out.CoursePort;
 import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
+import online.horarios_api.shared.infrastructure.cache.CacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -59,6 +61,7 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.COURSES, key = "'all'")
     public List<Course> listCourses() {
         return coursePort.findAll();
     }
@@ -91,6 +94,7 @@ public class CourseService implements CourseCommandUseCase, CourseQueryUseCase {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.COURSES, key = "'paged-' + #page + '-' + #pageSize")
     public Page<Course> listCoursesPaged(int page, int pageSize) {
         return coursePort.findAllPaged(page, pageSize);
     }

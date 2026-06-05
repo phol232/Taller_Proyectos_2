@@ -10,6 +10,8 @@ import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
 import online.horarios_api.shared.domain.model.AvailabilitySlot;
 import online.horarios_api.shared.domain.model.Page;
+import online.horarios_api.shared.infrastructure.cache.CacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
@@ -59,6 +61,7 @@ public class ClassroomService implements ClassroomCommandUseCase, ClassroomQuery
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.CLASSROOMS, key = "'all'")
     public List<Classroom> listClassrooms() {
         return classroomPort.findAll();
     }
@@ -74,6 +77,7 @@ public class ClassroomService implements ClassroomCommandUseCase, ClassroomQuery
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.CLASSROOMS, key = "'paged-' + #page + '-' + #pageSize")
     public Page<Classroom> listClassroomsPaged(int page, int pageSize) {
         return classroomPort.findAllPaged(page, pageSize);
     }

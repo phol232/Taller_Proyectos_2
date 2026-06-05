@@ -10,6 +10,8 @@ import online.horarios_api.scheduling.domain.port.in.ScheduleGenerationUseCase;
 import online.horarios_api.scheduling.domain.port.out.ScheduleGenerationRepository;
 import online.horarios_api.scheduling.domain.port.out.SolverClientPort;
 import online.horarios_api.shared.domain.exception.BadRequestException;
+import online.horarios_api.shared.infrastructure.cache.CacheNames;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.security.SecureRandom;
 import java.util.List;
@@ -85,6 +87,9 @@ public class ScheduleGenerationService implements ScheduleGenerationUseCase {
     }
 
     @Override
+    // TTL muy corto (≈2s): absorbe el polling de estado sin golpear Postgres en cada poll.
+    // El solver actualiza el estado en BD directamente; el desfase máximo es el TTL.
+    @Cacheable(value = CacheNames.RUN_STATUS, key = "#runId")
     public ScheduleGenerationRun getGenerationRun(UUID runId) {
         return repository.getGenerationRun(runId);
     }

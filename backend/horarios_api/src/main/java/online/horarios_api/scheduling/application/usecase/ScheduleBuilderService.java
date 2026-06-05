@@ -8,6 +8,8 @@ import online.horarios_api.scheduling.domain.model.TimeSlot;
 import online.horarios_api.scheduling.domain.port.in.ScheduleBuilderUseCase;
 import online.horarios_api.scheduling.domain.port.out.ScheduleBuilderRepository;
 import online.horarios_api.shared.domain.exception.BadRequestException;
+import online.horarios_api.shared.infrastructure.cache.CacheNames;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -23,6 +25,7 @@ public class ScheduleBuilderService implements ScheduleBuilderUseCase {
     }
 
     @Override
+    @Cacheable(value = CacheNames.TIME_SLOTS, key = "'active'")
     public List<TimeSlot> listActiveTimeSlots() {
         return repository.listActiveTimeSlots();
     }
