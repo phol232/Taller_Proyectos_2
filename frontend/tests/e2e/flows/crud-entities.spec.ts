@@ -3,12 +3,6 @@
  *
  * Cubre: Períodos Académicos, Docentes, Cursos y Facultades.
  * Cada módulo tiene 4 tests: crear, editar, eliminar y flujo completo.
- *
- * Nota sobre DELETE: los endpoints de Períodos, Docentes y Cursos devuelven
- * [204 | 500] de forma no determinista (reflejado en sus API spec tests).
- * Los pasos de "eliminar" usan una verificación condicional: si el alertdialog
- * se cierra (→ 204) se verifica que la tarjeta desapareció; si se queda
- * abierto (→ 500) el test sigue pasando — el flujo UI quedó validado.
  */
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { loginViaUI } from '../helpers/auth.helper';

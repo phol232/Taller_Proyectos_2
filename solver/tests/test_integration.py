@@ -285,72 +285,142 @@ def test_demand_projector_course_id_correcto(loaded_data):
 # (sin correr el solver: construimos offers ficticias pero con UUIDs reales)
 # ──────────────────────────────────────────────────────────────────
 
+def _find_assignment(data, comp, excluded_teacher_slots=None, excluded_classroom_slots=None):
+    """Devuelve (teacher_id, classroom_id, slot_ids) para comp, o None si no es posible.
+
+    excluded_teacher_slots: set de (teacher_id, slot_id) ya ocupados (H1).
+    excluded_classroom_slots: set de (classroom_id, slot_id) ya ocupados (H2).
+    """
+    excluded_teacher_slots = excluded_teacher_slots or set()
+    excluded_classroom_slots = excluded_classroom_slots or set()
+
+    t_ids = list(data.teacher_course_components.get(comp.id, set()))
+    if not t_ids:
+        return None
+
+    # Nivel 1: aulas vinculadas al curso
+    cls_ids = [
+        cid for cid in data.classroom_courses.get(comp.course_id, set())
+        if cid in data.classrooms
+        and data.classrooms[cid].room_type == comp.required_room_type
+        and (
+            not data.classroom_course_components.get(comp.id)
+            or cid in data.classroom_course_components.get(comp.id, set())
+        )
+    ]
+    # Nivel 2 (fallback): cualquier aula que pase los mismos checks de autorización
+    # que usa ConstraintValidator (classroom_course_components → classroom_courses → room_type).
+    # Cubre BDs de prueba donde classroom_courses está vacío para el curso.
+    if not cls_ids:
+        component_cls = data.classroom_course_components.get(comp.id, set())
+        course_cls = data.classroom_courses.get(comp.course_id, set())
+        cls_ids = [
+            cid for cid, cls in data.classrooms.items()
+            if cls.room_type == comp.required_room_type
+            # si hay restricción por componente, respetar
+            and (not component_cls or cid in component_cls)
+            # si no hay restricción por componente pero sí por curso, respetar
+            and (component_cls or not course_cls or cid in course_cls)
+        ]
+    if not cls_ids:
+        return None
+
+    required = _required_blocks(comp.weekly_hours)
+    if required == 0:
+        return None
+
+    for tid in t_ids:
+        teacher_blocks = _available_master_blocks(data, tid, data.teacher_availability)
+        for cid in cls_ids:
+            classroom_blocks = _available_master_blocks(
+                data, cid, data.classroom_availability
+            )
+            classroom_block_ids = {slot.id for slot in classroom_blocks}
+            # Intersección estricta docente ∩ aula
+            common = [
+                slot for slot in teacher_blocks
+                if slot.id in classroom_block_ids
+                and (tid, slot.id) not in excluded_teacher_slots
+                and (cid, slot.id) not in excluded_classroom_slots
+            ]
+            if len(common) >= required:
+                return tid, cid, [slot.id for slot in common[:required]]
+            # Fallback: slots del docente sin exigir disponibilidad del aula
+            # (válido porque aulas sin registros de disponibilidad = siempre libres)
+            teacher_only = [
+                slot for slot in teacher_blocks
+                if (tid, slot.id) not in excluded_teacher_slots
+                and (cid, slot.id) not in excluded_classroom_slots
+            ]
+            if len(teacher_only) >= required:
+                return tid, cid, [slot.id for slot in teacher_only[:required]]
+    return None
+
+
 def test_constraint_validator_acepta_asignacion_valida(loaded_data):
-    """Construye una oferta 100 % válida con datos reales y espera 0 conflictos."""
-    # Buscar un componente que tenga docente + aula + slots disponibles
+    """Construye ofertas 100 % válidas con datos reales y espera 0 conflictos críticos.
+
+    Si el primer componente asignable es PRACTICE, también construye la oferta
+    THEORY hermana del mismo curso para satisfacer la restricción THEORY_AFTER_PRACTICE.
+    """
     from app.domain.models import CourseOffer
 
-    component = None
-    teacher_id = None
-    classroom_id = None
-    slot_ids = None
+    offers_to_validate = []
+    found = False
 
-    for comp_id, comp in loaded_data.course_components.items():
-        t_ids = list(loaded_data.teacher_course_components.get(comp_id, set()))
-        cls_ids = [
-            cid for cid in loaded_data.classroom_courses.get(comp.course_id, set())
-            if cid in loaded_data.classrooms
-            and loaded_data.classrooms[cid].room_type == comp.required_room_type
-            and (
-                not loaded_data.classroom_course_components.get(comp.id)
-                or cid in loaded_data.classroom_course_components.get(comp.id, set())
-            )
-        ]
-        if not t_ids or not cls_ids:
+    for comp in loaded_data.course_components.values():
+        assignment = _find_assignment(loaded_data, comp)
+        if assignment is None:
             continue
 
-        for tid in t_ids:
-            for cid in cls_ids:
-                teacher_blocks = _available_master_blocks(
-                    loaded_data, tid, loaded_data.teacher_availability
-                )
-                classroom_blocks = _available_master_blocks(
-                    loaded_data, cid, loaded_data.classroom_availability
-                )
-                classroom_block_ids = {slot.id for slot in classroom_blocks}
-                common = [
-                    slot for slot in teacher_blocks
-                    if slot.id in classroom_block_ids
-                ]
-                required = _required_blocks(comp.weekly_hours)
-                if len(common) >= required:
-                    component = comp
-                    teacher_id = tid
-                    classroom_id = cid
-                    slot_ids = [slot.id for slot in common[:required]]
-                    break
-            if component:
-                break
-        if component:
-            break
+        tid, cid, sids = assignment
+        main_offer = CourseOffer(
+            course_id=comp.course_id,
+            course_component_id=comp.id,
+            teacher_id=tid,
+            classroom_id=cid,
+            time_slot_ids=sids,
+            max_capacity=loaded_data.classrooms[cid].capacity,
+        )
+        offers_to_validate = [main_offer]
 
-    if component is None:
+        # PRACTICE sin THEORY hermana dispara THEORY_AFTER_PRACTICE → incluir la THEORY
+        if comp.component_type == "PRACTICE":
+            theory_comp = next(
+                (c for c in loaded_data.course_components.values()
+                 if c.course_id == comp.course_id and c.component_type == "THEORY"),
+                None,
+            )
+            if theory_comp is None:
+                continue  # sin hermano THEORY, probar siguiente componente
+
+            # Excluir slots ya usados por la oferta PRACTICE para respetar H1/H2
+            used_t = {(tid, s) for s in sids}
+            used_c = {(cid, s) for s in sids}
+            theory_assignment = _find_assignment(loaded_data, theory_comp, used_t, used_c)
+            if theory_assignment is None:
+                continue  # no hay slots libres para THEORY, probar siguiente
+
+            t2, c2, s2 = theory_assignment
+            offers_to_validate.append(CourseOffer(
+                course_id=theory_comp.course_id,
+                course_component_id=theory_comp.id,
+                teacher_id=t2,
+                classroom_id=c2,
+                time_slot_ids=s2,
+                max_capacity=loaded_data.classrooms[c2].capacity,
+            ))
+
+        found = True
+        break
+
+    if not found:
         pytest.skip(
             "No hay ningún componente con docente+aula+slots compatibles en la BD de prueba"
         )
 
-    offer = CourseOffer(
-        course_id=component.course_id,
-        course_component_id=component.id,
-        teacher_id=teacher_id,
-        classroom_id=classroom_id,
-        time_slot_ids=slot_ids,
-        max_capacity=loaded_data.classrooms[classroom_id].capacity,
-    )
     validator = ConstraintValidator(loaded_data)
-    conflicts = validator.validate_offers([offer])
-    # Filtramos únicamente los conflictos estructurales (no de traslado, que son esperables
-    # si los slots son consecutivos y los edificios están lejos)
+    conflicts = validator.validate_offers(offers_to_validate)
     critical = [
         c for c in conflicts
         if c.conflict_type not in {
