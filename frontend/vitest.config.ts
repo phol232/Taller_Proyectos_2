@@ -10,7 +10,7 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "lcov"],
+      reporter: ["text", "lcov", "html"],
       include: ["lib/schedule/**", "lib/validators/**", "hooks/**", "store/**"],
       thresholds: {
         lines: 70,
