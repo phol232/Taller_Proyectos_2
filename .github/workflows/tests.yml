@@ -15,6 +15,9 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
 
     steps:
       - name: Checkout code
@@ -29,12 +32,33 @@ jobs:
 
       - name: Run tests
         working-directory: backend/horarios_api
-        run: ./gradlew test --no-daemon
+        run: ./gradlew test --no-daemon --continue
+        # --continue: ejecuta todos los tests aunque haya fallos (para ver el reporte completo)
+
+      - name: Publish test report (JUnit XML)
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: "Backend — JUnit Results"
+          path: "backend/horarios_api/build/test-results/test/*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-report
+          path: backend/horarios_api/build/reports/tests/test/
+          retention-days: 7
 
   # ── Solver CSP (FastAPI / Python) ─────────────────────────────────────────
   solver-tests:
     name: Solver Tests
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
 
     steps:
       - name: Checkout code
@@ -53,13 +77,27 @@ jobs:
 
       - name: Run tests
         working-directory: solver
-        # test_integration.py se omite: requiere una base de datos PostgreSQL.
-        run: python -m pytest tests/test_components.py tests/test_parallel.py -v
+        # test_integration.py se omite: requiere PostgreSQL
+        run: |
+          python -m pytest tests/test_components.py tests/test_parallel.py \
+            -v --junitxml=test-results.xml
+
+      - name: Publish test report (JUnit XML)
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: "Solver — pytest Results"
+          path: "solver/test-results.xml"
+          reporter: java-junit
+          fail-on-error: false
 
   # ── Frontend (Next.js / Vitest) ────────────────────────────────────────────
   frontend-tests:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
 
     steps:
       - name: Checkout code
@@ -81,4 +119,13 @@ jobs:
 
       - name: Run tests
         working-directory: frontend
-        run: pnpm test
+        run: pnpm test -- --reporter=verbose --reporter=junit --outputFile=test-results.xml
+
+      - name: Publish test report (JUnit XML)
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: "Frontend — Vitest Results"
+          path: "frontend/test-results.xml"
+          reporter: java-junit
+          fail-on-error: false
