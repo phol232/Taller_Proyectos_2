@@ -12,7 +12,17 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html"],
-      include: ["lib/schedule/**", "lib/validators/**", "hooks/**", "store/**"],
+      include: [
+        "lib/schedule/**",
+        "lib/validators/**",
+        "lib/adminApi.ts",
+        "lib/scheduleApi.ts",
+        "lib/scheduleBuilderApi.ts",
+        "lib/profileApi.ts",
+        "lib/studentScheduleApi.ts",
+        "hooks/**",
+        "store/**",
+      ],
       thresholds: {
         lines: 70,
         branches: 70,
