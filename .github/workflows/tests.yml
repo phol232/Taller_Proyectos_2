@@ -15,6 +15,10 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -29,12 +33,52 @@ jobs:
 
       - name: Run tests
         working-directory: backend/horarios_api
-        run: ./gradlew test --no-daemon
+        run: ./gradlew test --no-daemon --continue
+        # --continue: ejecuta todos los tests aunque haya fallos (para ver el reporte completo)
+
+      - name: Separate unit vs integration reports
+        working-directory: backend/horarios_api
+        if: always()
+        run: |
+          mkdir -p build/test-results/unit build/test-results/integration
+          find build/test-results/test -name "TEST-*integration*.xml" \
+            -exec cp {} build/test-results/integration/ \;
+          find build/test-results/test -name "TEST-*.xml" \
+            ! -name "TEST-*integration*.xml" \
+            -exec cp {} build/test-results/unit/ \;
+
+      - name: Publish unit test report
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          check_name: "Backend — Unit Tests (JUnit)"
+          files: "backend/horarios_api/build/test-results/unit/*.xml"
+          comment_mode: off
+
+      - name: Publish integration test report
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          check_name: "Backend — Integration Tests (JUnit)"
+          files: "backend/horarios_api/build/test-results/integration/*.xml"
+          comment_mode: off
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-report
+          path: backend/horarios_api/build/reports/tests/test/
+          retention-days: 7
 
   # ── Solver CSP (FastAPI / Python) ─────────────────────────────────────────
   solver-tests:
     name: Solver Tests
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -53,13 +97,27 @@ jobs:
 
       - name: Run tests
         working-directory: solver
-        # test_integration.py se omite: requiere una base de datos PostgreSQL.
-        run: python -m pytest tests/test_components.py tests/test_parallel.py -v
+        # test_integration.py se omite: requiere PostgreSQL
+        run: |
+          python -m pytest tests/test_components.py tests/test_parallel.py \
+            -v --junitxml=test-results.xml
+
+      - name: Publish test report
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          check_name: "Solver — pytest Results"
+          files: "solver/test-results.xml"
+          comment_mode: off
 
   # ── Frontend (Next.js / Vitest) ────────────────────────────────────────────
   frontend-tests:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -79,6 +137,46 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Run tests
+      - name: Run unit tests
         working-directory: frontend
-        run: pnpm test
+        run: |
+          pnpm test -- tests/unit \
+            --reporter=verbose \
+            --reporter=junit \
+            --outputFile=unit-test-results.xml
+
+      - name: Run integration tests
+        working-directory: frontend
+        run: |
+          pnpm test -- tests/integration \
+            --reporter=verbose \
+            --reporter=junit \
+            --outputFile=integration-test-results.xml
+
+      - name: Run tests with coverage
+        working-directory: frontend
+        run: pnpm test:coverage
+
+      - name: Publish unit test report
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          check_name: "Frontend — Unit Tests (Vitest)"
+          files: "frontend/unit-test-results.xml"
+          comment_mode: off
+
+      - name: Publish integration test report
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          check_name: "Frontend — Integration Tests (Vitest)"
+          files: "frontend/integration-test-results.xml"
+          comment_mode: off
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage-report
+          path: frontend/coverage/
+          retention-days: 7

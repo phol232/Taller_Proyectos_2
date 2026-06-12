@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.0.5"
     id("io.spring.dependency-management") version "1.1.7"
+    jacoco
 }
 
 group = "online"
@@ -70,10 +71,12 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok")
     testAnnotationProcessor("org.projectlombok:lombok")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testRuntimeOnly("com.h2database:h2")
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport) // Jacoco report after tests
 
     // Cargar variables del .env para los tests
     val envFile = rootProject.file(".env")
@@ -85,4 +88,25 @@ tasks.withType<Test> {
                 environment(key.trim(), value.trim())
             }
     }
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) {
+                exclude(
+                    "**/*Application**",
+                    "**/config/**",
+                    "**/dto/**",
+                    "**/exception/**",
+                    "**/adapter/**"
+                )
+            }
+        })
+    )
 }

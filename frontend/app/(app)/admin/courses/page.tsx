@@ -327,7 +327,15 @@ export default function CoursesPage() {
   }
 
   async function handleSubmit() {
-    const result = courseSchema.safeParse(form);
+    // Propagate course-level requiredRoomType to any component that hasn't set its own
+    const syncedForm = {
+      ...form,
+      components: form.components.map((c) => ({
+        ...c,
+        requiredRoomType: c.requiredRoomType || form.requiredRoomType,
+      })),
+    };
+    const result = courseSchema.safeParse(syncedForm);
     if (!result.success) { setErrors(flattenErrors(result.error)); return; }
 
     setSubmitting(true);

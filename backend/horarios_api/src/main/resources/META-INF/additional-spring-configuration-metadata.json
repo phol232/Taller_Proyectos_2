@@ -1,0 +1,34 @@
+{
+  "properties": [
+    {
+      "name": "app.cache.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Habilita la caché de lectura en Redis. Si es false, no se crea el RedisCacheManager (CacheConfig) y AdminMutationInterceptor omite la invalidación.",
+      "defaultValue": true
+    },
+    {
+      "name": "app.cache.ttl.reference-seconds",
+      "type": "java.lang.Long",
+      "description": "TTL (segundos) para datos de referencia: facultades, carreras, time slots, periodos académicos y aulas.",
+      "defaultValue": 1800
+    },
+    {
+      "name": "app.cache.ttl.listing-seconds",
+      "type": "java.lang.Long",
+      "description": "TTL (segundos) para listados: cursos, docentes, estudiantes y usuarios. También es el TTL por defecto del cacheManager.",
+      "defaultValue": 300
+    },
+    {
+      "name": "app.cache.ttl.derived-seconds",
+      "type": "java.lang.Long",
+      "description": "TTL (segundos) para datos derivados: opciones de horario, timetable, cursos pendientes y horario del estudiante.",
+      "defaultValue": 60
+    },
+    {
+      "name": "app.cache.ttl.run-status-seconds",
+      "type": "java.lang.Long",
+      "description": "TTL (segundos) muy corto para el estado de corrida del solver (anti-polling).",
+      "defaultValue": 2
+    }
+  ]
+}
