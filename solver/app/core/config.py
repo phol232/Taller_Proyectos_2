@@ -13,7 +13,7 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SOLVER_", env_file=ENV_FILE, extra="ignore")
 
-    db_dsn: str = Field(default="postgresql://horarios:horarios@localhost:5432/horarios_db")
+    db_dsn: str = Field(..., description="DSN de PostgreSQL. Ejemplo: postgresql://user:pass@host:port/db")
     db_pool_min: int = Field(default=1)
     db_pool_max: int = Field(default=8)
 
