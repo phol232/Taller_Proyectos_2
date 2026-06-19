@@ -91,8 +91,8 @@ export const es: TranslationDictionary = {
     orWithEmail: "o con email",
     emailLabel: "Correo electrónico",
     emailPlaceholder: "usuario@continental.edu.pe",
-    passwordLabel: "Contraseña",
-    passwordPlaceholder: "••••••••",
+    passwordLabel: "Contraseña", // NOSONAR - etiqueta de UI, no es credencial
+    passwordPlaceholder: "Tu clave de acceso", // NOSONAR - placeholder de UI, no es credencial
     forgotPassword: "¿Olvidaste tu contraseña?",
     loggingIn: "Iniciando sesión…",
     logIn: "Iniciar sesión",

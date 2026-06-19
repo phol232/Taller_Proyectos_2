@@ -364,7 +364,7 @@ export default function NrcScheduleView({ course, section }: Props) {
           <span className="h-2.5 w-2.5 rounded bg-sky-400" /> General
         </span>
         <span className="flex items-center gap-1.5">
-          <Coffee className="h-3 w-3 text-amber-600" /> Receso / Almuerzo
+          <Coffee className="h-3 w-3 text-amber-700" /> Receso / Almuerzo
         </span>
         <span className="ml-auto italic opacity-70">Haz clic en una franja para ver el detalle.</span>
       </div>

@@ -1,0 +1,6 @@
+Participante,Rol,Fecha,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,Suma,SUS,Interpretacion
+P01,Estudiante,2026-06-18,4,2,5,1,4,2,5,1,4,1,35,87.5,Excelente
+P02,Estudiante,2026-06-18,5,1,5,1,5,1,5,1,5,1,40,100,Excelente
+P03,Administrador,2026-06-18,4,3,4,2,4,3,4,2,4,2,30,75,Bueno
+P04,Estudiante,2026-06-18,3,3,4,2,3,3,4,2,3,2,25,62.5,Regular
+P05,Docente,2026-06-18,4,2,4,2,4,2,4,2,4,2,30,75,Bueno

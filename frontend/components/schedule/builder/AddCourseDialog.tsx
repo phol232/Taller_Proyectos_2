@@ -858,7 +858,7 @@ function SlotsPicker({
     <div className="space-y-3">
       <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         {label} ·{" "}
-        <span className={cn("font-semibold", progressOk ? "text-emerald-600" : "text-foreground")}>
+        <span className={cn("font-semibold", progressOk ? "text-emerald-700" : "text-foreground")}>
           {picked.size}/{requiredSlots}
         </span>{" "}
         franja(s){weeklyHours ? ` · requiere ${weeklyHours} h/sem` : ""}

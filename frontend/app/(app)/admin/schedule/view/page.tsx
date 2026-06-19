@@ -121,6 +121,7 @@ export default function AdminScheduleViewPage() {
           <select
             value={selectedClassroomId}
             onChange={(e) => setSelectedClassroomId(e.target.value)}
+            aria-label="Filtrar por aula"
             className="h-9 appearance-none rounded-lg border border-border bg-background pl-3 pr-8 text-sm text-foreground outline-none transition focus:border-[#6B21A8] focus:ring-2 focus:ring-[#6B21A8]/20"
           >
             <option value="all">Todas las aulas ({classrooms.length})</option>

@@ -200,7 +200,7 @@ export default function GenerateSchedulePage() {
   );
 
   const classroomTypes = useMemo(() => {
-    const types = Array.from(new Set(classrooms.map((c) => c.type))).sort();
+    const types = Array.from(new Set(classrooms.map((c) => c.type))).sort((a, b) => a.localeCompare(b));
     return ["TODOS", ...types];
   }, [classrooms]);
 
@@ -386,6 +386,7 @@ export default function GenerateSchedulePage() {
                     value={academicPeriodId}
                     onChange={(e) => setAcademicPeriodId(e.target.value)}
                     disabled={periodsLoading}
+                    aria-label="Período académico"
                     className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-[#6B21A8] focus:ring-2 focus:ring-[#6B21A8]/20"
                   >
                     {activePeriods.map((p) => (
@@ -511,7 +512,7 @@ export default function GenerateSchedulePage() {
                   ].map(({ label, value, sub, accent }) => (
                     <div key={label} className="rounded-lg border border-border bg-muted/50 px-4 py-3">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
-                      <p className={cn("mt-1 text-2xl font-bold", accent ? "text-[#6B21A8]" : "text-emerald-600")}>{value}</p>
+                      <p className={cn("mt-1 text-2xl font-bold", accent ? "text-[#6B21A8]" : "text-emerald-700")}>{value}</p>
                       {sub && <p className="mt-0.5 text-[10px] text-muted-foreground/60">{sub}</p>}
                     </div>
                   ))}
@@ -618,7 +619,7 @@ export default function GenerateSchedulePage() {
           <div className="flex flex-wrap items-center gap-2">
             {lastSlotCount !== null && (
               <div className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 ring-1 ring-emerald-100">
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
                 <p className="text-xs text-emerald-800">
                   Último: <strong>{lastSlotCount}</strong> bloques
                 </p>
@@ -628,7 +629,7 @@ export default function GenerateSchedulePage() {
               <span className={cn(
                 "rounded-full px-3 py-1 text-xs font-medium ring-1",
                 remainingRequests === 0
-                  ? "bg-rose-50 text-rose-600 ring-rose-200"
+                  ? "bg-rose-50 text-rose-700 ring-rose-200"
                   : "bg-muted text-muted-foreground ring-border",
               )}>
                 {remainingRequests} generaciones restantes
@@ -697,7 +698,7 @@ export default function GenerateSchedulePage() {
             </button>
 
             <div className="mb-5 flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                 <CheckCircle2 className="h-5 w-5" />
               </span>
               <div>
@@ -740,7 +741,7 @@ export default function GenerateSchedulePage() {
               {/* Iteraciones + Candidatos */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
                     <Hash className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
@@ -751,7 +752,7 @@ export default function GenerateSchedulePage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
                     <Layers className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
@@ -765,7 +766,7 @@ export default function GenerateSchedulePage() {
 
               {/* Bloques totales */}
               <div className="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">

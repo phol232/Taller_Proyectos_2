@@ -43,14 +43,14 @@ import type { CarreraAdmin, FacultadAdmin } from "@/types/admin";
 
 const FAC_PALETTE = [
   { icon: Building2,     bg: "bg-violet-100",  text: "text-violet-600" },
-  { icon: FlaskConical,  bg: "bg-blue-100",    text: "text-blue-600"   },
-  { icon: Globe,         bg: "bg-emerald-100", text: "text-emerald-600"},
-  { icon: Stethoscope,   bg: "bg-rose-100",    text: "text-rose-600"   },
-  { icon: Scale,         bg: "bg-amber-100",   text: "text-amber-600"  },
-  { icon: Cpu,           bg: "bg-cyan-100",    text: "text-cyan-600"   },
-  { icon: Music,         bg: "bg-pink-100",    text: "text-pink-600"   },
+  { icon: FlaskConical,  bg: "bg-blue-100",    text: "text-blue-700"   },
+  { icon: Globe,         bg: "bg-emerald-100", text: "text-emerald-700"},
+  { icon: Stethoscope,   bg: "bg-rose-100",    text: "text-rose-700"   },
+  { icon: Scale,         bg: "bg-amber-100",   text: "text-amber-700"  },
+  { icon: Cpu,           bg: "bg-cyan-100",    text: "text-cyan-700"   },
+  { icon: Music,         bg: "bg-pink-100",    text: "text-pink-700"   },
   { icon: GraduationCap, bg: "bg-indigo-100",  text: "text-indigo-600" },
-  { icon: Layers,        bg: "bg-orange-100",  text: "text-orange-600" },
+  { icon: Layers,        bg: "bg-orange-100",  text: "text-orange-700" },
 ];
 
 function getFacPalette(index: number) {
@@ -563,7 +563,7 @@ function FacultadCard({
         <DataRow
           icon={<span className={cn("flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold", facultad.isActive ? "bg-green-500 text-white" : "bg-gray-400 text-white")}>{facultad.isActive ? "✓" : "✕"}</span>}
           label={facultad.isActive ? "Activa" : "Inactiva"}
-          labelClass={facultad.isActive ? "text-green-500 dark:text-green-400" : "text-muted-foreground"}
+          labelClass={facultad.isActive ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}
         />
         {facultad.createdAt && (
           <DataRow icon={<CalendarDays className="h-3.5 w-3.5 text-indigo-400" />} label={`Creado: ${fmtDate(facultad.createdAt)}`} />
@@ -638,7 +638,7 @@ function CarreraCard({
         <DataRow
           icon={<span className={cn("flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold", carrera.isActive ? "bg-green-500 text-white" : "bg-gray-400 text-white")}>{carrera.isActive ? "✓" : "✕"}</span>}
           label={carrera.isActive ? "Activa" : "Inactiva"}
-          labelClass={carrera.isActive ? "text-green-500 dark:text-green-400" : "text-muted-foreground"}
+          labelClass={carrera.isActive ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}
         />
         {carrera.createdAt && (
           <DataRow icon={<CalendarDays className="h-3.5 w-3.5 text-indigo-400" />} label={`Creado: ${fmtDate(carrera.createdAt)}`} />
@@ -718,7 +718,7 @@ function ActionButton({
 }) {
   const variantClass = {
     neutral: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-    warning: "text-amber-600 hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-40 disabled:cursor-not-allowed",
+    warning: "text-amber-700 hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-40 disabled:cursor-not-allowed",
     danger:  "text-red-600 hover:bg-red-500/10 hover:text-red-500",
   }[variant];
 

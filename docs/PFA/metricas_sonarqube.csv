@@ -1,0 +1,40 @@
+Proyecto,Metrica,Valor,Unidad,Interpretacion
+planner-uc-frontend,Bugs,4,issues,Reliability Rating B (2.0) - reducción de 6 bugs por corrección de sort(); los 4 restantes son MINOR (accesibilidad de teclado)
+planner-uc-frontend,Vulnerabilities,0,issues,Security Rating A (1.0) - falso positivo de contraseña en i18n mitigado con NOSONAR, confirmado en análisis 2026-06-19
+planner-uc-frontend,Code Smells,316,issues,Mantenibilidad A (1.0)
+planner-uc-frontend,Security Hotspots,2,items,Requieren revisión manual
+planner-uc-frontend,Duplicated Lines Density,19.2,%,Duplicación alta
+planner-uc-frontend,Coverage,45.6,%,Subió desde 7.3% tras agregar 172 tests de integración (Vitest); aún por debajo de 70%
+planner-uc-frontend,Technical Debt,1611,min,~26.8 horas
+planner-uc-frontend,Maintainability Rating,1.0,A,
+planner-uc-frontend,Reliability Rating,2.0,B,
+planner-uc-frontend,Security Rating,1.0,A,
+planner-uc-frontend,Alert Status,OK,,
+planner-uc-frontend,NLOC,20356,lines,
+planner-uc-frontend,Lines,21967,lines,
+planner-uc-backend,Bugs,0,issues,Reliability Rating A (1.0)
+planner-uc-backend,Vulnerabilities,0,issues,Security Rating A (1.0)
+planner-uc-backend,Code Smells,77,issues,Mantenibilidad A (1.0)
+planner-uc-backend,Security Hotspots,1,item,Requiere revisión manual
+planner-uc-backend,Duplicated Lines Density,1.6,%,Baja duplicación
+planner-uc-backend,Coverage,61.7,%,Subió desde 28.0% tras agregar 17 clases de prueba JUnit; aún por debajo de 70%
+planner-uc-backend,Technical Debt,2843,min,~47.4 horas
+planner-uc-backend,Maintainability Rating,1.0,A,
+planner-uc-backend,Reliability Rating,1.0,A,
+planner-uc-backend,Security Rating,1.0,A,
+planner-uc-backend,Alert Status,OK,,
+planner-uc-backend,NLOC,9823,lines,
+planner-uc-backend,Lines,11967,lines,
+planner-uc-solver,Bugs,2,issues,Reliability Rating C (3.0)
+planner-uc-solver,Vulnerabilities,0,issues,Security Rating A (1.0) - credencial externalizada y README actualizado
+planner-uc-solver,Code Smells,38,issues,Mantenibilidad A (1.0)
+planner-uc-solver,Security Hotspots,2,items,Requieren revisión manual
+planner-uc-solver,Duplicated Lines Density,0.5,%,Muy baja duplicación
+planner-uc-solver,Coverage,69.8,%,Cobertura aceptable, sin cambio
+planner-uc-solver,Technical Debt,690,min,~11.5 horas
+planner-uc-solver,Maintainability Rating,1.0,A,
+planner-uc-solver,Reliability Rating,3.0,C,
+planner-uc-solver,Security Rating,1.0,A,
+planner-uc-solver,Alert Status,OK,,
+planner-uc-solver,NLOC,4563,lines,
+planner-uc-solver,Lines,5478,lines,

@@ -4,3 +4,9 @@ __pycache__/
 .venv/
 .env
 .pytest_cache/
+
+# Coverage reports (generados por pytest-cov)
+.coverage
+.coveragerc
+coverage.xml
+htmlcov/

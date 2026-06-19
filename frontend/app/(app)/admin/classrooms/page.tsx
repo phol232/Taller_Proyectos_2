@@ -49,11 +49,11 @@ import type { AvailabilitySlot, ClassroomAdmin, CourseAdmin, CourseComponentAdmi
 
 const CLASSROOM_PALETTE = [
   { icon: DoorOpen,      bg: "bg-violet-100  dark:bg-violet-900/30",  text: "text-violet-600  dark:text-violet-400"  },
-  { icon: Building2,     bg: "bg-blue-100    dark:bg-blue-900/30",    text: "text-blue-600    dark:text-blue-400"    },
-  { icon: Presentation,  bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-600 dark:text-emerald-400" },
-  { icon: Monitor,       bg: "bg-rose-100    dark:bg-rose-900/30",    text: "text-rose-600    dark:text-rose-400"    },
-  { icon: FlaskConical,  bg: "bg-amber-100   dark:bg-amber-900/30",   text: "text-amber-600   dark:text-amber-400"   },
-  { icon: CalendarClock, bg: "bg-cyan-100    dark:bg-cyan-900/30",    text: "text-cyan-600    dark:text-cyan-400"    },
+  { icon: Building2,     bg: "bg-blue-100    dark:bg-blue-900/30",    text: "text-blue-700    dark:text-blue-400"    },
+  { icon: Presentation,  bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-400" },
+  { icon: Monitor,       bg: "bg-rose-100    dark:bg-rose-900/30",    text: "text-rose-700    dark:text-rose-400"    },
+  { icon: FlaskConical,  bg: "bg-amber-100   dark:bg-amber-900/30",   text: "text-amber-700   dark:text-amber-400"   },
+  { icon: CalendarClock, bg: "bg-cyan-100    dark:bg-cyan-900/30",    text: "text-cyan-700    dark:text-cyan-400"    },
 ];
 
 const COMPONENT_LABELS: Record<string, string> = {
@@ -182,7 +182,7 @@ export default function ClassroomsPage() {
   // ─── Derived ──────────────────────────────────────────────────────────────
 
   const types = useMemo(
-    () => Array.from(new Set(classrooms.map((c) => c.type).filter((t): t is string => Boolean(t)))).sort(),
+    () => Array.from(new Set(classrooms.map((c) => c.type).filter((t): t is string => Boolean(t)))).sort((a, b) => a.localeCompare(b)),
     [classrooms],
   );
 
@@ -591,7 +591,7 @@ function ClassroomCard({
           >
             {classroom.isActive ? "✓" : "✕"}
           </span>
-          <span className={cn("text-xs", classroom.isActive ? "text-green-500 dark:text-green-400" : "text-muted-foreground")}>
+          <span className={cn("text-xs", classroom.isActive ? "text-green-700 dark:text-green-400" : "text-muted-foreground")}>
             {classroom.isActive ? "Activo" : "Inactivo"}
           </span>
         </div>
@@ -1245,7 +1245,7 @@ function ActionButton({
 }) {
   const variantClass = {
     neutral: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-    warning: "text-amber-600 hover:bg-amber-500/10 hover:text-amber-500 disabled:cursor-not-allowed disabled:opacity-40",
+    warning: "text-amber-700 hover:bg-amber-500/10 hover:text-amber-500 disabled:cursor-not-allowed disabled:opacity-40",
     danger: "text-red-600 hover:bg-red-500/10 hover:text-red-500",
   }[variant];
 

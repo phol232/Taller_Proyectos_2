@@ -39,3 +39,6 @@ out/
 ### Environment ###
 .env
 .env.prod
+
+### Artefactos de build fuera de build/ ###
+/META-INF/

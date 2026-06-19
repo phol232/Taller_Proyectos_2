@@ -31,7 +31,8 @@
   --color-gray-900: #171717;
   --color-gray-600: #4d4d4d;
   --color-gray-500: #666666;
-  --color-gray-400: #808080;
+  /* #808080 no llegaba a 4.5:1 de contraste sobre blanco/fondos claros (axe: color-contrast) */
+  --color-gray-400: #686868;
   --color-gray-100: #ebebeb;
   --color-gray-50:  #fafafa;
 
@@ -96,7 +97,9 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* #737373 (oklch 0.556) no llegaba a 4.5:1 sobre fondos muted/card (axe: color-contrast).
+     #686868 sí lo cumple en todos los fondos usados (badges, grids, footer). */
+  --muted-foreground: #686868;
   --accent: oklch(0.96 0.04 295);
   --accent-foreground: oklch(0.38 0.18 295);
   --destructive: oklch(0.577 0.245 27.325);

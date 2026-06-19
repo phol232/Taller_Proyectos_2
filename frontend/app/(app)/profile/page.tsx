@@ -33,9 +33,9 @@ interface ProfileForm {
   preferredShifts: PreferredShift[];
 }
 
-function FieldLabel({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
+function FieldLabel({ icon: Icon, htmlFor, children }: { icon: React.ElementType; htmlFor?: string; children: React.ReactNode }) {
   return (
-    <label className="flex items-center gap-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+    <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
       <Icon className="h-3.5 w-3.5 shrink-0" />
       {children}
     </label>
@@ -135,7 +135,7 @@ function ShiftCheckboxGroup({ value, disabled, onChange, labels }: ShiftCheckbox
       </label>
 
       {maxReached && !isFlexible && !disabled && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">{labels.maxReached}</p>
+        <p className="text-xs text-amber-700 dark:text-amber-400">{labels.maxReached}</p>
       )}
     </div>
   );
@@ -361,12 +361,12 @@ export default function ProfilePage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <FieldLabel icon={User2}>{t.profile.fullNameLabel}</FieldLabel>
-              <Input value={user?.name ?? "—"} readOnly disabled />
+              <FieldLabel icon={User2} htmlFor="profile-fullname">{t.profile.fullNameLabel}</FieldLabel>
+              <Input id="profile-fullname" value={user?.name ?? "—"} readOnly disabled />
             </div>
             <div>
-              <FieldLabel icon={Mail}>{t.profile.emailLabel}</FieldLabel>
-              <Input value={user?.email ?? "—"} readOnly disabled />
+              <FieldLabel icon={Mail} htmlFor="profile-email">{t.profile.emailLabel}</FieldLabel>
+              <Input id="profile-email" value={user?.email ?? "—"} readOnly disabled />
             </div>
           </div>
         </div>
@@ -378,8 +378,9 @@ export default function ProfilePage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <FieldLabel icon={CreditCard}>{t.profile.dniLabel}</FieldLabel>
+              <FieldLabel icon={CreditCard} htmlFor="profile-dni">{t.profile.dniLabel}</FieldLabel>
               <Input
+                id="profile-dni"
                 value={form.dni}
                 onChange={e => set("dni")(e.target.value)}
                 placeholder={t.profile.dniPlaceholder}
@@ -389,8 +390,9 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <FieldLabel icon={Phone}>{t.profile.phoneLabel}</FieldLabel>
+              <FieldLabel icon={Phone} htmlFor="profile-phone">{t.profile.phoneLabel}</FieldLabel>
               <Input
+                id="profile-phone"
                 value={form.phone}
                 onChange={e => set("phone")(e.target.value)}
                 placeholder={t.profile.phonePlaceholder}
@@ -400,8 +402,9 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <FieldLabel icon={User2}>{t.profile.sexLabel}</FieldLabel>
+              <FieldLabel icon={User2} htmlFor="profile-sex">{t.profile.sexLabel}</FieldLabel>
               <select
+                id="profile-sex"
                 value={form.sex}
                 onChange={e => set("sex")(e.target.value as SexOption)}
                 disabled={!editing}
@@ -413,8 +416,9 @@ export default function ProfilePage() {
               </select>
             </div>
             <div>
-              <FieldLabel icon={CalendarDays}>{t.profile.ageLabel}</FieldLabel>
+              <FieldLabel icon={CalendarDays} htmlFor="profile-age">{t.profile.ageLabel}</FieldLabel>
               <Input
+                id="profile-age"
                 value={form.age}
                 onChange={e => set("age")(e.target.value)}
                 placeholder={t.profile.agePlaceholder}
@@ -433,8 +437,9 @@ export default function ProfilePage() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <FieldLabel icon={GraduationCap}>Facultad</FieldLabel>
+                <FieldLabel icon={GraduationCap} htmlFor="profile-facultad">Facultad</FieldLabel>
                 <select
+                  id="profile-facultad"
                   value={form.facultadId}
                   onChange={e => {
                     const nextFacultadId = e.target.value;
@@ -450,8 +455,9 @@ export default function ProfilePage() {
                 </select>
               </div>
               <div>
-                <FieldLabel icon={BookOpen}>Carrera</FieldLabel>
+                <FieldLabel icon={BookOpen} htmlFor="profile-carrera">Carrera</FieldLabel>
                 <select
+                  id="profile-carrera"
                   value={form.carreraId}
                   onChange={e => setForm(prev => ({ ...prev, carreraId: e.target.value }))}
                   disabled={!editing || !form.facultadId || carrerasLoading}

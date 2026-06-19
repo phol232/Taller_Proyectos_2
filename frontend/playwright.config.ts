@@ -1,3 +1,5 @@
+import './tests/e2e/helpers/load-env';
+
 import { defineConfig, devices } from '@playwright/test';
 
 /**

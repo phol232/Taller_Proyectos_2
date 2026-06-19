@@ -38,7 +38,7 @@ solver/
 cd solver
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-export SOLVER_DB_DSN="postgresql://horarios:horarios@localhost:5432/horarios_db"
+export SOLVER_DB_DSN="postgresql://<USER>:<PASSWORD>@localhost:5432/horarios_db"
 uvicorn app.main:app --reload --port 8090
 ```
 

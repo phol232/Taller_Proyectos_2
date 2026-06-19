@@ -92,15 +92,17 @@ function SettingRow({ label, description, children }: {
   );
 }
 
-function Toggle({ checked, onChange, disabled }: {
+function Toggle({ checked, onChange, disabled, label }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  label: string;
 }) {
   return (
     <button
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       className={cn(
@@ -306,10 +308,10 @@ export default function SettingsPage() {
         {/* ── Notificaciones ───────────────────────────────────────── */}
         <SectionCard title={s.sectionNotifications}>
           <SettingRow label={s.notifEmail} description={s.notifEmailDesc}>
-            <Toggle checked={notifEmail} onChange={setNotifEmail} />
+            <Toggle checked={notifEmail} onChange={setNotifEmail} label={s.notifEmail} />
           </SettingRow>
           <SettingRow label={s.notifScheduleChanges} description={s.notifScheduleChangesDesc}>
-            <Toggle checked={notifSchedule} onChange={setNotifSchedule} />
+            <Toggle checked={notifSchedule} onChange={setNotifSchedule} label={s.notifScheduleChanges} />
           </SettingRow>
         </SectionCard>
 

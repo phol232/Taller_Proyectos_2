@@ -81,10 +81,10 @@ public class AcademicPeriodJdbcAdapter implements AcademicPeriodPort {
     public Optional<AcademicPeriod> findById(UUID periodId) {
         List<AcademicPeriod> results = jdbcTemplate.query(
                 "SELECT * FROM fn_get_academic_period_by_id(?)",
-                rowMapper,
+                (rs, rowNum) -> rs.getObject("id", UUID.class) == null ? null : rowMapper.mapRow(rs, rowNum),
                 periodId
         );
-        if (results.isEmpty() || results.getFirst().id() == null) {
+        if (results.isEmpty() || results.getFirst() == null) {
             return Optional.empty();
         }
         return Optional.of(results.getFirst());
