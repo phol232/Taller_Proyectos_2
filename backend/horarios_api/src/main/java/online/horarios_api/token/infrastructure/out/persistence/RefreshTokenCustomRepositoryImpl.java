@@ -16,32 +16,40 @@ public class RefreshTokenCustomRepositoryImpl implements RefreshTokenCustomRepos
 
     @Override
     public void revokeByTokenHash(String tokenHash, Instant now) {
+        em.flush();
         em.createNativeQuery("SELECT fn_revoke_refresh_token(?1, ?2)")
                 .setParameter(1, tokenHash)
                 .setParameter(2, Timestamp.from(now))
                 .getSingleResult();
+        em.clear();
     }
 
     @Override
     public void revokeAllByUserId(UUID userId, Instant now) {
+        em.flush();
         em.createNativeQuery("SELECT fn_revoke_all_user_tokens(?1, ?2)")
                 .setParameter(1, userId)
                 .setParameter(2, Timestamp.from(now))
                 .getSingleResult();
+        em.clear();
     }
 
     @Override
     public void deleteExpiredOrRevokedByUserId(UUID userId, Instant now) {
+        em.flush();
         em.createNativeQuery("SELECT fn_delete_user_expired_tokens(?1, ?2)")
                 .setParameter(1, userId)
                 .setParameter(2, Timestamp.from(now))
                 .getSingleResult();
+        em.clear();
     }
 
     @Override
     public void deleteAllExpiredOrRevoked(Instant now) {
+        em.flush();
         em.createNativeQuery("SELECT fn_delete_all_expired_tokens(?1)")
                 .setParameter(1, Timestamp.from(now))
                 .getSingleResult();
+        em.clear();
     }
 }
