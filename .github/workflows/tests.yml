@@ -98,6 +98,10 @@ jobs:
       - name: Run tests
         working-directory: solver
         # test_integration.py se omite: requiere PostgreSQL
+        # SOLVER_DB_DSN es obligatorio desde la externalización de credenciales (sin default);
+        # estos tests no abren conexión real, solo necesitan que Settings() valide.
+        env:
+          SOLVER_DB_DSN: "postgresql://test:test@localhost:5432/test_db"
         run: |
           python -m pytest tests/test_components.py tests/test_parallel.py \
             -v --junitxml=test-results.xml

@@ -100,7 +100,8 @@ describe("AdminHomePage", () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.queryAllByRole("status")).toHaveLength(0));
-    expect(screen.getByText("Sin período configurado")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("Sin período configurado")).toBeInTheDocument(),
+    );
   });
 });

@@ -42,6 +42,3 @@ out/
 
 ### Artefactos de build fuera de build/ ###
 /META-INF/
-
-### Dump local de esquema para Testcontainers (no versionado) ###
-src/test/resources/db/horarios_schema_dump.sql
