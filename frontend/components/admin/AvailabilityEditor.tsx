@@ -74,6 +74,7 @@ export function AvailabilityEditor({
                         className={FIELD_CLASSNAME}
                         value={slot.day}
                         onChange={(event) => updateSlot(index, { day: event.target.value as ScheduleDay })}
+                        aria-label={`Día de la franja ${index + 1}`}
                       >
                         {DAYS.map((day) => (
                           <option key={day} value={day}>

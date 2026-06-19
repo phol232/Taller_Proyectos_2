@@ -144,6 +144,7 @@ export default function StudentGeneratePage() {
               <select
                 value={periodId}
                 onChange={(e) => setPeriodId(e.target.value)}
+                aria-label="Período académico"
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-[#6B21A8] focus:ring-2 focus:ring-[#6B21A8]/20"
               >
                 {activePeriods.length === 0 && <option value="">Sin períodos activos</option>}

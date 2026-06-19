@@ -56,14 +56,14 @@ import type { CarreraAdmin, CourseAdmin, FacultadAdmin, StudentAdmin } from "@/t
 
 const STUDENT_PALETTE = [
   { icon: GraduationCap, bg: "bg-violet-100  dark:bg-violet-900/30",  text: "text-violet-600  dark:text-violet-400"  },
-  { icon: User,          bg: "bg-blue-100    dark:bg-blue-900/30",    text: "text-blue-600    dark:text-blue-400"    },
-  { icon: BookOpen,      bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-600 dark:text-emerald-400" },
-  { icon: Users,         bg: "bg-rose-100    dark:bg-rose-900/30",    text: "text-rose-600    dark:text-rose-400"    },
-  { icon: Award,         bg: "bg-amber-100   dark:bg-amber-900/30",   text: "text-amber-600   dark:text-amber-400"   },
-  { icon: BookMarked,    bg: "bg-cyan-100    dark:bg-cyan-900/30",    text: "text-cyan-600    dark:text-cyan-400"    },
-  { icon: Target,        bg: "bg-pink-100    dark:bg-pink-900/30",    text: "text-pink-600    dark:text-pink-400"    },
+  { icon: User,          bg: "bg-blue-100    dark:bg-blue-900/30",    text: "text-blue-700    dark:text-blue-400"    },
+  { icon: BookOpen,      bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-400" },
+  { icon: Users,         bg: "bg-rose-100    dark:bg-rose-900/30",    text: "text-rose-700    dark:text-rose-400"    },
+  { icon: Award,         bg: "bg-amber-100   dark:bg-amber-900/30",   text: "text-amber-700   dark:text-amber-400"   },
+  { icon: BookMarked,    bg: "bg-cyan-100    dark:bg-cyan-900/30",    text: "text-cyan-700    dark:text-cyan-400"    },
+  { icon: Target,        bg: "bg-pink-100    dark:bg-pink-900/30",    text: "text-pink-700    dark:text-pink-400"    },
   { icon: Layers,        bg: "bg-indigo-100  dark:bg-indigo-900/30",  text: "text-indigo-600  dark:text-indigo-400"  },
-  { icon: ClipboardList, bg: "bg-orange-100  dark:bg-orange-900/30",  text: "text-orange-600  dark:text-orange-400"  },
+  { icon: ClipboardList, bg: "bg-orange-100  dark:bg-orange-900/30",  text: "text-orange-700  dark:text-orange-400"  },
 ];
 
 function getPalette(index: number) {
@@ -196,7 +196,7 @@ export default function StudentsPage() {
   // ─── Derived ──────────────────────────────────────────────────────────────
 
   const careers = useMemo(
-    () => Array.from(new Set(students.map((s) => s.career).filter((c): c is string => Boolean(c)))).sort(),
+    () => Array.from(new Set(students.map((s) => s.career).filter((c): c is string => Boolean(c)))).sort((a, b) => a.localeCompare(b)),
     [students],
   );
   const facultadNameById = useMemo(
@@ -680,7 +680,7 @@ function StudentCard({
           >
             {student.isActive ? "✓" : "✕"}
           </span>
-          <span className={cn("text-xs", student.isActive ? "text-green-500 dark:text-green-400" : "text-muted-foreground")}>
+          <span className={cn("text-xs", student.isActive ? "text-green-700 dark:text-green-400" : "text-muted-foreground")}>
             {student.isActive ? "Activo" : "Inactivo"}
           </span>
         </div>
@@ -1167,7 +1167,7 @@ function ActionButton({
 }) {
   const variantClass = {
     neutral: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-    warning: "text-amber-600 hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-40 disabled:cursor-not-allowed",
+    warning: "text-amber-700 hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-40 disabled:cursor-not-allowed",
     danger:  "text-red-600 hover:bg-red-500/10 hover:text-red-500",
   }[variant];
 

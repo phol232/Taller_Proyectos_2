@@ -41,11 +41,11 @@ import type { AcademicPeriodAdmin } from "@/types/admin";
 
 const PERIOD_PALETTE = [
   { icon: CalendarDays, bg: "bg-violet-100", text: "text-violet-600", darkBg: "dark:bg-violet-900/30", darkText: "dark:text-violet-400" },
-  { icon: Clock,        bg: "bg-blue-100",    text: "text-blue-600",    darkBg: "dark:bg-blue-900/30",    darkText: "dark:text-blue-400" },
-  { icon: BookOpen,     bg: "bg-emerald-100", text: "text-emerald-600", darkBg: "dark:bg-emerald-900/30", darkText: "dark:text-emerald-400" },
-  { icon: GraduationCap,bg: "bg-rose-100",    text: "text-rose-600",    darkBg: "dark:bg-rose-900/30",    darkText: "dark:text-rose-400" },
-  { icon: CalendarCheck,bg: "bg-amber-100",   text: "text-amber-600",   darkBg: "dark:bg-amber-900/30",   darkText: "dark:text-amber-400" },
-  { icon: Tag,          bg: "bg-cyan-100",    text: "text-cyan-600",    darkBg: "dark:bg-cyan-900/30",    darkText: "dark:text-cyan-400" },
+  { icon: Clock,        bg: "bg-blue-100",    text: "text-blue-700",    darkBg: "dark:bg-blue-900/30",    darkText: "dark:text-blue-400" },
+  { icon: BookOpen,     bg: "bg-emerald-100", text: "text-emerald-700", darkBg: "dark:bg-emerald-900/30", darkText: "dark:text-emerald-400" },
+  { icon: GraduationCap,bg: "bg-rose-100",    text: "text-rose-700",    darkBg: "dark:bg-rose-900/30",    darkText: "dark:text-rose-400" },
+  { icon: CalendarCheck,bg: "bg-amber-100",   text: "text-amber-700",   darkBg: "dark:bg-amber-900/30",   darkText: "dark:text-amber-400" },
+  { icon: Tag,          bg: "bg-cyan-100",    text: "text-cyan-700",    darkBg: "dark:bg-cyan-900/30",    darkText: "dark:text-cyan-400" },
 ];
 
 function getPeriodPalette(index: number) {
@@ -464,7 +464,7 @@ function PeriodCard({
             </span>
           }
           label={period.isActive ? "Activo" : "Inactivo"}
-          labelClass={period.isActive ? "text-green-500 dark:text-green-400" : "text-muted-foreground"}
+          labelClass={period.isActive ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}
         />
         <DataRow
           icon={<CalendarDays className="h-3.5 w-3.5 text-indigo-400" />}
@@ -538,7 +538,7 @@ function ActionButton({
 }) {
   const variantClass = {
     neutral: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-    warning: "text-amber-600 hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-40 disabled:cursor-not-allowed",
+    warning: "text-amber-700 hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-40 disabled:cursor-not-allowed",
     danger: "text-red-600 hover:bg-red-500/10 hover:text-red-500",
   }[variant];
 

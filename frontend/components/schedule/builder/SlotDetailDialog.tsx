@@ -201,7 +201,7 @@ export default function SlotDetailDialog({
 
             {(wouldBeIncomplete || isLastSlot) && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-2.5">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
                 <p className="text-[11px] text-amber-900 dark:text-amber-200">
                   Si quitas esta franja, el componente quedará sin las horas requeridas.
                   Te pediremos confirmación para eliminar la asignación completa.

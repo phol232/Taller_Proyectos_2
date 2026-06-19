@@ -455,7 +455,7 @@ export default function ClassroomMatrixView({
             <span className="h-2.5 w-2.5 rounded border border-dashed border-border" /> Disponible
           </span>
           <span className="flex items-center gap-1.5">
-            <Coffee className="h-3 w-3 text-amber-600" /> Receso / Almuerzo
+            <Coffee className="h-3 w-3 text-amber-700" /> Receso / Almuerzo
           </span>
         </div>
       </div>

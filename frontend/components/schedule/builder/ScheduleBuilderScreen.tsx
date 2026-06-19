@@ -190,6 +190,7 @@ export default function ScheduleBuilderScreen() {
               <select
                 value={academicPeriodId}
                 onChange={(e) => setAcademicPeriodId(e.target.value)}
+                aria-label="Período académico"
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-[#6B21A8] focus:ring-2 focus:ring-[#6B21A8]/20"
               >
                 {activePeriods.length === 0 && <option value="">Sin períodos activos</option>}
@@ -204,6 +205,7 @@ export default function ScheduleBuilderScreen() {
                 value={scheduleId}
                 onChange={(e) => setScheduleId(e.target.value)}
                 disabled={options.length === 0}
+                aria-label="Horario"
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-[#6B21A8] focus:ring-2 focus:ring-[#6B21A8]/20"
               >
                 {options.length === 0 && <option value="">Sin horarios disponibles</option>}
@@ -235,7 +237,7 @@ export default function ScheduleBuilderScreen() {
                   {assignments.reduce((sum, a) => sum + a.slots.length, 0)}
                 </span>{" "}
                 franja(s) ·{" "}
-                <span className={cn("font-semibold", assignments.every((a) => a.complete) ? "text-emerald-600" : "text-amber-600")}>
+                <span className={cn("font-semibold", assignments.every((a) => a.complete) ? "text-emerald-700" : "text-amber-700")}>
                   {assignments.filter((a) => a.complete).length}/{assignments.length}
                 </span>{" "}
                 completas

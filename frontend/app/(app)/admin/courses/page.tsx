@@ -59,14 +59,14 @@ import type { CourseAdmin, CourseComponentAdmin, CourseComponentType } from "@/t
 
 const COURSE_PALETTE = [
   { icon: BookOpen,      bg: "bg-violet-100",  text: "text-violet-600"  },
-  { icon: FlaskConical,  bg: "bg-blue-100",    text: "text-blue-600"    },
-  { icon: Cpu,           bg: "bg-emerald-100", text: "text-emerald-600" },
-  { icon: GraduationCap, bg: "bg-rose-100",    text: "text-rose-600"    },
-  { icon: Layers,        bg: "bg-amber-100",   text: "text-amber-600"   },
-  { icon: Globe,         bg: "bg-cyan-100",    text: "text-cyan-600"    },
-  { icon: Scale,         bg: "bg-pink-100",    text: "text-pink-600"    },
+  { icon: FlaskConical,  bg: "bg-blue-100",    text: "text-blue-700"    },
+  { icon: Cpu,           bg: "bg-emerald-100", text: "text-emerald-700" },
+  { icon: GraduationCap, bg: "bg-rose-100",    text: "text-rose-700"    },
+  { icon: Layers,        bg: "bg-amber-100",   text: "text-amber-700"   },
+  { icon: Globe,         bg: "bg-cyan-100",    text: "text-cyan-700"    },
+  { icon: Scale,         bg: "bg-pink-100",    text: "text-pink-700"    },
   { icon: Stethoscope,   bg: "bg-indigo-100",  text: "text-indigo-600"  },
-  { icon: Music,         bg: "bg-orange-100",  text: "text-orange-600"  },
+  { icon: Music,         bg: "bg-orange-100",  text: "text-orange-700"  },
 ];
 
 function getPalette(index: number) {
@@ -264,7 +264,7 @@ export default function CoursesPage() {
         c.requiredRoomType,
         ...(c.components ?? []).map((component) => component.requiredRoomType),
       ]).filter((v): v is string => !!v),
-    )).sort(),
+    )).sort((a, b) => a.localeCompare(b)),
     [courses],
   );
 
@@ -865,7 +865,7 @@ function CourseCard({
           )}>
             {course.isActive ? "✓" : "✕"}
           </span>
-          <span className={cn("text-xs", course.isActive ? "text-green-500 dark:text-green-400" : "text-muted-foreground")}>
+          <span className={cn("text-xs", course.isActive ? "text-green-700 dark:text-green-400" : "text-muted-foreground")}>
             {course.isActive ? "Activo" : "Inactivo"}
           </span>
         </div>
@@ -915,7 +915,7 @@ function CourseCard({
         <button
           type="button"
           onClick={onSchedule}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-100 px-3 py-2 text-xs font-medium text-blue-600 transition hover:opacity-80 dark:bg-blue-950/40 dark:text-blue-400"
+          className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-100 px-3 py-2 text-xs font-medium text-blue-700 transition hover:opacity-80 dark:bg-blue-950/40 dark:text-blue-400"
         >
           <Clock className="h-3.5 w-3.5" />
           Horarios
@@ -1825,7 +1825,7 @@ function ActionButton({
 }) {
   const variantClass = {
     neutral: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-    warning: "text-amber-600 hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-40 disabled:cursor-not-allowed",
+    warning: "text-amber-700 hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-40 disabled:cursor-not-allowed",
     danger:  "text-red-600 hover:bg-red-500/10 hover:text-red-500",
   }[variant];
 
