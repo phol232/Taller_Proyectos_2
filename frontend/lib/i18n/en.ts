@@ -38,6 +38,7 @@ export const en: TranslationDictionary = {
       mySchedule: "My Schedule",
       viewSchedules: "View Schedules",
       buildSchedule: "Build Schedule",
+      generateOptions: "Generate Schedule",
       schedules: "Schedules",
       generate: "Generate",
       builder: "Builder",

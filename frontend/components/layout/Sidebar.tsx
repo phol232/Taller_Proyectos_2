@@ -58,9 +58,10 @@ function getNavGroups(t: TranslationDictionary): Record<Role, NavGroup[]> {
       {
         items: [
           { label: t.sidebar.nav.home, href: "/student", icon: <LayoutDashboard className="h-4 w-4" />, color: "#6B21A8", bgColor: "rgba(107,33,168,0.15)", exact: true },
-          { label: t.sidebar.nav.mySchedule, href: "/student/my-schedule", icon: <CalendarDays className="h-4 w-4" />, color: "#0369a1", bgColor: "rgba(3,105,161,0.15)" },
           { label: t.sidebar.nav.viewSchedules, href: "/student/schedule/generate", icon: <BookOpen className="h-4 w-4" />, color: "#047857", bgColor: "rgba(4,120,87,0.15)" },
+          { label: t.sidebar.nav.generateOptions, href: "/student/schedule/options", icon: <Sparkles className="h-4 w-4" />, color: "#6B21A8", bgColor: "rgba(107,33,168,0.15)" },
           { label: t.sidebar.nav.buildSchedule, href: "/student/schedule/builder", icon: <Sparkles className="h-4 w-4" />, color: "#b45309", bgColor: "rgba(180,83,9,0.15)" },
+          { label: t.sidebar.nav.mySchedule, href: "/student/my-schedule", icon: <CalendarDays className="h-4 w-4" />, color: "#0369a1", bgColor: "rgba(3,105,161,0.15)" },
         ],
       },
     ],
