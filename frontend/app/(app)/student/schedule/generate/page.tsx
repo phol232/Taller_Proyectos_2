@@ -127,7 +127,7 @@ export default function StudentGeneratePage() {
   if (meError) {
     return (
       <PageShell title={t.subpages.viewSchedules.title} description={t.subpages.viewSchedules.desc}>
-        <Card className="flex flex-col items-center justify-center py-16 bg-white border border-gray-100 shadow-none rounded-xl">
+        <Card className="flex flex-col items-center justify-center py-16 bg-card border border-border shadow-none rounded-xl">
           <p className="text-sm text-muted-foreground">No se encontró un estudiante vinculado a este usuario.</p>
         </Card>
       </PageShell>
@@ -163,32 +163,32 @@ export default function StudentGeneratePage() {
         </section>
 
         {!periodId ? (
-          <Card className="flex flex-col items-center justify-center py-16 bg-white border border-gray-100 shadow-none rounded-xl">
+          <Card className="flex flex-col items-center justify-center py-16 bg-card border border-border shadow-none rounded-xl">
             <p className="text-sm text-muted-foreground">Selecciona un período académico para ver los cursos disponibles.</p>
           </Card>
         ) : coursesLoading ? (
           <div className="h-[300px] animate-pulse rounded-xl bg-muted/40" />
         ) : coursesError ? (
-          <Card className="flex flex-col items-center justify-center py-16 bg-white border border-gray-100 shadow-none rounded-xl">
+          <Card className="flex flex-col items-center justify-center py-16 bg-card border border-border shadow-none rounded-xl">
             <p className="text-sm text-muted-foreground">No se pudieron cargar los cursos.</p>
           </Card>
         ) : courses.length === 0 ? (
-          <Card className="flex flex-col items-center justify-center py-16 bg-white border border-gray-100 shadow-none rounded-xl">
+          <Card className="flex flex-col items-center justify-center py-16 bg-card border border-border shadow-none rounded-xl">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
               style={{ backgroundColor: "rgba(107,33,168,0.07)", color: "#6B21A8" }}
             >
               <BookOpen className="h-6 w-6" />
             </div>
-            <p className="text-sm font-semibold text-vercel-black mb-1">Sin cursos pendientes</p>
-            <p className="text-xs text-gray-400">No tienes cursos por cursar en este período.</p>
+            <p className="text-sm font-semibold text-foreground mb-1">Sin cursos pendientes</p>
+            <p className="text-xs text-muted-foreground">No tienes cursos por cursar en este período.</p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {courses.map((course) => {
               const hasSections = course.sections.length > 0;
               return (
-                <Card key={course.courseId} className="border border-gray-100 bg-white shadow-none rounded-xl">
+                <Card key={course.courseId} className="border border-border bg-card shadow-none rounded-xl">
                   <div className="border-b border-border px-5 py-3">
                     <div className="text-sm font-semibold text-foreground">
                       {course.courseCode} · {course.courseName}

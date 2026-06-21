@@ -54,15 +54,15 @@ export default function StudentSchedulePreviewPage() {
       </div>
 
       {isLoading ? (
-        <Card className="flex h-[400px] items-center justify-center bg-white border border-gray-100 shadow-none rounded-xl">
+        <Card className="flex h-[400px] items-center justify-center bg-card border border-border shadow-none rounded-xl">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </Card>
       ) : !course || !section ? (
-        <Card className="flex flex-col items-center justify-center py-16 bg-white border border-gray-100 shadow-none rounded-xl">
+        <Card className="flex flex-col items-center justify-center py-16 bg-card border border-border shadow-none rounded-xl">
           <p className="text-sm text-muted-foreground">No se encontró el horario solicitado.</p>
         </Card>
       ) : (
-        <Card className="bg-white border border-gray-100 shadow-none rounded-xl p-5">
+        <Card className="bg-card border border-border shadow-none rounded-xl p-5">
           <NrcScheduleView course={course} section={section} />
         </Card>
       )}
