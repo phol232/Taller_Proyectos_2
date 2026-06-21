@@ -171,6 +171,81 @@ def persist_student_schedule(
         )
         return cur.fetchone()["id"]
 
+class NoVacancyError(Exception):
+    """Raised when a draft option cannot be held due to lack of vacancy."""
+
+    def __init__(self, course_id: str | None = None):
+        self.course_id = course_id
+        super().__init__(f"no vacancy to hold seats for course {course_id}")
+
+
+def save_student_draft_option(
+    *,
+    student_id: UUID,
+    academic_period_id: UUID,
+    generated_by: UUID | None,
+    items: list[StudentScheduleItem],
+    ttl_seconds: int,
+    max_live_drafts: int,
+) -> UUID:
+    """Persist one DRAFT option and reserve its seats (seat_holds).
+
+    Raises NoVacancyError if any component has no vacancy (the DB function
+    raises SQLSTATE P0001 and rolls back the whole option).
+    """
+    payload = [
+        {
+            "course_id": str(item.course_id),
+            "components": [
+                {
+                    "course_component_id": str(component_id),
+                    "course_assignment_id": str(assignment_id),
+                }
+                for component_id, assignment_id in item.component_assignments
+            ],
+        }
+        for item in items
+    ]
+    try:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT fn_student_save_draft_option(%s, %s, %s, %s::jsonb, %s, %s) AS id",
+                (student_id, academic_period_id, generated_by,
+                 json.dumps(payload), ttl_seconds, max_live_drafts),
+            )
+            return cur.fetchone()["id"]
+    except Exception as exc:  # noqa: BLE001
+        sqlstate = getattr(exc, "sqlstate", None) or getattr(
+            getattr(exc, "diag", None), "sqlstate", None
+        )
+        if sqlstate == "P0001":
+            course_id = None
+            msg = str(exc)
+            if "SIN_CUPO:" in msg:
+                course_id = msg.split("SIN_CUPO:", 1)[1].strip().split()[0]
+            raise NoVacancyError(course_id) from exc
+        raise
+
+
+def load_student_live_assignments(
+    academic_period_id: UUID, student_ids: list[UUID]
+) -> dict[UUID, frozenset[UUID]]:
+    """student_id -> assignment_ids reservadas en borradores vivos."""
+    out: dict[UUID, set[UUID]] = {}
+    if not student_ids:
+        return {}
+    with get_connection() as conn, conn.cursor() as cur:
+        for sid in student_ids:
+            cur.execute(
+                "SELECT course_assignment_id FROM fn_student_live_assignment_ids(%s, %s)",
+                (sid, academic_period_id),
+            )
+            ids = {r["course_assignment_id"] for r in cur.fetchall()}
+            if ids:
+                out[sid] = ids
+    return {sid: frozenset(ids) for sid, ids in out.items()}
+
+
 def load_offer_vacancies(teaching_schedule_id: UUID) -> dict[UUID, dict]:
     """Returns assignment_id -> dict(course_id, teacher_id, classroom_id,
     max_capacity, enrolled_count, time_slot_ids)."""
