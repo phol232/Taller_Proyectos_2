@@ -16,10 +16,25 @@ public class JdbcTimetableRepository implements TimetableRepository {
     private final JdbcTemplate jdbcTemplate;
 
     @Override
+    public List<TimetableSlot> findByStudentScheduleId(UUID studentScheduleId) {
+        return jdbcTemplate.query(
+                "SELECT * FROM fn_student_schedule_timetable(?)",
+                TIMETABLE_ROW_MAPPER,
+                studentScheduleId
+        );
+    }
+
+    @Override
     public List<TimetableSlot> findByTeachingScheduleId(UUID teachingScheduleId) {
         return jdbcTemplate.query(
                 "SELECT * FROM fn_get_schedule_timetable(?)",
-                (rs, rowNum) -> new TimetableSlot(
+                TIMETABLE_ROW_MAPPER,
+                teachingScheduleId
+        );
+    }
+
+    private static final org.springframework.jdbc.core.RowMapper<TimetableSlot> TIMETABLE_ROW_MAPPER =
+            (rs, rowNum) -> new TimetableSlot(
                         rs.getObject("slot_id", UUID.class),
                         rs.getObject("classroom_id", UUID.class),
                         rs.getString("classroom_code"),
@@ -38,8 +53,5 @@ public class JdbcTimetableRepository implements TimetableRepository {
                         rs.getString("day_of_week"),
                         rs.getTime("start_time").toLocalTime(),
                         rs.getTime("end_time").toLocalTime()
-                ),
-                teachingScheduleId
-        );
-    }
+                );
 }

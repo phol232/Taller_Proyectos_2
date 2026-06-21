@@ -57,6 +57,37 @@ public class RestSolverClientAdapter implements SolverClientPort {
                 .retrieve()
                 .body(MAP_TYPE);
 
+        return toAccepted(response);
+    }
+
+    @Override
+    public SolverRunAccepted runStudentSchedule(
+            UUID academicPeriodId,
+            UUID requestedBy,
+            UUID studentId,
+            int seed,
+            int timeLimitMs
+    ) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("academic_period_id", academicPeriodId.toString());
+        body.put("run_type", "STUDENT");
+        body.put("requested_by", requestedBy.toString());
+        body.put("student_id", studentId.toString());
+        body.put("time_limit_ms", timeLimitMs);
+        body.put("seed", seed);
+
+        Map<String, Object> response = restClient.post()
+                .uri("/api/solver/run")
+                .header("X-Solver-Internal-Token", properties.internalToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP_TYPE);
+
+        return toAccepted(response);
+    }
+
+    private SolverRunAccepted toAccepted(Map<String, Object> response) {
         if (response == null || response.get("solver_run_id") == null) {
             throw new BadRequestException("El solver no devolvió un run válido.");
         }

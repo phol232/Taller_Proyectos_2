@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface TimetableRepository {
     List<TimetableSlot> findByTeachingScheduleId(UUID teachingScheduleId);
+
+    List<TimetableSlot> findByStudentScheduleId(UUID studentScheduleId);
 }
