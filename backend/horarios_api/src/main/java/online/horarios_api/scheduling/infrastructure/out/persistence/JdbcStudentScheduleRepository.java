@@ -30,6 +30,7 @@ public class JdbcStudentScheduleRepository implements StudentScheduleRepository 
 
     private static final TypeReference<List<Map<String, Object>>> SECTION_LIST_TYPE = new TypeReference<>() {};
     private static final TypeReference<List<Map<String, Object>>> ITEM_LIST_TYPE = new TypeReference<>() {};
+    private static final TypeReference<List<Map<String, Object>>> PREREQ_LIST_TYPE = new TypeReference<>() {};
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -47,6 +48,7 @@ public class JdbcStudentScheduleRepository implements StudentScheduleRepository 
                             rs.getInt("course_credits"),
                             rs.getBigDecimal("course_weekly_hours"),
                             rs.getInt("required_components"),
+                            parsePrerequisites(rs.getString("prerequisites")),
                             parseSections(rs.getString("sections"))
                     ),
                     studentId, academicPeriodId
@@ -140,6 +142,24 @@ public class JdbcStudentScheduleRepository implements StudentScheduleRepository 
         return count != null ? count : 0;
     }
 
+    private List<StudentPendingCourse.CoursePrerequisite> parsePrerequisites(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            List<Map<String, Object>> raw = objectMapper.readValue(json, PREREQ_LIST_TYPE);
+            List<StudentPendingCourse.CoursePrerequisite> out = new ArrayList<>(raw.size());
+            for (Map<String, Object> p : raw) {
+                out.add(new StudentPendingCourse.CoursePrerequisite(
+                        toUuid(p.get("prerequisite_course_id")),
+                        toStr(p.get("prerequisite_code")),
+                        Boolean.TRUE.equals(p.get("is_satisfied"))
+                ));
+            }
+            return out;
+        } catch (JsonProcessingException ex) {
+            throw new BadRequestException("No se pudieron leer los prerrequisitos.");
+        }
+    }
+
     private List<StudentPendingCourse.PendingCourseSection> parseSections(String json) {
         if (json == null || json.isBlank()) return List.of();
         try {
@@ -152,6 +172,7 @@ public class JdbcStudentScheduleRepository implements StudentScheduleRepository 
                         toUuid(sec.get("section_id")),
                         toStr(sec.get("nrc")),
                         toInt(sec.get("section_number")),
+                        toInt(sec.get("available_vacancies")),
                         comps
                 ));
             }

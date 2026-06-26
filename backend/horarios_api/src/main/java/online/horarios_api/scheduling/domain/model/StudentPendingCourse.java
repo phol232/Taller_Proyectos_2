@@ -12,12 +12,20 @@ public record StudentPendingCourse(
         int courseCredits,
         BigDecimal courseWeeklyHours,
         int requiredComponents,
+        List<CoursePrerequisite> prerequisites,
         List<PendingCourseSection> sections
 ) {
+    public record CoursePrerequisite(
+            UUID prerequisiteCourseId,
+            String prerequisiteCode,
+            boolean satisfied
+    ) {}
+
     public record PendingCourseSection(
             UUID sectionId,
             String nrc,
             Integer sectionNumber,
+            Integer availableVacancies,
             List<PendingCourseSectionComponent> components
     ) {}
 
