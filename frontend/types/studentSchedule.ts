@@ -11,10 +11,17 @@ export interface PendingCourseSectionComponent {
   slots: ScheduleAssignmentSlot[];
 }
 
+export interface PendingCoursePrerequisite {
+  prerequisiteCourseId: string;
+  prerequisiteCode: string;
+  isSatisfied: boolean;
+}
+
 export interface PendingCourseSection {
   sectionId: string;
   nrc: string | null;
   sectionNumber: number | null;
+  availableVacancies: number | null;
   components: PendingCourseSectionComponent[];
 }
 
@@ -26,6 +33,7 @@ export interface StudentPendingCourse {
   courseCredits: number;
   courseWeeklyHours: number;
   requiredComponents: number;
+  prerequisites: PendingCoursePrerequisite[];
   sections: PendingCourseSection[];
 }
 
@@ -74,4 +82,33 @@ export interface StudentScheduleGeneration {
   status: string;
   websocketUrl: string;
   warning: string | null;
+}
+
+export interface StudentBuilderCourseItem {
+  itemId: string;
+  courseId: string;
+  courseCode: string;
+  courseName: string;
+  courseCredits: number;
+  sectionId: string | null;
+  nrc: string | null;
+  sectionNumber: number | null;
+  components: Array<{
+    courseComponentId: string;
+    courseAssignmentId: string;
+    componentType: string;
+  }>;
+}
+
+export interface StudentBuilderDraft {
+  scheduleId: string;
+  optionIndex: number;
+  status: string;
+  draftSource: string;
+  creditLimit: number;
+  totalCredits: number;
+  expiresAt: string | null;
+  secondsRemaining: number;
+  liveDraftCount: number;
+  items: StudentBuilderCourseItem[];
 }
