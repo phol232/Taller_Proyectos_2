@@ -32,6 +32,12 @@ function callRejected(error: unknown) {
   return (api.interceptors.response as unknown as InterceptorManager).handlers[0].rejected(error);
 }
 
+type RetriableRequestConfig = {
+  url?: string;
+  _sessionRetry?: boolean;
+  suppressGlobalErrorToast?: boolean;
+};
+
 function makeAxiosError(
   status: number,
   url: string,
@@ -206,5 +212,23 @@ describe("api.ts — interceptor de respuesta", () => {
     await expect(callRejected(networkError)).rejects.toThrow();
 
     expect(toast.error).toHaveBeenCalledWith("Error de conexión", expect.any(Object));
+  });
+
+  it("401 con reintento previo → limpia sesión y redirige", async () => {
+    const error = makeAxiosError(401, "/api/schedules");
+    (error.config as RetriableRequestConfig)._sessionRetry = true;
+
+    await expect(callRejected(error)).rejects.toThrow();
+
+    expect(locationReplaceSpy).toHaveBeenCalledWith("/login");
+  });
+
+  it("respeta suppressGlobalErrorToast en errores no 401", async () => {
+    const error = makeAxiosError(403, "/api/schedules");
+    error.config = { url: "/api/schedules", suppressGlobalErrorToast: true } as never;
+
+    await expect(callRejected(error)).rejects.toThrow();
+
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

@@ -64,6 +64,23 @@ public class StudentScheduleController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
+    @GetMapping("/{studentId}/schedule/timetable")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR', 'STUDENT')")
+    @Operation(summary = "Ver el horario confirmado del estudiante en formato calendario")
+    public ResponseEntity<List<TimetableSlotResponse>> getConfirmedTimetable(
+            @PathVariable UUID studentId,
+            @RequestParam UUID periodId
+    ) {
+        return studentScheduleUseCase.getActiveSchedule(studentId, periodId)
+                .filter(s -> "CONFIRMED".equals(s.status()))
+                .map(s -> timetableRepository.findByStudentScheduleId(s.scheduleId())
+                        .stream()
+                        .map(TimetableSlotResponse::from)
+                        .toList())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @PostMapping("/{studentId}/schedule/generate")
     @PreAuthorize("hasAnyRole('ADMIN', 'COORDINATOR', 'STUDENT')")
     @Operation(

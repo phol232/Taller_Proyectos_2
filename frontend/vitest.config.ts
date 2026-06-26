@@ -18,8 +18,13 @@ export default defineConfig({
         "hooks/**",
         "lib/**",
         "store/**",
-        "types/**",
       ],
+      thresholds: {
+        lines: 70,
+        statements: 62,
+        branches: 52,
+        functions: 58,
+      },
       exclude: [
         "components/ui/**",
         "**/*.config.*",

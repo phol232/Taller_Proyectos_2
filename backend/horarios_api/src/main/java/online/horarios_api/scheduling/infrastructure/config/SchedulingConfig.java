@@ -3,15 +3,18 @@ package online.horarios_api.scheduling.infrastructure.config;
 import online.horarios_api.scheduling.application.usecase.ListCourseSectionsUseCaseImpl;
 import online.horarios_api.scheduling.application.usecase.ScheduleBuilderService;
 import online.horarios_api.scheduling.application.usecase.ScheduleGenerationService;
+import online.horarios_api.scheduling.application.usecase.StudentScheduleBuilderService;
 import online.horarios_api.scheduling.application.usecase.StudentScheduleService;
 import online.horarios_api.scheduling.domain.port.in.ListCourseSectionsUseCase;
 import online.horarios_api.scheduling.domain.port.in.ScheduleBuilderUseCase;
 import online.horarios_api.scheduling.domain.port.in.ScheduleGenerationUseCase;
+import online.horarios_api.scheduling.domain.port.in.StudentScheduleBuilderUseCase;
 import online.horarios_api.scheduling.domain.port.in.StudentScheduleUseCase;
 import online.horarios_api.scheduling.domain.port.out.CourseSectionRepository;
 import online.horarios_api.scheduling.domain.port.out.ScheduleBuilderRepository;
 import online.horarios_api.scheduling.domain.port.out.ScheduleGenerationRepository;
 import online.horarios_api.scheduling.domain.port.out.SolverClientPort;
+import online.horarios_api.scheduling.domain.port.out.StudentScheduleBuilderRepository;
 import online.horarios_api.scheduling.domain.port.out.StudentScheduleRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,6 +52,13 @@ public class SchedulingConfig {
             SolverClientPort solverClient
     ) {
         return new StudentScheduleService(repository, solverClient);
+    }
+
+    @Bean
+    public StudentScheduleBuilderUseCase studentScheduleBuilderUseCase(
+            StudentScheduleBuilderRepository repository
+    ) {
+        return new StudentScheduleBuilderService(repository);
     }
 
     @Bean

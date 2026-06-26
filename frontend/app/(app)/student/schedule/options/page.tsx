@@ -1,7 +1,7 @@
 "use client";
 // Generación de horarios en borrador con hold de cupo (2 min): el estudiante
 // genera varias opciones, las compara con su contador y confirma una.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import axios from "axios";
@@ -54,6 +54,10 @@ export default function StudentScheduleOptionsPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ scheduleId: string; optionIndex: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ scheduleId: string; optionIndex: number } | null>(null);
+  const [contextReady, setContextReady] = useState(
+    () => Boolean(search.get("periodId")),
+  );
+  const contextResolvedRef = useRef(Boolean(search.get("periodId")));
 
   const { data: me } = useSWR<StudentMe>("/api/students/me", () => getCurrentStudent());
   const { data: periods = [] } = useSWR<AcademicPeriodAdmin[]>(
@@ -68,7 +72,54 @@ export default function StudentScheduleOptionsPage() {
   );
   const activeCarreras = useMemo(() => carreras.filter((c) => c.isActive), [carreras]);
 
-  // Por defecto no se preselecciona nada: el estudiante elige período y carrera.
+  // Si entra sin período en la URL, busca borradores vivos y abre ese período.
+  useEffect(() => {
+    if (contextResolvedRef.current || !me || activePeriods.length === 0) return;
+
+    const urlPeriod = search.get("periodId");
+    const urlCarrera = search.get("carreraId");
+
+    if (urlCarrera) {
+      setCarreraId(urlCarrera);
+    } else if (me.carreraId) {
+      setCarreraId(me.carreraId);
+    }
+
+    if (urlPeriod) {
+      setPeriodId(urlPeriod);
+      contextResolvedRef.current = true;
+      setContextReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      for (const period of activePeriods) {
+        try {
+          const live = await getStudentScheduleOptions(me.id, period.id);
+          if (cancelled) return;
+          if (live.length > 0) {
+            setPeriodId(period.id);
+            contextResolvedRef.current = true;
+            setContextReady(true);
+            return;
+          }
+        } catch {
+          // Si un período falla, seguimos con el siguiente.
+        }
+      }
+
+      if (!cancelled) {
+        setPeriodId(activePeriods[0]?.id ?? "");
+        contextResolvedRef.current = true;
+        setContextReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [me, activePeriods, search]);
 
   // Reloj para el contador regresivo.
   useEffect(() => {
@@ -236,7 +287,7 @@ export default function StudentScheduleOptionsPage() {
           </div>
         )}
 
-        {isLoading ? (
+        {(!contextReady || isLoading) ? (
           <div className="h-[200px] animate-pulse rounded-xl bg-muted/40" />
         ) : sortedOptions.length === 0 ? (
           <div className="mx-auto w-full max-w-xl pt-6">
@@ -342,6 +393,15 @@ export default function StudentScheduleOptionsPage() {
                   >
                     <CalendarDays className="h-4 w-4" />
                     Ver horario
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => router.push(`/student/schedule/builder?periodId=${periodId}&importFrom=${opt.scheduleId}`)}
+                    className="h-9 w-full gap-1.5"
+                  >
+                    Ajustar manualmente
                   </Button>
 
                   <div className="mt-auto flex flex-wrap gap-2">

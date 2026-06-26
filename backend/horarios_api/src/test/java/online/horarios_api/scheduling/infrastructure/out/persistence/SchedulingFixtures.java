@@ -114,9 +114,9 @@ final class SchedulingFixtures {
         UUID id = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO course_schedule_assignments " +
-                        "(id, teaching_schedule_id, teacher_id, course_id, course_component_id, section_id) " +
-                        "VALUES (?, ?, ?, ?, ?, ?)",
-                id, teachingScheduleId, teacherId, courseId, courseComponentId, sectionId
+                        "(id, teaching_schedule_id, teacher_id, course_id, course_component_id, section_id, max_capacity) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                id, teachingScheduleId, teacherId, courseId, courseComponentId, sectionId, 30
         );
         return id;
     }

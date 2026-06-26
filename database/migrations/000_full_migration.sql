@@ -13,3 +13,12 @@
 \i migrations/202605_solver_classroom_component_quality.sql
 \i migrations/202605_solver_elective_course_rules.sql
 \i migrations/202605_academic_period_is_active.sql
+
+-- ── Sprint 202605/202606 — horarios estudiante y builder ─────
+\i migrations/202605_student_schedule_view.sql
+\i migrations/202606_seat_holds.sql
+\i migrations/202606_seat_holds_functions.sql
+\i migrations/202607_student_schedule_builder.sql
+\i migrations/202608_fix_builder_hold_reimport.sql
+\i migrations/202609_fix_builder_get_draft_components.sql
+\i migrations/202610_fix_builder_open_option_in_place.sql

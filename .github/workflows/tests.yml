@@ -103,7 +103,8 @@ jobs:
         env:
           SOLVER_DB_DSN: "postgresql://test:test@localhost:5432/test_db"
         run: |
-          python -m pytest tests/test_components.py tests/test_parallel.py \
+          python -m pytest tests/test_components.py tests/test_parallel.py tests/test_student_options.py \
+            tests/test_infrastructure_unit.py \
             -v --junitxml=test-results.xml
 
       - name: Publish test report

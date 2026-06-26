@@ -15,17 +15,30 @@ public record StudentPendingCourseResponse(
         int courseCredits,
         BigDecimal courseWeeklyHours,
         int requiredComponents,
+        List<PrerequisiteResponse> prerequisites,
         List<SectionResponse> sections
 ) {
+    public record PrerequisiteResponse(
+            UUID prerequisiteCourseId,
+            String prerequisiteCode,
+            boolean satisfied
+    ) {
+        public static PrerequisiteResponse from(StudentPendingCourse.CoursePrerequisite p) {
+            return new PrerequisiteResponse(
+                    p.prerequisiteCourseId(), p.prerequisiteCode(), p.satisfied());
+        }
+    }
+
     public record SectionResponse(
             UUID sectionId,
             String nrc,
             Integer sectionNumber,
+            Integer availableVacancies,
             List<ComponentResponse> components
     ) {
         public static SectionResponse from(StudentPendingCourse.PendingCourseSection s) {
             return new SectionResponse(
-                    s.sectionId(), s.nrc(), s.sectionNumber(),
+                    s.sectionId(), s.nrc(), s.sectionNumber(), s.availableVacancies(),
                     s.components().stream().map(ComponentResponse::from).toList()
             );
         }
@@ -75,6 +88,7 @@ public record StudentPendingCourseResponse(
                 c.courseId(), c.courseCode(), c.courseName(),
                 c.courseCycle(), c.courseCredits(), c.courseWeeklyHours(),
                 c.requiredComponents(),
+                c.prerequisites().stream().map(PrerequisiteResponse::from).toList(),
                 c.sections().stream().map(SectionResponse::from).toList()
         );
     }

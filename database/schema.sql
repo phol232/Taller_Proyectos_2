@@ -561,6 +561,8 @@ CREATE TABLE student_schedules (
     academic_period_id UUID         NOT NULL,
     status             VARCHAR(20)  NOT NULL DEFAULT 'DRAFT',
     generated_by       UUID,
+    option_index       SMALLINT     NOT NULL DEFAULT 0,
+    draft_source       VARCHAR(20)  NOT NULL DEFAULT 'SOLVER',
     created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     confirmed_at       TIMESTAMPTZ,
@@ -571,12 +573,13 @@ CREATE TABLE student_schedules (
         FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE CASCADE,
     CONSTRAINT fk_student_schedules_generated_by
         FOREIGN KEY (generated_by) REFERENCES users(id) ON DELETE SET NULL,
-    CONSTRAINT chk_student_schedules_status CHECK (status IN ('DRAFT', 'CONFIRMED', 'CANCELLED'))
+    CONSTRAINT chk_student_schedules_status CHECK (status IN ('DRAFT', 'CONFIRMED', 'CANCELLED')),
+    CONSTRAINT chk_student_schedules_draft_source CHECK (draft_source IN ('MANUAL', 'SOLVER'))
 );
 
-CREATE UNIQUE INDEX uq_student_schedules_active_per_period
+CREATE UNIQUE INDEX uq_student_schedules_confirmed_per_period
     ON student_schedules(student_id, academic_period_id)
-    WHERE status IN ('DRAFT', 'CONFIRMED');
+    WHERE status = 'CONFIRMED';
 
 CREATE TABLE student_schedule_items (
     id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -620,6 +623,42 @@ CREATE TABLE student_schedule_item_components (
     CONSTRAINT uq_ssic_item_component UNIQUE (student_schedule_item_id, course_component_id),
     CONSTRAINT chk_ssic_status CHECK (item_status IN ('ACTIVE', 'REMOVED'))
 );
+
+CREATE TABLE seat_holds (
+    id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_assignment_id UUID         NOT NULL,
+    student_id           UUID         NOT NULL,
+    student_schedule_id  UUID         NOT NULL,
+    status               VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
+    expires_at           TIMESTAMPTZ  NOT NULL,
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_seat_holds_assignment
+        FOREIGN KEY (course_assignment_id)
+        REFERENCES course_schedule_assignments(id) ON DELETE CASCADE,
+    CONSTRAINT fk_seat_holds_student
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    CONSTRAINT fk_seat_holds_schedule
+        FOREIGN KEY (student_schedule_id)
+        REFERENCES student_schedules(id) ON DELETE CASCADE,
+    CONSTRAINT chk_seat_holds_status
+        CHECK (status IN ('ACTIVE', 'CONSUMED', 'RELEASED'))
+);
+
+CREATE INDEX idx_seat_holds_assignment_active
+    ON seat_holds (course_assignment_id)
+    WHERE status = 'ACTIVE';
+
+CREATE INDEX idx_seat_holds_expires
+    ON seat_holds (expires_at)
+    WHERE status = 'ACTIVE';
+
+CREATE INDEX idx_seat_holds_schedule
+    ON seat_holds (student_schedule_id);
+
+CREATE UNIQUE INDEX uq_seat_holds_active_per_assignment
+    ON seat_holds (student_schedule_id, course_assignment_id)
+    WHERE status = 'ACTIVE';
 
 CREATE TABLE solver_runs (
     id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),

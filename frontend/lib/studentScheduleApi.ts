@@ -97,3 +97,16 @@ export async function getStudentOptionTimetable(
   );
   return data;
 }
+
+/** Timetable del horario confirmado del estudiante en el período. */
+export async function getStudentConfirmedTimetable(
+  studentId: string,
+  periodId: string,
+): Promise<TimetableSlot[]> {
+  const { data, status } = await api.get<TimetableSlot[]>(
+    `/api/students/${studentId}/schedule/timetable`,
+    { params: { periodId }, validateStatus: (s) => s === 200 || s === 204 },
+  );
+  if (status === 204) return [];
+  return data;
+}

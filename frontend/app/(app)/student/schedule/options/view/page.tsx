@@ -91,7 +91,15 @@ export default function StudentOptionTimetablePage() {
           <OptionTimetableGrid slots={slots} />
         )}
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(`/student/schedule/builder?periodId=${periodId}&importFrom=${scheduleId}`)}
+            disabled={!scheduleId || slots.length === 0}
+          >
+            Ajustar manualmente
+          </Button>
           <Button
             type="button"
             onClick={() => setConfirmOpen(true)}
