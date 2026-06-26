@@ -56,3 +56,22 @@ export interface StudentMe {
   carreraId: string | null;
   facultadId: string | null;
 }
+
+/** Una opción de horario en borrador con su tiempo de hold (bloqueo de cupo). */
+export interface StudentScheduleOption {
+  scheduleId: string;
+  optionIndex: number;
+  status: string;
+  createdAt: string;
+  expiresAt: string;
+  secondsRemaining: number;
+  itemCount: number;
+}
+
+/** Resultado de disparar la generación de una opción de horario. */
+export interface StudentScheduleGeneration {
+  solverRunId: string;
+  status: string;
+  websocketUrl: string;
+  warning: string | null;
+}

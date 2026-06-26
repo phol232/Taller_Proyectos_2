@@ -7,6 +7,7 @@ import { ArrowLeft, Building2, ChevronDown, Search } from "lucide-react";
 import PageShell from "@/components/layout/PageShell";
 import { Input } from "@/components/ui/input";
 import { getTimetable } from "@/lib/scheduleApi";
+import { safeInternalReturnTo } from "@/lib/schedule/generationUtils";
 import { cn } from "@/lib/utils";
 import type { TimetableSlot } from "@/types/schedule";
 
@@ -45,6 +46,7 @@ export default function AdminScheduleViewPage() {
   const router = useRouter();
   const params = useSearchParams();
   const scheduleId = params.get("scheduleId") ?? "";
+  const returnTo = safeInternalReturnTo(params.get("returnTo"));
 
   const [selectedClassroomId, setSelectedClassroomId] = useState("all");
   const [query, setQuery] = useState("");
@@ -99,7 +101,7 @@ export default function AdminScheduleViewPage() {
       actions={
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => (returnTo ? router.push(returnTo) : router.back())}
           className="flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground ring-1 ring-border transition hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" />

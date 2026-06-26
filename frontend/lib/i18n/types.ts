@@ -33,6 +33,7 @@ export type TranslationDictionary = {
       mySchedule: string;
       viewSchedules: string;
       buildSchedule: string;
+      generateOptions: string;
       schedules: string;
       generate: string;
       builder: string;

@@ -5,6 +5,7 @@ Hard constraints H10–H15.
 """
 from __future__ import annotations
 
+import random
 import time as _time
 from collections import defaultdict
 from uuid import UUID
@@ -34,6 +35,9 @@ class StudentScheduleSolver:
         data: SolverInput,
         offers: dict[UUID, dict],
         vacancy: VacancyTracker,
+        *,
+        seed: int | None = None,
+        top_k: int = 3,
     ):
         self._data = data
         self._offers = offers              # assignment_id -> meta
@@ -41,13 +45,29 @@ class StudentScheduleSolver:
         self._shift_filter = ShiftFilter()
         self._travel = TravelTimeChecker(data.travel_times)
         self._grouper = CorequisiteGrouper(data.course_corequisites)
+        self._rng = random.Random(seed)
+        self._top_k = max(1, top_k)
+        # Asignaciones a evitar (borradores previos del alumno) para que cada
+        # nueva generación produzca un horario distinto. Se fija por estudiante
+        # al inicio de solve_one.
+        self._exclude: frozenset[UUID] = frozenset()
 
     # ------------------------------------------------------------------
-    def solve_batch(self, *, time_limit_ms: int) -> tuple[list[StudentScheduleSolution], list[Conflict]]:
-        """Solve all loaded students, ordered by GPA DESC."""
+    def solve_batch(
+        self,
+        *,
+        time_limit_ms: int,
+        excludes: dict[UUID, frozenset[UUID]] | None = None,
+    ) -> tuple[list[StudentScheduleSolution], list[Conflict]]:
+        """Solve all loaded students, ordered by GPA DESC.
+
+        ``excludes`` mapea student_id -> asignaciones ya reservadas en
+        borradores previos, para que la nueva generación difiera.
+        """
         deadline = _time.monotonic() + time_limit_ms / 1000.0
         results: list[StudentScheduleSolution] = []
         conflicts: list[Conflict] = []
+        excludes = excludes or {}
 
         students = sorted(
             self._data.students.values(),
@@ -60,13 +80,18 @@ class StudentScheduleSolver:
                     f"Phase 2 budget exceeded; remaining students unassigned",
                 ))
                 break
-            sol, sc = self.solve_one(student)
+            sol, sc = self.solve_one(student, exclude_assignments=excludes.get(student.id))
             results.append(sol)
             conflicts.extend(sc)
         return results, conflicts
 
     # ------------------------------------------------------------------
-    def solve_one(self, student: Student) -> tuple[StudentScheduleSolution, list[Conflict]]:
+    def solve_one(
+        self,
+        student: Student,
+        exclude_assignments: frozenset[UUID] | None = None,
+    ) -> tuple[StudentScheduleSolution, list[Conflict]]:
+        self._exclude = frozenset(exclude_assignments or ())
         solution = StudentScheduleSolution(student_id=student.id)
         conflicts: list[Conflict] = []
 
@@ -271,7 +296,16 @@ class StudentScheduleSolver:
             scored.append((score, aid, slots))
 
         scored.sort(key=lambda x: x[0])
-        for _, aid, slots in scored:
+        # Prioriza ofertas no usadas en borradores previos del alumno, luego
+        # aleatoriza entre el top-K para que cada generación sea distinta
+        # (manteniendo el determinismo por seed).
+        preferred = [t for t in scored if t[1] not in self._exclude]
+        deferred = [t for t in scored if t[1] in self._exclude]
+        ordered = preferred + deferred
+        head = ordered[: self._top_k]
+        self._rng.shuffle(head)
+        candidates = head + ordered[self._top_k:]
+        for _, aid, slots in candidates:
             if self._vacancy.reserve(aid):
                 return aid, slots
         return None, []

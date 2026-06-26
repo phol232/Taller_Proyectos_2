@@ -13,13 +13,15 @@ from app.domain.models import Conflict, ConflictType, TeachingScheduleSolution
 from app.domain.solver_input import SolverInput
 from app.infrastructure.input_loader import SolverInputLoader
 from app.infrastructure.persistence import (
+    NoVacancyError,
     consume_generation_reservation,
     create_solver_run,
     finish_solver_run,
     load_offer_vacancies,
-    persist_student_schedule,
+    load_student_live_assignments,
     persist_teaching_schedule,
     report_conflicts,
+    save_student_draft_option,
     set_solver_run_input_hash,
 )
 from app.services.constraint_validator import ConstraintValidator
@@ -234,31 +236,54 @@ class SolverOrchestrator:
                                    "no confirmed teaching schedule", [conflict])
 
         self._emit(run_id, "solving_phase2")
+        settings = get_settings()
         offers = load_offer_vacancies(data.confirmed_teaching_schedule_id)
         vacancy = VacancyTracker(offers)
-        solver = StudentScheduleSolver(data, offers, vacancy)
-        solutions, conflicts = solver.solve_batch(time_limit_ms=max(1_000, req.time_limit_ms - _SOLVER_OVERHEAD_BUFFER_MS))
+        excludes = load_student_live_assignments(
+            req.academic_period_id, list(data.students.keys())
+        )
+        solver = StudentScheduleSolver(
+            data, offers, vacancy,
+            seed=req.seed,
+            top_k=settings.student_topk_variation,
+        )
+        solutions, conflicts = solver.solve_batch(
+            time_limit_ms=max(1_000, req.time_limit_ms - _SOLVER_OVERHEAD_BUFFER_MS),
+            excludes=excludes,
+        )
 
         self._emit(run_id, "persisting",
                    placed=sum(1 for s in solutions if s.items))
+        placed = 0
         for sol in solutions:
-            if sol.items:
-                persist_student_schedule(
+            if not sol.items:
+                continue
+            try:
+                save_student_draft_option(
                     student_id=sol.student_id,
                     academic_period_id=req.academic_period_id,
                     generated_by=req.requested_by,
                     items=sol.items,
+                    ttl_seconds=settings.student_hold_ttl_seconds,
+                    max_live_drafts=settings.student_max_live_drafts,
                 )
+                placed += 1
+            except NoVacancyError as exc:
+                conflicts.append(Conflict(
+                    ConflictType.NO_VACANCY,
+                    f"no vacancy to hold seats for student {sol.student_id}",
+                    course_id=UUID(exc.course_id) if exc.course_id else None,
+                ))
 
         report_conflicts(run_id, conflicts)
         succeeded = bool(solutions) and not any(
             c.conflict_type == ConflictType.TIME_LIMIT_EXCEEDED for c in conflicts
         )
         status = "SUCCEEDED" if succeeded and not conflicts else "FAILED"
-        summary = f"phase2 placed {sum(1 for s in solutions if s.items)} students; {len(conflicts)} conflicts"
+        summary = f"phase2 placed {placed} students; {len(conflicts)} conflicts"
         finish_solver_run(run_id, status=status, summary=summary)
         self._emit(run_id, "finished", status=status,
-                   placed=sum(1 for s in solutions if s.items),
+                   placed=placed,
                    conflict_count=len(conflicts))
         return SolverRunResult(run_id, status, summary, conflicts)
 

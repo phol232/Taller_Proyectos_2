@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     shift_evening_start: str = Field(default="19:00")
     shift_evening_end: str = Field(default="22:10")
 
+    # Fase 2 estudiante: borradores con hold de cupo (estrategia B).
+    student_hold_ttl_seconds: int = Field(default=120)
+    student_max_live_drafts: int = Field(default=3)
+    student_topk_variation: int = Field(default=3)
+
     local_search_ratio: float = Field(default=0.45)
 
     local_search_max_iters: int = Field(default=10_000)

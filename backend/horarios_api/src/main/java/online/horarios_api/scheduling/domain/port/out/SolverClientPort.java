@@ -14,4 +14,12 @@ public interface SolverClientPort {
             UUID reservationId,
             List<UUID> classroomIds
     );
+
+    SolverRunAccepted runStudentSchedule(
+            UUID academicPeriodId,
+            UUID requestedBy,
+            UUID studentId,
+            int seed,
+            int timeLimitMs
+    );
 }

@@ -7,13 +7,17 @@ import lombok.RequiredArgsConstructor;
 import online.horarios_api.scheduling.domain.model.ActiveStudentSchedule;
 import online.horarios_api.scheduling.domain.model.ScheduleAssignmentSlot;
 import online.horarios_api.scheduling.domain.model.StudentPendingCourse;
+import online.horarios_api.scheduling.domain.model.StudentScheduleOption;
 import online.horarios_api.scheduling.domain.port.out.StudentScheduleRepository;
 import online.horarios_api.shared.domain.exception.BadRequestException;
+import online.horarios_api.shared.domain.exception.ConflictException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +71,73 @@ public class JdbcStudentScheduleRepository implements StudentScheduleRepository 
             return Optional.empty();
         }
         return Optional.of(rows.get(0));
+    }
+
+    @Override
+    public List<StudentScheduleOption> listScheduleOptions(UUID studentId, UUID academicPeriodId) {
+        try {
+            return jdbcTemplate.query(
+                    "SELECT * FROM fn_student_list_schedule_options(?, ?)",
+                    (rs, rowNum) -> new StudentScheduleOption(
+                            rs.getObject("schedule_id", UUID.class),
+                            rs.getInt("option_index"),
+                            rs.getString("status"),
+                            toInstant(rs.getTimestamp("created_at")),
+                            toInstant(rs.getTimestamp("expires_at")),
+                            rs.getInt("seconds_remaining"),
+                            rs.getInt("item_count")
+                    ),
+                    studentId, academicPeriodId
+            );
+        } catch (DataAccessException ex) {
+            throw mapException(ex);
+        }
+    }
+
+    @Override
+    public String confirmSchedule(UUID studentId, UUID scheduleId) {
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT fn_student_confirm_schedule(?, ?)",
+                    String.class,
+                    studentId, scheduleId
+            );
+        } catch (DataAccessException ex) {
+            throw mapStudentException(ex);
+        }
+    }
+
+    @Override
+    public int renewHolds(UUID scheduleId, int ttlSeconds) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT fn_student_renew_holds(?, ?)",
+                    Integer.class,
+                    scheduleId, ttlSeconds
+            );
+            return count != null ? count : 0;
+        } catch (DataAccessException ex) {
+            throw mapException(ex);
+        }
+    }
+
+    @Override
+    public void releaseOption(UUID scheduleId) {
+        try {
+            jdbcTemplate.query(
+                    "SELECT fn_student_release_option(?)",
+                    resultSet -> null,
+                    scheduleId
+            );
+        } catch (DataAccessException ex) {
+            throw mapException(ex);
+        }
+    }
+
+    @Override
+    public int expireSeatHolds() {
+        Integer count = jdbcTemplate.queryForObject("SELECT fn_seat_holds_expire()", Integer.class);
+        return count != null ? count : 0;
     }
 
     private List<StudentPendingCourse.PendingCourseSection> parseSections(String json) {
@@ -167,6 +238,24 @@ public class JdbcStudentScheduleRepository implements StudentScheduleRepository 
         String detail = ex.getMostSpecificCause().getMessage();
         if (detail == null) return ex;
         return new BadRequestException(detail);
+    }
+
+    /** Mapea los errores de confirmación de la BD a estados HTTP semánticos. */
+    private RuntimeException mapStudentException(DataAccessException ex) {
+        String detail = ex.getMostSpecificCause().getMessage();
+        if (detail == null) return ex;
+        if (detail.contains("CUPO_EXPIRADO")) {
+            return new ConflictException(
+                    "El cupo de este horario ya no está disponible. Genera una nueva opción.");
+        }
+        if (detail.contains("NO_EXISTE") || detail.contains("ESTADO_INVALIDO")) {
+            return new BadRequestException("La opción de horario ya no es válida.");
+        }
+        return new BadRequestException(detail);
+    }
+
+    private static Instant toInstant(Timestamp timestamp) {
+        return timestamp != null ? timestamp.toInstant() : null;
     }
 
     private static UUID toUuid(Object value) {

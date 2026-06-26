@@ -44,8 +44,11 @@ public class SchedulingConfig {
     }
 
     @Bean
-    public StudentScheduleUseCase studentScheduleUseCase(StudentScheduleRepository repository) {
-        return new StudentScheduleService(repository);
+    public StudentScheduleUseCase studentScheduleUseCase(
+            StudentScheduleRepository repository,
+            SolverClientPort solverClient
+    ) {
+        return new StudentScheduleService(repository, solverClient);
     }
 
     @Bean
