@@ -2,7 +2,6 @@ package online.horarios_api.student.application.usecase;
 
 import online.horarios_api.shared.domain.exception.BadRequestException;
 import online.horarios_api.shared.domain.exception.NotFoundException;
-import online.horarios_api.shared.domain.model.Page;
 import online.horarios_api.student.domain.model.Student;
 import online.horarios_api.student.domain.model.StudentData;
 import online.horarios_api.student.domain.port.out.StudentPort;

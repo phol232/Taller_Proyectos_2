@@ -8,12 +8,14 @@ import { useNotificationStore } from "@/store/notification.store";
 import { useUiStore } from "@/store/ui.store";
 
 const replaceMock = vi.fn();
+const setThemeMock = vi.fn();
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: replaceMock, push: vi.fn(), back: vi.fn() }),
 }));
 
 vi.mock("next-themes", () => ({
-  useTheme: () => ({ resolvedTheme: "light", setTheme: vi.fn() }),
+  useTheme: () => ({ resolvedTheme: "light", setTheme: setThemeMock }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -33,6 +35,7 @@ function renderNavbar() {
 describe("Navbar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.setItem("planner-uc-locale", "es");
     useAuthStore.setState({
       user: { id: "1", name: "Ana García", email: "ana@continental.edu.pe", role: "admin" },
       role: "admin",
@@ -85,5 +88,21 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(screen.getByLabelText(/Switch to English|Cambiar a Español/i)).toBeInTheDocument();
+  });
+
+  it("cambia el idioma al pulsar el selector", async () => {
+    const user = userEvent.setup();
+    renderNavbar();
+
+    await user.click(screen.getByLabelText(/switch to english/i));
+    expect(screen.getByLabelText(/cambiar a español/i)).toBeInTheDocument();
+  });
+
+  it("alterna el tema claro/oscuro", async () => {
+    const user = userEvent.setup();
+    renderNavbar();
+
+    await user.click(screen.getByLabelText(/cambiar tema|change theme/i));
+    expect(setThemeMock).toHaveBeenCalledWith("dark");
   });
 });

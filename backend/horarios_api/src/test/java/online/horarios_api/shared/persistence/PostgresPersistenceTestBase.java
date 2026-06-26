@@ -34,25 +34,31 @@ public abstract class PostgresPersistenceTestBase {
     }
 
     private static void loadSchema() {
+        loadSqlFile("db/horarios_schema_dump.sql");
+        loadSqlFile("db/student_schedule_migrations.sql");
+    }
+
+    private static void loadSqlFile(String classpathResource) {
         try {
+            String containerPath = "/tmp/" + classpathResource.replace('/', '_');
             POSTGRES.copyFileToContainer(
-                    MountableFile.forClasspathResource("db/horarios_schema_dump.sql"),
-                    "/tmp/schema.sql"
+                    MountableFile.forClasspathResource(classpathResource),
+                    containerPath
             );
             Container.ExecResult result = POSTGRES.execInContainer(
                     "psql",
                     "-U", POSTGRES.getUsername(),
                     "-d", POSTGRES.getDatabaseName(),
                     "-v", "ON_ERROR_STOP=1",
-                    "-f", "/tmp/schema.sql"
+                    "-f", containerPath
             );
             if (result.getExitCode() != 0) {
                 throw new IllegalStateException(
-                        "No se pudo cargar el schema de prueba en el contenedor Postgres: "
+                        "No se pudo cargar " + classpathResource + " en el contenedor Postgres: "
                                 + result.getStderr());
             }
         } catch (Exception e) {
-            throw new IllegalStateException("Error inicializando el schema de prueba", e);
+            throw new IllegalStateException("Error cargando " + classpathResource, e);
         }
     }
 

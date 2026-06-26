@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import api from "@/lib/api";
 import {
+  confirmStudentScheduleOption,
+  generateStudentScheduleOption,
   getCurrentStudent,
   getStudentActiveSchedule,
   getStudentAvailableCourses,
+  getStudentOptionTimetable,
+  getStudentScheduleOptions,
+  releaseStudentScheduleOption,
+  renewStudentScheduleOption,
 } from "@/lib/studentScheduleApi";
+import type { ConfirmScheduleResponse, TimetableSlot } from "@/types/schedule";
+import type { StudentScheduleGeneration, StudentScheduleOption } from "@/types/studentSchedule";
 import type {
   ActiveStudentSchedule,
   StudentMe,
@@ -182,6 +190,119 @@ describe("studentScheduleApi — integración", () => {
 
       const result = await getStudentActiveSchedule("student-1", "period-1");
       expect(result?.status).toBe("CONFIRMED");
+    });
+  });
+
+  describe("generateStudentScheduleOption", () => {
+    it("POST /api/students/:id/schedule/generate", async () => {
+      const generation: StudentScheduleGeneration = {
+        solverRunId: "run-1",
+        status: "RUNNING",
+        websocketUrl: "ws://localhost:8090/runs/run-1",
+        warning: null,
+      };
+      const spy = vi.spyOn(api, "post").mockResolvedValue({ data: generation });
+
+      await expect(generateStudentScheduleOption("student-1", "period-1")).resolves.toEqual(generation);
+      expect(spy).toHaveBeenCalledWith(
+        "/api/students/student-1/schedule/generate",
+        null,
+        { params: { periodId: "period-1" } },
+      );
+    });
+  });
+
+  describe("getStudentScheduleOptions", () => {
+    it("GET /api/students/:id/schedule/options", async () => {
+      const options: StudentScheduleOption[] = [
+        {
+          scheduleId: "schedule-1",
+          optionIndex: 1,
+          status: "DRAFT",
+          createdAt: "2026-05-18T10:00:00Z",
+          expiresAt: "2026-05-18T12:00:00Z",
+          secondsRemaining: 3600,
+          itemCount: 4,
+        },
+      ];
+      const spy = vi.spyOn(api, "get").mockResolvedValue({ data: options });
+
+      await expect(getStudentScheduleOptions("student-1", "period-1")).resolves.toEqual(options);
+      expect(spy).toHaveBeenCalledWith("/api/students/student-1/schedule/options", {
+        params: { periodId: "period-1" },
+      });
+    });
+  });
+
+  describe("confirmStudentScheduleOption", () => {
+    it("POST confirm con suppressGlobalErrorToast", async () => {
+      const response: ConfirmScheduleResponse = {
+        scheduleId: "schedule-1",
+        status: "CONFIRMED",
+      };
+      const spy = vi.spyOn(api, "post").mockResolvedValue({ data: response });
+
+      await expect(confirmStudentScheduleOption("student-1", "schedule-1")).resolves.toEqual(response);
+      expect(spy).toHaveBeenCalledWith(
+        "/api/students/student-1/schedule/options/schedule-1/confirm",
+        null,
+        { suppressGlobalErrorToast: true },
+      );
+    });
+  });
+
+  describe("renewStudentScheduleOption", () => {
+    it("POST renew de la opción", async () => {
+      const spy = vi.spyOn(api, "post").mockResolvedValue({ data: undefined });
+
+      await renewStudentScheduleOption("student-1", "schedule-1");
+      expect(spy).toHaveBeenCalledWith(
+        "/api/students/student-1/schedule/options/schedule-1/renew",
+      );
+    });
+  });
+
+  describe("releaseStudentScheduleOption", () => {
+    it("DELETE libera la opción reservada", async () => {
+      const spy = vi.spyOn(api, "delete").mockResolvedValue({ data: undefined });
+
+      await releaseStudentScheduleOption("student-1", "schedule-1");
+      expect(spy).toHaveBeenCalledWith(
+        "/api/students/student-1/schedule/options/schedule-1",
+      );
+    });
+  });
+
+  describe("getStudentOptionTimetable", () => {
+    it("GET timetable de una opción", async () => {
+      const slots: TimetableSlot[] = [
+        {
+          slotId: "slot-1",
+          classroomId: "classroom-1",
+          classroomCode: "A-101",
+          classroomName: "Aula 101",
+          classroomType: "CLASSROOM",
+          teacherId: "teacher-1",
+          teacherCode: "DOC-01",
+          teacherName: "Docente",
+          courseId: "course-1",
+          courseCode: "INF-101",
+          courseName: "Programación I",
+          componentType: "THEORY",
+          sectionId: "section-1",
+          nrc: "NRC-001",
+          sectionNumber: 1,
+          dayOfWeek: "MONDAY",
+          startTime: "07:00",
+          endTime: "08:30",
+        },
+      ];
+      const spy = vi.spyOn(api, "get").mockResolvedValue({ data: slots });
+
+      await expect(getStudentOptionTimetable("student-1", "schedule-1")).resolves.toEqual(slots);
+      expect(spy).toHaveBeenCalledWith(
+        "/api/students/student-1/schedule/options/schedule-1/timetable",
+      );
     });
   });
 });

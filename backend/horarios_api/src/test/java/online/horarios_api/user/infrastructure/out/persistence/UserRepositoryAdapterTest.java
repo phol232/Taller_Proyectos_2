@@ -18,7 +18,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import javax.sql.DataSource;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
