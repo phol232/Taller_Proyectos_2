@@ -1,7 +1,6 @@
 package online.horarios_api.scheduling.application.dto;
 
 import online.horarios_api.scheduling.domain.model.StudentBuilderDraft;
-import online.horarios_api.scheduling.domain.model.StudentScheduleConflict;
 
 import java.time.Instant;
 import java.util.List;

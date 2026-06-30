@@ -22,6 +22,7 @@
 
 ## 📑 Tabla de Contenidos
 
+- [👥 Equipo](#-equipo)
 - [📌 Descripción](#-descripción)
 - [🛠 Tecnologías](#-tecnologías)
 - [🧠 Motor de Generación de Horarios (CSP)](#-motor-de-generación-de-horarios-csp)
@@ -30,11 +31,61 @@
 - [⚙️ Instalación](#️-instalación)
 - [▶️ Uso](#️-uso)
 - [🔌 API](#-api)
-- [👥 Equipo](#-equipo)
 - [🤝 Contribución](#-contribución)
 - [❓ FAQ](#-faq)
 - [📚 Documentación del Proyecto](#-documentación-del-proyecto)
 - [📄 Licencia](#-licencia)
+
+---
+
+## 👥 Equipo
+
+<p align="center">
+  <img src="docs/fotogrupal.jpeg" alt="Foto grupal del equipo Planner UC" width="600"/>
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center" width="180">
+      <strong>Jhann Pier Tapia De La Cruz</strong>
+      <br/>
+      <sub>🎯 Gerente de Proyecto</sub>
+      <br/>
+      <sub>Planificación, coordinación y seguimiento</sub>
+    </td>
+    <td align="center" width="180">
+      <strong>Taquiri Rojas Phol Edwin</strong>
+      <br/>
+      <sub>⚙️ Desarrollador Backend</sub>
+      <br/>
+      <sub>API REST, lógica de negocio, CSP</sub>
+    </td>
+    <td align="center" width="180">
+      <strong>Kevin Mendez Roca</strong>
+      <br/>
+      <sub>🧪 QA / Tester</sub>
+      <br/>
+      <sub>Pruebas unitarias e integración</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="180">
+      <strong>Brayan Pedro Condor Aliaga</strong>
+      <br/>
+      <sub>🎨 Desarrollador Frontend</sub>
+      <br/>
+      <sub>Interfaz SPA, vistas, integración API</sub>
+    </td>
+    <td align="center" width="180">
+      <strong>Daniel Gamarra Moreno</strong>
+      <br/>
+      <sub>🎓 Patrocinador Académico</sub>
+      <br/>
+      <sub>Taller de Proyectos 2</sub>
+    </td>
+    
+  </tr>
+</table>
 
 ---
 
@@ -491,53 +542,6 @@ curl -X POST http://localhost:8080/api/schedules/generate \
 
 ---
 
-## 👥 Equipo
-
-<table align="center">
-  <tr>
-    <td align="center" width="180">
-      <strong>Jhann Pier Tapia De La Cruz</strong>
-      <br/>
-      <sub>🎯 Gerente de Proyecto</sub>
-      <br/>
-      <sub>Planificación, coordinación y seguimiento</sub>
-    </td>
-    <td align="center" width="180">
-      <strong>Taquiri Rojas Phol Edwin</strong>
-      <br/>
-      <sub>⚙️ Desarrollador Backend</sub>
-      <br/>
-      <sub>API REST, lógica de negocio, CSP</sub>
-    </td>
-    <td align="center" width="180">
-      <strong>Kevin Mendez Roca</strong>
-      <br/>
-      <sub>🧪 QA / Tester</sub>
-      <br/>
-      <sub>Pruebas unitarias e integración</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="180">
-      <strong>Brayan Pedro Condor Aliaga</strong>
-      <br/>
-      <sub>🎨 Desarrollador Frontend</sub>
-      <br/>
-      <sub>Interfaz SPA, vistas, integración API</sub>
-    </td>
-    <td align="center" width="180">
-      <strong>Daniel Gamarra Moreno</strong>
-      <br/>
-      <sub>🎓 Patrocinador Académico</sub>
-      <br/>
-      <sub>Taller de Proyectos 2</sub>
-    </td>
-    
-  </tr>
-</table>
-
----
-
 ## 🤝 Contribución
 
 ### Metodología
@@ -636,9 +640,12 @@ No en el PMV actual. El soporte multi-institución y multi-sede está fuera del 
 | Documento | Descripción |
 |:---|:---|
 | [Requerimientos Funcionales y No Funcionales](docs/Planificación/Requerimientos_Funcionales_y_No_Funcionales.md) | Listado detallado de requerimientos del sistema |
+| [Diseño del Microservicio Solver CSP](docs/Planificación/Diseno_Microservicio_Solver_CSP.md) | Arquitectura y diseño del motor CSP |
 | [Backlog Detallado del Producto](docs/Planificación/01%20Backlog%20Detallado%20del%20Producto.xlsx) | Product backlog con historias de usuario |
+| [Backlog del Sprint](docs/Planificación/02%20Backlog%20del%20Sprint.xlsx) | Backlog priorizado por sprint |
 | [Presupuesto del Proyecto](docs/Planificación/04%20Presupuesto%20del%20Proyecto.xls) | Estimación y desglose de costos |
 | [Registro de Riesgos](docs/Planificación/05%20Registro%20de%20Riesgos.xls) | Identificación y plan de mitigación de riesgos |
+| [Cronograma de Alto Nivel - Hitos](docs/Planificación/Cronograma%20de%20alto%20nivel%20-%20Hitos.pdf) | Hitos y cronograma general del proyecto |
 
 ### 📂 Sprint 0
 
@@ -651,6 +658,62 @@ No en el PMV actual. El soporte multi-institución y multi-sede está fuera del 
 | [Lista Preliminar de Requerimientos](docs/Sprint_0/Lista_Preliminar%20de%20Requerimientos.md) | Requerimientos identificados en Sprint 0 |
 | [Registro de Supuestos y Restricciones](docs/Sprint_0/Registro_de_supuestos_y_restricciones.md) | Supuestos y restricciones del proyecto |
 | [Selección de Enfoque del Proyecto](docs/Sprint_0/Seleccion_enfoque_proyecto.md) | Justificación del enfoque metodológico |
+
+### 📂 Sprint 1
+
+| Documento | Descripción |
+|:---|:---|
+| [Informe de Estado del Proyecto](docs/Sprint_1/Informe%20de%20Estado%20del%20Proyecto.docx) | Estado de avance del Sprint 1 |
+| [Minuta de Reunión](docs/Sprint_1/Minuta%20de%20Reunión.docx) | Acta de la reunión de seguimiento |
+| [Registro de Impedimentos](docs/Sprint_1/Registro%20de%20Impedimentos.xlsx) | Bloqueos identificados durante el sprint |
+| [Retrospectiva del Sprint](docs/Sprint_1/Retrospectiva%20del%20Sprint.pptx) | Aprendizajes y mejoras del sprint |
+| [Revisión del Sprint](docs/Sprint_1/Revisión%20del%20Sprint.pptx) | Resultados presentados al cierre del sprint |
+
+### 📂 Artefactos
+
+| Documento | Descripción |
+|:---|:---|
+| [SPEC](docs/Artefactos/SPEC.md) | Especificación técnica del sistema |
+| [Auditoría del Solver](docs/Artefactos/Auditoria_Solver.md) | Auditoría del motor de generación CSP |
+| [Testing](docs/Artefactos/Testing.md) | Estrategia y plan de pruebas |
+| [Validación y Evidencias](docs/Artefactos/Validacion_y_Evidencias.md) | Evidencias de validación funcional |
+| [Presupuesto](docs/Artefactos/Presupuesto.md) | Detalle de presupuesto del proyecto |
+| [Riesgos y Oportunidades](docs/Artefactos/Riesgos_oportunidades.md) | Registro de riesgos y oportunidades |
+
+### 📂 Pruebas
+
+| Documento | Descripción |
+|:---|:---|
+| [Pruebas Backend](docs/Pruebas/Pruebas_Backend.md) | Casos y resultados de pruebas del backend |
+| [Pruebas Frontend](docs/Pruebas/Pruebas_Frontend.md) | Casos y resultados de pruebas del frontend |
+| [Pruebas Solver](docs/Pruebas/Pruebas_Solver.md) | Casos y resultados de pruebas del motor CSP |
+| [Pruebas E2E](docs/Pruebas/Pruebas_E2E.md) | Pruebas de extremo a extremo |
+
+### 📂 PFA
+
+| Documento | Descripción |
+|:---|:---|
+| [Informe Técnico Integral](docs/PFA/Informe_Tecnico_Integral.md) | Informe técnico consolidado del proyecto |
+| [Anexo A - SonarQube](docs/PFA/Anexo_A_SonarQube.md) | Resultados de análisis estático de calidad |
+| [Anexo B - OWASP](docs/PFA/Anexo_B_OWASP.md) | Evaluación de seguridad según OWASP |
+| [Anexo C - WCAG](docs/PFA/Anexo_C_WCAG.md) | Evaluación de accesibilidad según WCAG |
+| [Anexo D - SUS](docs/PFA/Anexo_D_SUS.md) | Resultados del System Usability Scale |
+| [Anexo E - Testing Automatizado](docs/PFA/Anexo_E_Testing_Automatizado.md) | Cobertura y resultados de testing automatizado |
+
+### 📂 Cierre
+
+| Documento | Descripción |
+|:---|:---|
+| [Acta de Constitución - Revisión de Cierre](docs/Cierre/Acta_de_Constitucion_Revision_de_Cierre.md) | Revisión final del acta de constitución |
+| [Informe Final del Proyecto](docs/Cierre/Informe_Final_del_Proyecto.md) | Resumen final de resultados y entregables |
+| [Informe Final - Lecciones Aprendidas](docs/Cierre/Informe_Final_Lecciones_Aprendidas.md) | Lecciones aprendidas durante el proyecto |
+| [Manual del Software](docs/Cierre/Manual_del_Software.md) | Manual de uso del sistema |
+| [Declaración de Trabajo](docs/Cierre/Declaracion_de_Trabajo.md) | Alcance final del trabajo realizado |
+| [Registro de Defectos](docs/Cierre/Registro_de_Defectos.md) | Defectos identificados y su resolución |
+| [Registro de Impedimentos](docs/Cierre/Registro_de_Impedimentos.md) | Bloqueos a lo largo del proyecto |
+| [Registro de Incidentes o Problemas](docs/Cierre/Registro%20de%20Incidentes%20o%20Problemas.md) | Incidentes registrados durante el proyecto |
+| [Registro de Riesgos](docs/Cierre/Registro%20de%20Riesgos.md) | Riesgos identificados al cierre del proyecto |
+| [Registro de Supuestos](docs/Cierre/Registro_de_Supuestos.md) | Supuestos validados al cierre del proyecto |
 
 ---
 
