@@ -22,15 +22,20 @@ import java.util.List;
  */
 public abstract class PostgresPersistenceTestBase {
 
-    protected static final PostgreSQLContainer<?> POSTGRES;
+    protected static final PostgreSQLContainer<?> POSTGRES = createContainer();
 
     static {
-        POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
+        loadSchema();
+    }
+
+    @SuppressWarnings("resource")
+    private static PostgreSQLContainer<?> createContainer() {
+        PostgreSQLContainer<?> container = new PostgreSQLContainer<>("postgres:16-alpine")
                 .withDatabaseName("horarios_db")
                 .withUsername("postgres")
                 .withPassword("postgres");
-        POSTGRES.start();
-        loadSchema();
+        container.start();
+        return container;
     }
 
     private static void loadSchema() {

@@ -1,6 +1,5 @@
 package online.horarios_api.scheduling.infrastructure.out.persistence;
 
-import online.horarios_api.scheduling.domain.model.StudentBuilderDraft;
 import online.horarios_api.scheduling.domain.model.StudentScheduleConflict;
 import online.horarios_api.shared.persistence.PostgresPersistenceTestBase;
 import org.junit.jupiter.api.BeforeEach;
